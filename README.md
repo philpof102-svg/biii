@@ -68,7 +68,40 @@ BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface,
   pay in USDC with its own wallet, and keep a receipt
 - `web/` — the merchant phone app (PWA): amount → QR → **PAID ✓** → receipt
 
+## Business model — the trust+bridge layer partners resell
+
+BIII is not (only) an app to grow one merchant at a time. It's a **white-label trust + bridge
+layer** that companies **who already have the merchants** plug in:
+
+> They bring the clientele. BIII brings the trusted USDC payment + the human/agent bridge +
+> the provable receipts. Sold to PSPs, neobanks, merchant platforms, Base ecosystem apps.
+
+Lyzi is white-label for PSPs but terminal/enterprise and human-only. BIII is white-label too —
+and it's the one that also lets **AI agents pay**, ships **un-fakeable consumer receipts**, and
+runs **non-custodially** (the partner never touches the merchant's funds, so no money-transmitter
+custody to license). That combination is the wedge.
+
+*Stance: genuinely open to partners with distribution. We build compatible with
+Base/Coinbase/Flexa/Lyzi and claim no partnership until one is signed (anti-hype).*
+
+## Trust roadmap — make BOTH sides safe
+
+- **Now:** the payer is protected by field-for-field on-chain verification; the merchant can be
+  vetted via MainStreet's "safe to pay" reputation (`till_vet_merchant`), advisory.
+- **Next (ZK):** privacy-preserving attestations so each side proves what matters without
+  doxxing — "this merchant is verified", "this payer is reputable / has funds" — as a
+  zero-knowledge badge, not a data dump. The receipt already proves the *payment*; ZK proves
+  the *parties*. (Design tracked; not built yet — no ZK claims until it ships.)
+
+## The receipt & the books (the human layer)
+
+`lib/ledger.js` turns a payment into a **paper-ticket a non-crypto human instantly reads**
+(merchant, `B3-####`, item, amount, tip, ✓ PAID, a verify link) and a **provable day roll** for
+the merchant — every line re-checkable on-chain, one txHash counted once, books that can't be
+padded. Nobody offers this for in-person USDC today; it's the trust made legible.
+
 ## Non-negotiables
 
 Non-custodial by construction · descriptor-only (never signs, never custodies) · the chain is
-the only source of truth for "paid" · real numbers only, no invented usage or partnerships.
+the only source of truth for "paid" · every receipt re-verifiable by anyone · real numbers
+only, no invented usage or partnerships.
