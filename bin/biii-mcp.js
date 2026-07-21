@@ -107,7 +107,8 @@ const TOOLS = [
   { name: 'till_roll', description: 'PROVABLE BOOKS: render an agent/merchant\'s till roll — a shareable statement where EVERY line carries its own txHash + basescan link, so the reader re-verifies each payment on Base themselves (trust no one, not even BIII). This is the substitute for the settlement statement an excluded merchant/agent loses when they leave a PSP. Pure and non-custodial (BIII holds no funds). Pass the verified receipts you collected from till_receipt.',
     inputSchema: { type: 'object', properties: {
       receipts: { type: 'array', description: 'the verified receipt objects (from till_receipt), each carrying a txHash', items: { type: 'object' } },
-      merchantName: { type: 'string' }, lang: { type: 'string', description: '"en" (default) or "fr"' } }, required: ['receipts'] } },
+      merchantName: { type: 'string' }, lang: { type: 'string', description: '"en" (default) or "fr"' },
+      brand: { description: 'WHITE-LABEL: a partner brand for the footer ("via <name>", optionally "· powered by BIII"). String or {name, poweredBy}. The non-custodial disclosure is a fact and stays regardless.' } }, required: ['receipts'] } },
 ];
 
 async function callTool(name, a = {}) {
@@ -234,7 +235,7 @@ async function callTool(name, a = {}) {
     for (const r of receipts) { const res = L.appendReceipt(rows, r); if (res.entry) rows = res.rows; }
     const s = L.summary(rows);
     return {
-      statement: L.renderRoll(rows, { merchantName: a.merchantName || 'Merchant', lang: a.lang === 'fr' ? 'fr' : 'en' }),
+      statement: L.renderRoll(rows, { merchantName: a.merchantName || 'Merchant', lang: a.lang === 'fr' ? 'fr' : 'en', brand: a.brand }),
       summary: { count: s.count, grossUsd: s.grossUsd, tipsUsd: s.tipsUsd },
       lines: rows.map((e) => ({ no: e.no, amountUsd: e.receipt.amountUsd, txHash: e.receipt.txHash, explorer: e.receipt.explorer || ('https://basescan.org/tx/' + e.receipt.txHash) })),
       note: 'Re-verify EVERY txHash on BaseScan yourself — this statement is only as true as the chain it points to. ' + DISCLAIMER,
