@@ -99,13 +99,17 @@
   "use strict";
 
   // ── CONFIG ──
-  const API = "http://127.0.0.1:4700";
+  // Same-origin by default: the BIII server serves this PWA AND the API, so relative paths work wherever
+  // it's deployed (open the server URL on the phone → the till loads and polls itself). Override with
+  // ?api=https://host only if hosting the PWA separately from the server.
+  const API = new URLSearchParams(location.search).get("api") || "";
   const DEMO = new URLSearchParams(location.search).get("demo") === "1";
 
   // ── STATE ──
   let rawCents = 0;          // ex: 450 = $4.50
   let charge = null;          // charge object from POST /charge
   let pollTimer = null;
+  let lastVerdict = null;     // the verified payment, for the receipt
 
   // ── DOM ──
   const $keypad     = document.getElementById("screen-keypad");
@@ -139,6 +143,7 @@
     const key = e.target.closest(".key");
     if (!key) return;
     const k = key.dataset.key;
+    if (!k) return;   // the Encaisser button also has class "key" but no data-key — ignore it (else rawCents→NaN)
     if (k === "del") {
       rawCents = Math.floor(rawCents / 10);
     } else if (k === ".") {
@@ -171,6 +176,9 @@
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       charge = data.charge;
+      // the server returns paymentURI as a SIBLING of charge ({charge, paymentURI}), not charge.paymentURI
+      const paymentURI = data.paymentURI || (charge && charge.paymentURI);
+      if (!paymentURI) throw new Error("no payment URI in charge response");
 
       // Show QR
       $qrAmount.textContent = amountUsd + " USDC";
@@ -179,7 +187,7 @@
 
       // Generate QR
       const qr = qrcode(0, "M");
-      qr.addData(charge.paymentURI);
+      qr.addData(paymentURI);
       qr.make();
       $qrBox.innerHTML = qr.createImgTag(6);
 
@@ -217,6 +225,7 @@
 
   // ── SHOW PAID ──
   function showPaid(verdict) {
+    lastVerdict = verdict;
     const amountUsd = formatDisplay(rawCents);
     $paidAmount.textContent = amountUsd + " USDC";
 
@@ -247,11 +256,35 @@
     show($keypad);
   });
 
-  // ── RECEIPT (stub) ──
+  // ── RECEIPT — the bon de caisse, anchored to the on-chain tx (the real proof) ──
   $btnReceipt.addEventListener("click", function() {
+    const v = lastVerdict || {};
     const amountUsd = formatDisplay(rawCents);
-    alert("Reçu pour " + amountUsd + " USDC\n(Merchant name à configurer)");
+    const tx = v.txHash && v.txHash !== "0xDEMO" ? v.txHash : null;
+    const explorer = tx ? "https://basescan.org/tx/" + tx : null;
+    const when = new Date().toLocaleString();
+    const ov = document.createElement("div");
+    ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px;z-index:99";
+    ov.innerHTML =
+      '<div style="background:#fff;color:#111;border-radius:14px;max-width:340px;width:100%;padding:22px;font-family:ui-monospace,Menlo,monospace;font-size:13px;line-height:1.7">'
+      + '<div style="text-align:center;font-weight:800;letter-spacing:2px;margin-bottom:2px">BIII · REÇU</div>'
+      + '<div style="text-align:center;color:#888;font-size:11px;margin-bottom:14px">USDC sur Base</div>'
+      + '<div style="border-top:1px dashed #ccc;margin:10px 0"></div>'
+      + '<div style="display:flex;justify-content:space-between"><span>Montant</span><b>' + amountUsd + ' USDC</b></div>'
+      + '<div style="display:flex;justify-content:space-between;color:#666"><span>Heure</span><span>' + esc(when) + '</span></div>'
+      + (v.from ? '<div style="display:flex;justify-content:space-between;color:#666"><span>Payé par</span><span>' + esc(v.from.slice(0,6)) + '…' + esc(v.from.slice(-4)) + '</span></div>' : '')
+      + '<div style="border-top:1px dashed #ccc;margin:10px 0"></div>'
+      + '<div style="text-align:center;color:#16A34A;font-weight:700;margin-bottom:8px">✓ PAYÉ' + (v.tier ? ' · ' + esc(v.tier) : '') + '</div>'
+      + (explorer
+          ? '<div style="text-align:center"><a href="' + esc(explorer) + '" target="_blank" rel="noopener" style="color:#0052FF;word-break:break-all">Vérifier sur Basescan ↗</a><div style="color:#aaa;font-size:10px;margin-top:6px;word-break:break-all">' + esc(tx) + '</div></div>'
+          : '<div style="text-align:center;color:#aaa;font-size:11px">(démo — pas de tx réelle)</div>')
+      + '<button style="margin-top:16px;width:100%;background:#111;color:#fff;border:none;border-radius:10px;padding:12px;font:inherit;font-size:14px;cursor:pointer">Fermer</button>'
+      + '</div>';
+    ov.addEventListener("click", function(e){ if (e.target === ov || e.target.tagName === "BUTTON") document.body.removeChild(ov); });
+    document.body.appendChild(ov);
   });
+
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
 
   // ── INIT ──
   updateDisplay();

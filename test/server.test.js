@@ -15,7 +15,7 @@ function req(server, method, path, body) {
     const addr = server.address(), data = body ? JSON.stringify(body) : null;
     const r = http.request({ host: '127.0.0.1', port: addr.port, method, path,
       headers: data ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(data) } : {} },
-      (res) => { let b = ''; res.on('data', (c) => b += c); res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(b || '{}') })); });
+      (res) => { let b = ''; res.on('data', (c) => b += c); res.on('end', () => { let body; try { body = JSON.parse(b || '{}'); } catch { body = null; } resolve({ status: res.statusCode, body, raw: b }); }); });
     if (data) r.write(data); r.end();
   });
 }
@@ -27,10 +27,15 @@ function req(server, method, path, body) {
   const server = build({ merchant: M, findPayment: async ({ minMicro }) => (BigInt(minMicro) <= 4500000n ? paid : null) });
   await new Promise((r) => server.listen(0, r));
 
-  await t('GET / reports non-custodial + merchant configured', async () => {
-    const r = await req(server, 'GET', '/');
+  await t('GET /health reports non-custodial + merchant configured', async () => {
+    const r = await req(server, 'GET', '/health');
     assert.equal(r.body.merchantConfigured, true);
     assert.match(r.body.note, /holds no key/);
+  });
+
+  await t('GET / serves the merchant PWA same-origin (so the phone app and its API share one URL)', async () => {
+    const r = await req(server, 'GET', '/');
+    assert.match(String(r.raw || ''), /BIII|Caisse|screen-keypad/, 'the / route serves web/index.html');
   });
 
   await t('POST /charge → charge + EIP-681 URI (uses configured merchant)', async () => {
