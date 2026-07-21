@@ -6,7 +6,7 @@
   "type": "commonjs",
   "main": "lib/till.js",
   "scripts": {
-    "test": "node test/till.test.js && node test/chain.test.js && node test/server.test.js && node test/ledger.test.js && node test/trust.test.js && node test/decoupling.test.js && node test/invoice.test.js && node test/asset.test.js && node test/harden.test.js && node test/rwa-registry.test.js && node eval/verdict-harness.js --check",
+    "test": "node test/till.test.js && node test/chain.test.js && node test/server.test.js && node test/ledger.test.js && node test/trust.test.js && node test/decoupling.test.js && node test/invoice.test.js && node test/asset.test.js && node test/harden.test.js && node test/rwa-registry.test.js && node test/disclaimer.test.js && node eval/verdict-harness.js --check",
     "eval": "node eval/verdict-harness.js",
     "serve": "node lib/server.js"
   },
