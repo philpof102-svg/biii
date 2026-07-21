@@ -72,12 +72,14 @@ async function callTool(name, a = {}) {
       const r = await fetch(`${MAINSTREET}/api/agent/preflight/${encodeURIComponent(cp)}`, { headers: { 'x-ms-monitor': '1' }, signal: AbortSignal.timeout(8000) });
       if (r.ok) { const j = await r.json(); reputation = { decision: j.decision ?? null, score: j.score ?? null }; }
     } catch {}
-    // vertex 2 — standing (LAWBOR proven history), optional (only if a node is configured)
+    // vertex 2 — standing (LAWBOR proven history), optional (only if a node is configured).
+    // LAWBOR GET /credit?of= returns directUsdcMicro: the direct, on-chain-PROVEN USDC settled with this
+    // counterparty (agent↔agent). That IS standing. Fail-closed: unreachable/absent ⇒ null ⇒ 'none'.
     let standing = null;
     if (process.env.BIII_LAWBOR_URL) {
       try {
-        const r = await fetch(`${process.env.BIII_LAWBOR_URL.replace(/\/$/, '')}/peer?of=${encodeURIComponent(cp)}`, { signal: AbortSignal.timeout(8000) });
-        if (r.ok) { const j = await r.json(); standing = { paidMicro: (j.trust && (j.trust.inboundMicro || j.trust.directMicro)) || '0' }; }
+        const r = await fetch(`${process.env.BIII_LAWBOR_URL.replace(/\/$/, '')}/credit?of=${encodeURIComponent(cp)}`, { signal: AbortSignal.timeout(8000) });
+        if (r.ok) { const j = await r.json(); standing = { paidMicro: String(j.directUsdcMicro || '0') }; }
       } catch {}
     }
     // vertex 3 — settlement (on-chain), only if an amount is being checked
