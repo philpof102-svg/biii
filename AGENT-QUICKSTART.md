@@ -60,7 +60,7 @@ La démo simule un paiement et imprime :
 ## Pour aller plus loin
 
 - **Intégration MCP** : utilisez `bin/biii-mcp.js` (stdio) pour appeler `till_create_charge` → `till_check_payment` → `till_receipt` depuis n'importe quel agent
-- **Paiement réel** : configurez `BIII_RPC_URL` pour lire les vrais transferts USDC sur Base via `findPayment()`
+- **Paiement réel** : configurez `BASE_RPC_URL` pour lire les vrais transferts USDC sur Base via `findPayment()`
 - **Facturation Web2** : voir `lib/invoice.js` pour des factures avec numéro, lignes, échéance
 
 ## Garde-fous (honnétes limites)

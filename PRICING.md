@@ -15,8 +15,9 @@ whole pricing decision:
 | Bundled custody + processing | 1.5% (Stripe stablecoin) | moving the money |
 | Compliance middleware / yr | $15k (Elliptic) · $40k (TRM) · $175k avg (Chainalysis) | the enterprise seat |
 
-BIII's verdict composes reputation (MainStreet, now blocking **3,673 real known-bad wallets**) +
-standing (LAWBOR) + on-chain settlement. That is judgment. **Price it in the per-check corridor,
+BIII's verdict composes reputation (the **MainStreet** oracle, which flags known-bad wallets from OFAC +
+scam lists — the list lives in MainStreet, BIII folds its BLOCK) + standing (LAWBOR) + on-chain
+settlement. That is judgment. **Price it in the per-check corridor,
 never like an RPC call.** The receipt is a brand-new category (no comparable) — pricing freedom.
 
 ## The model (three meters + a license)
@@ -38,7 +39,7 @@ Copy Sardine's mechanism (a **minimum monthly commit drawn down against usage** 
 commitment, feels usage-based, no metering anxiety):
 
 > **BIII Pilot — $750/mo, 3-month term.** Includes 5,000 trust verdicts / mo + **unlimited
-> receipts**, the `till_trust` MCP + REST, and the provable till-roll. White-label optional.
+> receipts**, the `till_trust` MCP verdict, and the provable till-roll. White-label optional.
 > Framed publicly as **~60% off list**. Small enough a seed-stage fintech signs without
 > procurement; big enough to prove the meter.
 
@@ -52,8 +53,9 @@ board decision. Land 3 of these, learn the real verdict volume, *then* set list 
 actually work at first contact:**
 
 1. **MainStreet BLOCKs known-bad wallets** (it silently returned "CAUTION — start with a small
-   payment" for an OFAC-sanctioned Lazarus address until today; now it BLOCKs, proven on 3,673 real
-   addresses). A partner's first test is *"what does it say about a scammer I know?"* — we now pass it.
+   payment" for an OFAC-sanctioned Lazarus address until recently; now it BLOCKs — verified live today on
+   that Lazarus/OFAC address). A partner's first test is *"what does it say about a scammer I know?"* — we
+   now pass it. (The screening list is MainStreet's, not BIII's; confirm the oracle is up before a demo.)
 2. **LAWBOR's remote operator-takeover is closed** (a stranger could impersonate the operator on the
    live node; fixed + deployed + verified). The "proven paid" standing can't be forged.
 

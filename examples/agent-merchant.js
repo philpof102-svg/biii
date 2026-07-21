@@ -68,7 +68,7 @@ async function main() {
 
   // ─── 3. SIMULATION DU PAIEMENT (fact chaîne fabriqué) ─────────────────────
   console.log('[4] Simulation du paiement on-chain (fact fabriqué pour la démo) :');
-  // En production : lire le vrai transfert via findPayment (lib/chain.js) si BIII_RPC_URL est set
+  // En production : lire le vrai transfert via findPayment (lib/chain.js) si BASE_RPC_URL est set
   const simulatedFact = {
     txHash: '0x' + 'a1b2c3d4e5f6789012345678901234567890123456789012345678901234567890',
     chainId: 8453,
@@ -117,7 +117,7 @@ async function main() {
   console.log('  ✅ BIII ne tient aucune clé, ne bouge aucun fonds');
   console.log('  ✅ Reçu ancré au txHash — re-vérifiable par tous');
   console.log('═'.repeat(70));
-  console.log('\nPour un vrai paiement : configurez BIII_RPC_URL et utilisez findPayment()');
+  console.log('\nPour un vrai paiement : configurez BASE_RPC_URL et utilisez findPayment()');
   console.log('pour lire le transfert on-chain réel au lieu du fact simulé.\n');
 }
 

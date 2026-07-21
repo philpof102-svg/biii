@@ -14,10 +14,10 @@ that ship today (see README + COMPETITION.md + PRICING.md).*
 >
 > You already move USDC for `<their merchants / their users>`. BIII adds the one thing a rail and a
 > wallet don't: a **non-custodial trust verdict** — is this counterparty safe to pay? — composed from
-> reputation, on-chain settlement, and known-bad screening (OFAC + drainer lists), plus a **receipt
-> anyone can re-check on-chain**. White-label, so it ships under your brand. You never touch the funds.
+> reputation + known-bad screening (via the MainStreet oracle), on-chain settlement, plus a **receipt
+> anyone can re-check on-chain**. You never touch the funds.
 >
-> It's one MCP/REST call. Worth a 20-minute look? I can run your own test address through it live.
+> It's one MCP call. Worth a 20-minute look? I can run your own test address through it live.
 >
 > `<you>`
 
@@ -32,9 +32,10 @@ because the product now passes it.*
 **Parties.** `<Partner Co.>` ("Partner") and `<BIII entity>` ("BIII").
 **Term.** 3 months from the effective date, then month-to-month unless either party gives 30 days' notice.
 **What BIII provides during the pilot:**
-- The `till_trust` verdict API (MCP + REST): reputation + standing + on-chain settlement → one
+- The `till_trust` verdict API (MCP): reputation + standing + on-chain settlement → one
   fail-closed verdict (`unsafe` / `unknown` / `trusted` / `settled`).
-- Known-bad screening (OFAC SDN + phishing/drainer lists) folded into the verdict.
+- Known-bad screening — the MainStreet oracle flags OFAC/scam-list addresses and BIII folds that BLOCK
+  into the verdict (the list lives in MainStreet, not BIII; BIII does no screening itself).
 - The provable till-roll: human-readable receipts + a day-roll re-checkable on Base.
 - Up to **5,000 verdicts / month + unlimited receipts** (overage billed at list — see §Fees).
 - White-label headers/branding on request; a shared Slack/email channel for integration support.
@@ -63,7 +64,8 @@ no partnership or agency is created. Either party may walk at the end of the ter
 ## 3. The live demo script (what to actually show in the call)
 
 1. **The scammer test.** Ask them for any address they distrust (or use a known OFAC/drainer address).
-   Run `till_vet_merchant` / `till_trust` → **BLOCK / unsafe**, with the reason (OFAC SDN / drainer list).
+   Run `till_vet_merchant` / `till_trust` → **BLOCK / unsafe** (MainStreet flags the address; the verdict
+   folds its BLOCK — MainStreet's list is the source, BIII does not attribute a specific list).
    *This is the moment — the product passes the sceptical test.*
 2. **A clean merchant.** Run a normal address → the composed verdict + what each vertex contributed.
 3. **A real charge → receipt.** `till_create_charge` → the EIP-681 QR → (optionally pay a few cents of

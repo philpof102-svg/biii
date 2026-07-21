@@ -24,8 +24,10 @@ Three layers are already crowded and giant-backed; **one is open.**
   1.5%, 70+ countries, $5B+ stablecoin volume in six months. Online-checkout + cross-border B2B.
   Custodial payout rails.
 
-→ **BIII stance:** not a rail. A BIII charge/invoice can be paid over **EIP-681** *or* an **x402** flow;
-BIII contributes the **verdict + the receipt the rail lacks**.
+→ **BIII stance:** not a rail. A BIII charge/invoice is paid over **EIP-681** today. Because verification
+only reads the resulting on-chain USDC transfer, an x402-settled transfer would verify the same way — but
+there is **no x402-specific integration in the code yet**. BIII contributes the **verdict + the receipt the
+rail lacks**.
 
 ### 2. Invoicing + accounting (mature — but centralized books you must trust)
 - **Request Finance** — "Bill.com for crypto": AP / AR / expenses / payroll under one login. Invoices on
@@ -36,8 +38,9 @@ BIII contributes the **verdict + the receipt the rail lacks**.
 
 → **BIII stance:** **don't rebuild the invoice UI / accounting suite** — Request is years ahead and Stripe
 has infinite resources. But their books are *their* centralized record you must trust. BIII's registry is
-**non-custodial and re-checkable on-chain by anyone**, and it **exports to the same QuickBooks/Xero**.
-Sit *under* their invoice or *beside* it as the provable trust layer.
+**non-custodial and re-checkable on-chain by anyone** (a fixed-width receipt + a re-verifiable day-roll).
+A QuickBooks/Xero export is **not built yet** — it's on the roadmap (see below), and without it finance
+teams won't fully adopt. Sit *under* their invoice or *beside* it as the provable trust layer.
 
 ### 3. Agent identity + reputation (the new standards — INTEROPERATE, never rival)
 - **ERC-8004 "Trustless Agents"** — ratified Jan 2026, live on Ethereum mainnet Feb 2026. Three registries:
