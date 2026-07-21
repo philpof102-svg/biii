@@ -5,6 +5,13 @@
   "description": "The real-world USDC till on Base — the Square/SumUp of USDC: an independent merchant accepts USDC in person with just a phone. Non-custodial (their own wallet), no terminal, no PSP, universal EIP-681 QR, field-for-field on-chain verification, receipt anchored to the tx.",
   "type": "commonjs",
   "main": "lib/till.js",
-  "scripts": { "test": "node test/till.test.js" },
-  "engines": { "node": ">=18" }
+  "scripts": {
+    "test": "node test/till.test.js && node test/chain.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "basetill-mcp": "bin/basetill-mcp.js"
+  }
 }
