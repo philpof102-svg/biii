@@ -73,10 +73,12 @@ BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface,
   fail-closed — catches the FBI-flagged lookalike-token fraud, and composes into the trust triangle
   (`till_vet_asset`).
 - `scripts/biii-rwa-registry.js` — sources the verified-issuer registry from **RWA.xyz** ("the only
-  verified API for tokenized securities") — `RWA_XYZ_API_KEY=… node scripts/biii-rwa-registry.js` writes
-  `data/rwa-registry.json`, which `till_vet_asset` loads. **Fail-safe:** every entry must validate
-  (0x-40hex · integer chainId · symbol) or it's dropped, so a schema mismatch yields an empty registry —
-  never a wrong "genuine" address. No hand-coded addresses; the authoritative source is the source of truth.
+  verified API for tokenized securities"). Joins `/v4/tokens` (address · network · asset_id) ⋈ `/v4/assets`
+  (name · issuer · ticker), Bearer-auth. Get a key: **app.rwa.xyz/login → API Tools ▸ API Keys**, then
+  `RWA_XYZ_API_KEY=… node scripts/biii-rwa-registry.js` writes `data/rwa-registry.json`, which
+  `till_vet_asset` loads. **Fail-safe:** every entry must validate (0x-40hex · integer chainId · symbol ·
+  wanted chain) or it's dropped, so a schema drift yields an empty registry — never a wrong "genuine"
+  address. No hand-coded addresses; the authoritative source is the source of truth.
 - `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (7 tools: `till_vet_merchant`,
   `till_create_charge`, `till_check_payment`, `till_trust`, `till_create_invoice`,
   `till_check_invoice`, `till_receipt`) — an agent can vet a merchant, get the whole trust triangle

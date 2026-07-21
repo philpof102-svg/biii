@@ -1,8 +1,8 @@
 'use strict';
-// BIII RWA registry ingest — sources verified issuer contracts from RWA.xyz, fail-safe.
+// BIII RWA registry ingest — joins RWA.xyz /v4/tokens ⋈ /v4/assets, fail-safe.
 // Run: node test/rwa-registry.test.js
 const assert = require('node:assert');
-const { normalizeAssets, fetchRwaAssets, toChainId } = require('../scripts/biii-rwa-registry');
+const { buildRegistry, fetchAll, toChainId } = require('../scripts/biii-rwa-registry');
 const { assessAsset } = require('../lib/asset');
 
 let pass = 0, fail = 0;
@@ -12,78 +12,85 @@ const tA = async (n, fn) => { try { await fn(); pass++; console.log('  ✓ ' + n
 const BUIDL_ETH = '0x' + '11'.repeat(20);
 const BUIDL_BASE = '0x' + '22'.repeat(20);
 const USDY_BASE = '0x' + '33'.repeat(20);
-// a representative response (field spellings vary on purpose — the parser must be defensive but strict)
-const RESP = { data: [
-  { name: 'BlackRock USD Institutional Digital Liquidity', issuer: 'BlackRock', symbol: 'BUIDL',
-    tokens: [ { chainId: 1, address: BUIDL_ETH, symbol: 'BUIDL' },
-              { network: 'base', contractAddress: BUIDL_BASE } ] },           // symbol falls back to the asset's
-  { name: 'Ondo US Dollar Yield', platform: 'Ondo',
-    deployments: [ { chain_id: 8453, tokenAddress: USDY_BASE, ticker: 'USDY' } ] },
-  { name: 'Solana-only', issuer: 'X', tokens: [ { network: 'solana', address: 'NotAnEvmAddress', symbol: 'S' } ] }, // dropped
-  { name: 'Malformed', tokens: [ { chainId: 8453, address: '0xshort', symbol: 'BAD' } ] },                          // dropped
-] };
+const ORPHAN = '0x' + '44'.repeat(20);
+// real v4 shapes: tokens carry the address+network+asset_id; assets carry name+issuer_name+ticker
+const TOKENS = [
+  { address: BUIDL_ETH, network_name: 'Ethereum', asset_id: 'a1', ticker: 'BUIDL' },
+  { address: BUIDL_BASE, network_name: 'Base', asset_id: 'a1' },              // ticker falls back to the asset's
+  { address: USDY_BASE, network_name: 'Base', asset_id: 'a2', ticker: 'USDY' },
+  { address: 'NotAnEvmAddress', network_name: 'Solana', asset_id: 'a3' },     // dropped: bad addr + off-chain
+  { address: '0xshort', network_name: 'Base', asset_id: 'a4' },               // dropped: malformed addr
+  { address: ORPHAN, network_name: 'Base', asset_id: 'zz' },                  // dropped: no asset → no symbol
+];
+const ASSETS = [
+  { id: 'a1', name: 'BlackRock USD Institutional Digital Liquidity', issuer_name: 'BlackRock', ticker: 'BUIDL' },
+  { id: 'a2', name: 'Ondo US Dollar Yield', issuer_name: 'Ondo', ticker: 'USDY' },
+];
 
-console.log('BIII RWA registry ingest — authoritative, validated, fail-safe:');
+console.log('BIII RWA registry ingest — tokens⋈assets join, validated, fail-safe:');
 
-t('normalizeAssets extracts VALID contracts across the token lists, mapping issuer/symbol/chain', () => {
-  const { entries } = normalizeAssets(RESP, { chains: [1, 8453, 42161] });
+t('buildRegistry JOINS tokens→assets, mapping address · chain (network_name) · symbol · issuer', () => {
+  const { entries } = buildRegistry(TOKENS, ASSETS, { chains: [1, 8453, 42161] });
   assert.equal(entries.length, 3);
-  const base = entries.find((e) => e.address === USDY_BASE);
-  assert.equal(base.issuer, 'Ondo'); assert.equal(base.symbol, 'USDY'); assert.equal(base.chainId, 8453);
-  const bx = entries.find((e) => e.address === BUIDL_BASE);
-  assert.equal(bx.symbol, 'BUIDL'); assert.equal(bx.chainId, 8453);   // symbol fell back to the asset symbol
-  assert.equal(bx.source, 'rwa.xyz');
+  const usdy = entries.find((e) => e.address === USDY_BASE);
+  assert.equal(usdy.issuer, 'Ondo'); assert.equal(usdy.symbol, 'USDY'); assert.equal(usdy.chainId, 8453);
+  const bxBase = entries.find((e) => e.address === BUIDL_BASE);
+  assert.equal(bxBase.symbol, 'BUIDL');   // token had no ticker → fell back to the joined asset's
+  assert.equal(bxBase.issuer, 'BlackRock'); assert.equal(bxBase.source, 'rwa.xyz');
 });
 
-t('FAIL-SAFE: off-chain (Solana) and malformed-address rows are dropped, never mis-mapped', () => {
-  const { entries, dropped } = normalizeAssets(RESP, { chains: [1, 8453, 42161] });
-  assert.ok(!entries.some((e) => e.symbol === 'S' || e.symbol === 'BAD'));
-  assert.ok(dropped >= 2);
+t('FAIL-SAFE: off-chain (Solana), malformed-address, and unjoinable (no symbol) tokens are dropped', () => {
+  const { entries, dropped } = buildRegistry(TOKENS, ASSETS, { chains: [1, 8453, 42161] });
+  assert.ok(!entries.some((e) => e.address === '0xshort' || e.address === ORPHAN));
+  assert.ok(dropped >= 3);
 });
 
 t('FAIL-SAFE: a schema mismatch yields an EMPTY registry — never a wrong address', () => {
-  assert.equal(normalizeAssets({ garbage: 1 }).entries.length, 0);
-  assert.equal(normalizeAssets({ data: [{ foo: 'bar' }] }).entries.length, 0);
-  assert.equal(normalizeAssets(null).entries.length, 0);
-  assert.equal(normalizeAssets([{ tokens: [{ address: BUIDL_ETH }] }]).entries.length, 0); // no chainId/symbol → dropped
+  assert.equal(buildRegistry([{ foo: 'bar' }], []).entries.length, 0);
+  assert.equal(buildRegistry(null, null).entries.length, 0);
+  assert.equal(buildRegistry([{ address: BUIDL_ETH, network_name: 'Ethereum', asset_id: 'x' }], []).entries.length, 0); // no asset → no symbol → dropped
 });
 
 t('chain filter narrows to the wanted chains (Base-only)', () => {
-  const { entries } = normalizeAssets(RESP, { chains: [8453] });
+  const { entries } = buildRegistry(TOKENS, ASSETS, { chains: [8453] });
   assert.ok(entries.every((e) => e.chainId === 8453));
   assert.equal(entries.length, 2);   // BUIDL-base + USDY-base
 });
 
-t('toChainId maps names and ids, rejects unknown/off-chain', () => {
-  assert.equal(toChainId('base'), 8453);
-  assert.equal(toChainId('ethereum'), 1);
-  assert.equal(toChainId(42161), 42161);
-  assert.equal(toChainId('solana'), null);
+t('toChainId maps network_name strings and ids, rejects off-chain/unknown', () => {
+  assert.equal(toChainId('Base'), 8453);
+  assert.equal(toChainId('Ethereum'), 1);
+  assert.equal(toChainId('Ethereum Mainnet'), 1);
+  assert.equal(toChainId('Arbitrum One'), 42161);
+  assert.equal(toChainId(8453), 8453);
+  assert.equal(toChainId('Solana'), null);
   assert.equal(toChainId('bogus'), null);
 });
 
-t('an INGESTED registry composes with assessAsset — the Ondo contract reads genuine', () => {
-  const { entries } = normalizeAssets(RESP, { chains: [8453] });
-  const r = assessAsset({ token: USDY_BASE, claimedSymbol: 'USDY' }, { registry: entries });
-  assert.equal(r.status, 'genuine'); assert.equal(r.issuer, 'Ondo');
-  // and an impersonator claiming USDY at a different address is caught against the ingested registry
+t('a built registry composes with assessAsset — genuine + impersonation', () => {
+  const { entries } = buildRegistry(TOKENS, ASSETS, { chains: [8453] });
+  const g = assessAsset({ token: USDY_BASE, claimedSymbol: 'USDY' }, { registry: entries });
+  assert.equal(g.status, 'genuine'); assert.equal(g.issuer, 'Ondo');
   const imp = assessAsset({ token: '0x' + 'ff'.repeat(20), claimedSymbol: 'USDY' }, { registry: entries });
   assert.equal(imp.status, 'impersonation'); assert.equal(imp.genuineAddress, USDY_BASE);
 });
 
-tA('fetchRwaAssets sends the Bearer key, paginates, and returns the flattened asset array', async () => {
+tA('fetchAll sends the Bearer key, uses the v4 query= param, paginates, returns the flattened array', async () => {
   const calls = [];
   const fakeFetch = async (url, opt) => {
     calls.push({ url, auth: opt.headers.Authorization });
-    const page0 = { data: Array.from({ length: 100 }, (_, i) => ({ name: 'a' + i })) };  // full page → paginate
-    const page1 = { data: [{ name: 'last' }] };                                            // short page → stop
-    return { ok: true, json: async () => (url.includes('offset=0') ? page0 : page1) };
+    const q = JSON.parse(decodeURIComponent((url.match(/query=([^&]+)/) || [])[1] || '{}'));
+    const page = q.pagination && q.pagination.page;
+    const full = { data: Array.from({ length: 100 }, (_, i) => ({ address: '0x' + String(i).padStart(40, '0') })) };
+    const last = { data: [{ address: '0xlast' }] };
+    return { ok: true, json: async () => (page === 1 ? full : last) };
   };
-  const all = await fetchRwaAssets({ apiKey: 'KEY123', fetchImpl: fakeFetch });
+  const all = await fetchAll('tokens', { apiKey: 'KEY123', fetchImpl: fakeFetch });
   assert.equal(all.length, 101);
   assert.equal(calls.length, 2, 'stopped after the short page');
   assert.match(calls[0].auth, /Bearer KEY123/);
-  await assert.rejects(() => fetchRwaAssets({ apiKey: '', fetchImpl: fakeFetch }), /API_KEY required/);
+  assert.match(calls[0].url, /\/v4\/tokens\?query=.*pagination/i, 'uses /v4/<endpoint> with the query= param');
+  await assert.rejects(() => fetchAll('assets', { apiKey: '', fetchImpl: fakeFetch }), /API_KEY required/);
 });
 
 console.log(`\n${pass} passed · ${fail} failed`);
