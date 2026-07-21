@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>BIII — Caisse</title>
+<meta name="theme-color" content="#0A0A0F">
+<link rel="manifest" href="manifest.json">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root { --bg: #0A0A0F; --accent: #0052FF; --green: #16C784; --text: #F5F7FF; --text-dim: #8A8FA0; --surface: #14141F; --border: #1E1E2E; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+  button { font-family: inherit; cursor: pointer; border: none; outline: none; }
+  button:active { transform: scale(0.96); }
+
+  /* ── KEYPAD SCREEN ── */
+  #screen-keypad { display: flex; flex-direction: column; height: 100dvh; padding: 16px; }
+  .amount-display { flex: 1; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px; }
+  .amount-display .value { font-size: 64px; font-weight: 700; letter-spacing: -2px; color: var(--text); }
+  .amount-display .currency { font-size: 28px; color: var(--text-dim); margin-left: 6px; align-self: flex-end; margin-bottom: 10px; }
+  .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 360px; margin: 0 auto; width: 100%; }
+  .key { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; font-size: 28px; font-weight: 600; color: var(--text); height: 64px; display: flex; align-items: center; justify-content: center; transition: background 0.1s; }
+  .key:hover { background: #1E1E2E; }
+  .key.del { color: var(--text-dim); font-size: 22px; }
+  .key.enter { grid-column: span 2; background: var(--accent); color: #fff; font-size: 20px; font-weight: 700; border-radius: 16px; height: 64px; }
+  .key.enter:disabled { opacity: 0.35; }
+  .key.enter:not(:disabled):hover { background: #0041CC; }
+
+  /* ── QR SCREEN ── */
+  #screen-qr { display: none; flex-direction: column; height: 100dvh; padding: 16px; align-items: center; justify-content: center; }
+  .qr-amount { font-size: 36px; font-weight: 700; margin-bottom: 4px; }
+  .qr-label { font-size: 14px; color: var(--text-dim); margin-bottom: 24px; text-align: center; line-height: 1.4; }
+  .qr-box { width: min(300px, 70vw); aspect-ratio: 1; background: #fff; border-radius: 16px; display: flex; align-items: center; justify-content: center; padding: 12px; margin-bottom: 24px; }
+  .qr-box img { width: 100%; height: 100%; }
+  .spinner { width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status-text { font-size: 14px; color: var(--text-dim); margin-bottom: 32px; }
+  .btn-cancel { background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); border-radius: 12px; padding: 14px 32px; font-size: 16px; font-weight: 600; }
+
+  /* ── PAID SCREEN ── */
+  #screen-paid { display: none; flex-direction: column; height: 100dvh; background: var(--green); align-items: center; justify-content: center; padding: 24px; text-align: center; }
+  .paid-check { font-size: 80px; margin-bottom: 16px; }
+  .paid-title { font-size: 36px; font-weight: 800; color: #fff; margin-bottom: 8px; }
+  .paid-amount { font-size: 24px; color: rgba(255,255,255,0.9); margin-bottom: 32px; }
+  .paid-details { background: rgba(255,255,255,0.15); border-radius: 12px; padding: 16px; width: 100%; max-width: 320px; margin-bottom: 32px; font-size: 13px; color: rgba(255,255,255,0.85); line-height: 1.6; word-break: break-all; }
+  .paid-details b { color: #fff; }
+  .btn-new { background: #fff; color: var(--green); border-radius: 14px; padding: 16px 40px; font-size: 18px; font-weight: 700; }
+  .btn-receipt { background: transparent; border: 1px solid rgba(255,255,255,0.4); color: #fff; border-radius: 14px; padding: 12px 28px; font-size: 14px; margin-top: 12px; }
+</style>
+</head>
+<body>
+
+<!-- SCREEN 1: KEYPAD -->
+<div id="screen-keypad">
+  <div class="amount-display">
+    <span class="value" id="amount-value">0</span>
+    <span class="currency">USDC</span>
+  </div>
+  <div class="keypad">
+    <button class="key" data-key="1">1</button>
+    <button class="key" data-key="2">2</button>
+    <button class="key" data-key="3">3</button>
+    <button class="key" data-key="4">4</button>
+    <button class="key" data-key="5">5</button>
+    <button class="key" data-key="6">6</button>
+    <button class="key" data-key="7">7</button>
+    <button class="key" data-key="8">8</button>
+    <button class="key" data-key="9">9</button>
+    <button class="key" data-key=".">.</button>
+    <button class="key" data-key="0">0</button>
+    <button class="key del" data-key="del">⌫</button>
+    <button class="key enter" id="btn-charge" disabled>Encaisser ▶</button>
+  </div>
+</div>
+
+<!-- SCREEN 2: QR -->
+<div id="screen-qr">
+  <div class="qr-amount" id="qr-amount"></div>
+  <div class="qr-label">Scannez avec votre wallet<br>(Base App, Coinbase, MetaMask…)</div>
+  <div class="qr-box" id="qr-box"></div>
+  <div class="spinner"></div>
+  <div class="status-text" id="status-text">En attente du paiement…</div>
+  <button class="btn-cancel" id="btn-cancel">Annuler</button>
+</div>
+
+<!-- SCREEN 3: PAID -->
+<div id="screen-paid">
+  <div class="paid-check">✓</div>
+  <div class="paid-title">Payé</div>
+  <div class="paid-amount" id="paid-amount"></div>
+  <div class="paid-details" id="paid-details"></div>
+  <button class="btn-new" id="btn-new">Nouvelle vente</button>
+  <button class="btn-receipt" id="btn-receipt">Reçu</button>
+</div>
+
+<script src="qrcode.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ── CONFIG ──
+  const API = "http://127.0.0.1:4700";
+  const DEMO = new URLSearchParams(location.search).get("demo") === "1";
+
+  // ── STATE ──
+  let rawCents = 0;          // ex: 450 = $4.50
+  let charge = null;          // charge object from POST /charge
+  let pollTimer = null;
+
+  // ── DOM ──
+  const $keypad     = document.getElementById("screen-keypad");
+  const $qrScreen   = document.getElementById("screen-qr");
+  const $paidScreen = document.getElementById("screen-paid");
+  const $amountVal  = document.getElementById("amount-value");
+  const $btnCharge  = document.getElementById("btn-charge");
+  const $qrAmount   = document.getElementById("qr-amount");
+  const $qrBox      = document.getElementById("qr-box");
+  const $statusText = document.getElementById("status-text");
+  const $btnCancel  = document.getElementById("btn-cancel");
+  const $paidAmount = document.getElementById("paid-amount");
+  const $paidDetails= document.getElementById("paid-details");
+  const $btnNew     = document.getElementById("btn-new");
+  const $btnReceipt = document.getElementById("btn-receipt");
+
+  // ── KEYPAD LOGIC ──
+  function formatDisplay(cents) {
+    // Show like a register: cents 0→"0", 50→"0.50", 450→"4.50"
+    const intPart = Math.floor(cents / 100);
+    const decPart = cents % 100;
+    return intPart + "." + String(decPart).padStart(2, "0");
+  }
+
+  function updateDisplay() {
+    $amountVal.textContent = formatDisplay(rawCents);
+    $btnCharge.disabled = (rawCents === 0);
+  }
+
+  document.querySelector(".keypad").addEventListener("click", function(e) {
+    const key = e.target.closest(".key");
+    if (!key) return;
+    const k = key.dataset.key;
+    if (k === "del") {
+      rawCents = Math.floor(rawCents / 10);
+    } else if (k === ".") {
+      // no-op on a register-style pad: always 2 decimals
+    } else {
+      const digit = parseInt(k, 10);
+      rawCents = rawCents * 10 + digit;
+      if (rawCents > 999999) rawCents = 999999; // cap $9999.99
+    }
+    updateDisplay();
+  });
+
+  // ── SCREEN SWITCH ──
+  function show(screen) {
+    [$keypad, $qrScreen, $paidScreen].forEach(s => s.style.display = "none");
+    screen.style.display = "flex";
+  }
+
+  // ── ENCAISSER ──
+  $btnCharge.addEventListener("click", async function() {
+    if (rawCents === 0) return;
+    const amountUsd = formatDisplay(rawCents);
+
+    try {
+      const res = await fetch(API + "/charge", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ amountUsd: amountUsd })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      charge = data.charge;
+
+      // Show QR
+      $qrAmount.textContent = amountUsd + " USDC";
+      $qrBox.innerHTML = "";
+      $statusText.textContent = "En attente du paiement…";
+
+      // Generate QR
+      const qr = qrcode(0, "M");
+      qr.addData(charge.paymentURI);
+      qr.make();
+      $qrBox.innerHTML = qr.createImgTag(6);
+
+      show($qrScreen);
+
+      // DEMO mode: simulate paid after 6s
+      if (DEMO) {
+        setTimeout(() => showPaid({ paid: true, txHash: "0xDEMO", from: "0xDemo", tier: "standard" }), 6000);
+        return;
+      }
+
+      // Start polling
+      pollTimer = setInterval(checkPayment, 3000);
+      checkPayment();
+
+    } catch (err) {
+      alert("Erreur: " + err.message);
+    }
+  });
+
+  // ── POLL STATUS ──
+  async function checkPayment() {
+    if (!charge) return;
+    try {
+      const url = API + "/status?amountMicro=" + charge.amountMicro;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.verdict && data.verdict.paid) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        showPaid(data.verdict);
+      }
+    } catch(e) { /* ignore network blips */ }
+  }
+
+  // ── SHOW PAID ──
+  function showPaid(verdict) {
+    const amountUsd = formatDisplay(rawCents);
+    $paidAmount.textContent = amountUsd + " USDC";
+
+    let html = "";
+    if (verdict.txHash) html += "<b>Tx:</b> " + verdict.txHash.slice(0, 10) + "…<br>";
+    if (verdict.from)  html += "<b>De:</b> " + verdict.from.slice(0, 8) + "…<br>";
+    if (verdict.tier)   html += "<b>Tier:</b> " + verdict.tier;
+    $paidDetails.innerHTML = html;
+
+    // vibrate if supported
+    if (navigator.vibrate) navigator.vibrate(200);
+
+    show($paidScreen);
+  }
+
+  // ── CANCEL ──
+  $btnCancel.addEventListener("click", function() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    charge = null;
+    show($keypad);
+  });
+
+  // ── NEW SALE ──
+  $btnNew.addEventListener("click", function() {
+    rawCents = 0;
+    charge = null;
+    updateDisplay();
+    show($keypad);
+  });
+
+  // ── RECEIPT (stub) ──
+  $btnReceipt.addEventListener("click", function() {
+    const amountUsd = formatDisplay(rawCents);
+    alert("Reçu pour " + amountUsd + " USDC\n(Merchant name à configurer)");
+  });
+
+  // ── INIT ──
+  updateDisplay();
+})();
+</script>
+</body>
+</html>
