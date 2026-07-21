@@ -106,11 +106,20 @@ const TOOLS = [
 
 async function callTool(name, a = {}) {
   if (name === 'till_vet_merchant') {
-    const r = await fetch(`${MAINSTREET}/api/agent/preflight/${encodeURIComponent(String(a.address || ''))}`,
-      { headers: { 'x-ms-monitor': '1' }, signal: AbortSignal.timeout(8000) });
-    if (!r.ok) return { advisory: 'oracle unreachable (HTTP ' + r.status + ') — treat the merchant as UNKNOWN, not as safe' };
-    const j = await r.json();
-    return { decision: j.decision ?? null, score: j.score ?? null, advisory: 'ORACLE-REPORTED — advisory only, never a guarantee' };
+    // DECENTRALIZED floor FIRST: a locally-known-bad address is refused with zero network, even if the
+    // oracle is slow/down — the block cannot vanish with the service (the SPOF this closes).
+    const local = screenAddress(a.address, KNOWN_BAD);
+    if (local.blocked) return { decision: 'BLOCK', score: 0, source: 'local-known-bad', advisory: local.reason };
+    try {
+      const r = await fetch(`${MAINSTREET}/api/agent/preflight/${encodeURIComponent(String(a.address || ''))}`,
+        { headers: { 'x-ms-monitor': '1' }, signal: AbortSignal.timeout(8000) });
+      if (!r.ok) return { advisory: 'oracle unreachable (HTTP ' + r.status + ') — treat the merchant as UNKNOWN, not as safe' };
+      const j = await r.json();
+      return { decision: j.decision ?? null, score: j.score ?? null, source: 'mainstreet-oracle', advisory: 'ORACLE-REPORTED — advisory only, never a guarantee' };
+    } catch (e) {
+      // a timeout used to THROW here (no catch) and crash the tool; degrade honestly instead.
+      return { advisory: 'oracle unreachable (' + (e && e.message) + ') — treat the merchant as UNKNOWN, not as safe' };
+    }
   }
   if (name === 'till_create_charge') {
     const charge = T.createCharge({ to: a.to, amountUsd: a.amountUsd, label: a.label, orderId: a.orderId, nowMs: Date.now() });
