@@ -21,6 +21,7 @@ const readline = require('node:readline');
 const T = require('../lib/till');
 const { findPayment } = require('../lib/chain');
 const { assessTriangle } = require('../lib/trust');
+const I = require('../lib/invoice');
 
 const MAINSTREET = (process.env.MAINSTREET_URL || 'https://avisradar-production.up.railway.app').replace(/\/$/, '');
 
@@ -40,6 +41,18 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: {
       counterparty: { type: 'string', description: '0x address to assess (the merchant, or a payer)' },
       amountMicro: { type: 'string', description: 'optional — if given, also check on-chain settlement to this address' } }, required: ['counterparty'] } },
+  { name: 'till_create_invoice', description: 'Create a Web2-style INVOICE (number, line items, due date, bill-to) on the SAME non-custodial registry: paid by the same EIP-681 intent, verified by the same chain discipline, recorded in the same provable till roll. Returns the invoice + a human-readable bill (EN/FR) + the payment URI.',
+    inputSchema: { type: 'object', properties: {
+      to: { type: 'string', description: 'merchant 0x address (their own wallet — non-custodial)' },
+      lineItems: { type: 'array', description: '[{description, amountUsd} or {description, qty, unitUsd}]',
+        items: { type: 'object', properties: { description: { type: 'string' }, amountUsd: { type: 'string' }, qty: { type: 'number' }, unitUsd: { type: 'string' } } } },
+      number: { type: 'string' }, billTo: { type: 'string' }, merchantName: { type: 'string' },
+      dueDateMs: { type: 'number' }, lang: { type: 'string', description: '"en" (default) or "fr"' } }, required: ['to', 'lineItems'] } },
+  { name: 'till_check_invoice', description: 'Check an invoice against the chain: settled (paid on-chain, field-for-field) / overdue / issued. If settled, returns the receipt for the registry.',
+    inputSchema: { type: 'object', properties: {
+      to: { type: 'string' }, totalMicro: { type: 'string', description: 'the invoice totalMicro' },
+      number: { type: 'string' }, dueDateMs: { type: 'number' }, merchantName: { type: 'string' },
+      lookbackBlocks: { type: 'number', description: 'default 43200 (~1 day on Base); invoices are slower than tills' } }, required: ['to', 'totalMicro'] } },
   { name: 'till_receipt', description: 'Produce the chain-anchored receipt for a VERIFIED payment (txHash + basescan link). Refuses without verification.',
     inputSchema: { type: 'object', properties: {
       to: { type: 'string' }, amountUsd: { type: 'string' }, label: { type: 'string' },
@@ -89,6 +102,23 @@ async function callTool(name, a = {}) {
       settlement = T.verifyPayment({ to: cp, amountMicro: String(a.amountMicro), token: T.USDC_BASE, chainId: 8453 }, fact);
     }
     return { triangle: assessTriangle({ reputation, standing, settlement }), sources: { reputation, standing: standing || null, settlementChecked: !!a.amountMicro } };
+  }
+  if (name === 'till_create_invoice') {
+    const invoice = I.createInvoice({ to: a.to, lineItems: a.lineItems, number: a.number, billTo: a.billTo,
+      merchantName: a.merchantName, dueDateMs: a.dueDateMs, issueDateMs: Date.now(), nowMs: Date.now() });
+    return { invoice, bill: I.renderInvoice(invoice, { lang: a.lang || 'en' }), paymentURI: I.invoiceURI(invoice),
+      note: 'Same registry as the till: the payer\'s OWN wallet executes the EIP-681; only the chain says "settled". Then till_check_invoice.' };
+  }
+  if (name === 'till_check_invoice') {
+    const invoice = { kind: 'biii-invoice', number: a.number || null, dueDateMs: a.dueDateMs || null,
+      merchant: { name: a.merchantName || null, address: String(a.to || '').toLowerCase() },
+      charge: { to: String(a.to || '').toLowerCase(), amountMicro: String(a.totalMicro || ''), amountUsd: T.microToUsd(String(a.totalMicro || '0')), token: T.USDC_BASE, chainId: 8453 },
+      lineItems: [], totalMicro: String(a.totalMicro || ''), totalUsd: T.microToUsd(String(a.totalMicro || '0')) };
+    const fact = await findPayment({ to: invoice.charge.to, minMicro: invoice.charge.amountMicro, lookbackBlocks: a.lookbackBlocks || 43200 });
+    const verdict = I.verifyInvoice(invoice, fact);
+    const status = I.invoiceStatus(invoice, verdict, Date.now());
+    return { status, verdict, fact: fact || null,
+      receipt: verdict.paid === true ? I.invoiceReceipt(invoice, verdict, { merchantName: a.merchantName }) : null };
   }
   if (name === 'till_receipt') {
     const charge = T.createCharge({ to: a.to, amountUsd: a.amountUsd, label: a.label, nowMs: Date.now() });

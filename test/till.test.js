@@ -16,7 +16,7 @@ t('usdToMicro: exact 6-decimals, comma tolerated, junk/zero/negative refused', (
   assert.equal(T.usdToMicro('4.50'), '4500000');
   assert.equal(T.usdToMicro('4,5'), '4500000');
   assert.equal(T.usdToMicro('0.000001'), '1');
-  assert.equal(T.microToUsd('4500000'), '4.5');
+  assert.equal(T.microToUsd('4500000'), '4.50');
   for (const bad of ['', 'abc', '-3', '1.2345678', '0']) assert.throws(() => T.usdToMicro(bad), undefined, 'refuses ' + bad);
 });
 
@@ -26,7 +26,7 @@ t('createCharge: merchant address required, amount normalized, id stable', () =>
   const c = T.createCharge({ to: M, amountUsd: '4.50', label: 'flat white', nowMs: 1700000000000 });
   assert.equal(c.to, M.toLowerCase());
   assert.equal(c.amountMicro, '4500000');
-  assert.equal(c.amountUsd, '4.5');
+  assert.equal(c.amountUsd, '4.50');
   assert.equal(c.chainId, 8453);
   assert.throws(() => T.createCharge({ to: '0x123', amountUsd: '1' }), /merchant 0x address/);
 });
@@ -67,7 +67,7 @@ t('receipt only exists for a verified payment, carries txHash + explorer link', 
   const c = T.createCharge({ to: M, amountUsd: '4.50', label: 'flat white', nowMs: 1 });
   const v = T.verifyPayment(c, fact());
   const r = T.receipt(c, v, { merchantName: 'Café Demo' });
-  assert.equal(r.amountUsd, '4.5');
+  assert.equal(r.amountUsd, '4.50');
   assert.equal(r.txHash, TX);
   assert.ok(r.explorer.includes('basescan.org/tx/'));
   assert.throws(() => T.receipt(c, { paid: false }), /no receipt without/);

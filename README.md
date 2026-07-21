@@ -56,7 +56,7 @@ wallet signs, and the chain — not us — is the only thing allowed to say "pai
 ## Run it
 
 ```bash
-npm test                               # 24/24, fully offline
+npm test                               # 31/31, fully offline
 BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface, :4700
 ```
 
@@ -65,10 +65,16 @@ BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface,
 - `lib/server.js` — thin HTTP: `/charge`, `/status`, `/receipt`
 - `lib/trust.js` — **the trust triangle**: composes reputation (MainStreet) + standing (LAWBOR) +
   settlement (chain) into one fail-closed verdict (`unsafe`/`unknown`/`trusted`/`settled`)
-- `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (`till_vet_merchant`,
-  `till_create_charge`, `till_check_payment`, `till_trust`, `till_receipt`) — an agent can vet a
-  merchant, get the whole trust triangle in one call, pay in USDC with its own wallet, keep a receipt
+- `lib/invoice.js` — **the same registry for Web2-style invoices**: number, line items (exact micro
+  math), due date, bill-to — paid by the same EIP-681, verified by the same chain discipline,
+  settled/overdue lifecycle, and its receipt lands in the SAME provable till roll as a café sale
+- `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (7 tools: `till_vet_merchant`,
+  `till_create_charge`, `till_check_payment`, `till_trust`, `till_create_invoice`,
+  `till_check_invoice`, `till_receipt`) — an agent can vet a merchant, get the whole trust triangle
+  in one call, issue or pay an invoice, and keep a receipt
 - `pitch/trust-triangle.html` — the sellable white-label one-pager (self-contained, theme-aware)
+- `COMPETITION.md` — the researched landscape (dated): ride the rails (x402/Stripe), interop with the
+  standards (ERC-8004/Skyfire KYA), never custodial — the open layer is the non-custodial trust registry
 - `web/` — the merchant phone app (PWA): amount → QR → **PAID ✓** → receipt
 
 ## Business model — the trust+bridge layer partners resell

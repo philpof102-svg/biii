@@ -22,7 +22,7 @@ t('renderReceipt: a paper-ticket a non-crypto human understands (amount, PAID, t
   assert.match(r, /Café Demo/);
   assert.match(r, /B3-0042/);
   assert.match(r, /Amount:\s+4\.50 USDC/);
-  assert.match(r, /Tip:\s+0\.5 USDC/);
+  assert.match(r, /Tip:\s+0\.50 USDC/);
   assert.match(r, /✓ PAID · USDC on Base/);
   assert.match(r, /basescan\.org\/tx\//);
   const fr = L.renderReceipt(mkReceipt('0x' + 'cd'.repeat(32), '4.50'), { lang: 'fr' });
@@ -46,8 +46,8 @@ t('summary: provable day books — exact micro totals + tips + every txHash re-c
   ({ rows } = L.appendReceipt(rows, mkReceipt('0x' + '22'.repeat(32), '3.00', '0', 1700003600)));
   const s = L.summary(rows);
   assert.equal(s.count, 2);
-  assert.equal(s.grossUsd, '7.5');
-  assert.equal(s.tipsUsd, '0.5');
+  assert.equal(s.grossUsd, '7.50');
+  assert.equal(s.tipsUsd, '0.50');
   assert.equal(s.txHashes.length, 2);
   // windowing by block time
   assert.equal(L.summary(rows, { fromBlockTime: 1700003000 }).count, 1);
