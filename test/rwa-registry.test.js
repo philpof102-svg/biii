@@ -2,7 +2,7 @@
 // BIII RWA registry ingest — joins RWA.xyz /v4/tokens ⋈ /v4/assets, fail-safe.
 // Run: node test/rwa-registry.test.js
 const assert = require('node:assert');
-const { buildRegistry, fetchAll, toChainId } = require('../scripts/biii-rwa-registry');
+const { buildRegistry, fetchAll, toChainId, buildRegistryFromCoingecko } = require('../scripts/biii-rwa-registry');
 const { assessAsset } = require('../lib/asset');
 
 let pass = 0, fail = 0;
@@ -73,6 +73,26 @@ t('a built registry composes with assessAsset — genuine + impersonation', () =
   assert.equal(g.status, 'genuine'); assert.equal(g.issuer, 'Ondo');
   const imp = assessAsset({ token: '0x' + 'ff'.repeat(20), claimedSymbol: 'USDY' }, { registry: entries });
   assert.equal(imp.status, 'impersonation'); assert.equal(imp.genuineAddress, USDY_BASE);
+});
+
+t('buildRegistryFromCoingecko (FREE source): maps platforms→chainId exactly, joins issuer, drops off-chain', () => {
+  const members = new Map([
+    ['ondo-google', { issuer: 'Ondo', category: 'ondo-tokenized-assets' }],
+    ['dinari-aapl', { issuer: 'Dinari', category: 'dinari' }],
+  ]);
+  const platformList = [
+    { id: 'ondo-google', symbol: 'googlon', name: 'Google (Ondo)', platforms: { ethereum: BUIDL_ETH, solana: 'SoLaNaAddr', 'optimistic-ethereum': USDY_BASE } },
+    { id: 'dinari-aapl', symbol: 'daapl', name: 'Apple dShare', platforms: { base: BUIDL_BASE } },
+    { id: 'not-rwa', symbol: 'x', name: 'x', platforms: { ethereum: ORPHAN } },   // not in members → ignored
+  ];
+  const { entries } = buildRegistryFromCoingecko(members, platformList, { chains: [1, 8453, 42161, 10] });
+  const eth = entries.find((e) => e.address === BUIDL_ETH);
+  assert.equal(eth.chainId, 1); assert.equal(eth.issuer, 'Ondo'); assert.equal(eth.symbol, 'GOOGLON');  // uppercased
+  const opt = entries.find((e) => e.address === USDY_BASE);
+  assert.equal(opt.chainId, 10, 'optimistic-ethereum must map to 10, NOT 1 (no fuzzy-match)');
+  assert.equal(entries.find((e) => e.address === BUIDL_BASE).chainId, 8453);  // base
+  assert.ok(!entries.some((e) => e.address === ORPHAN), 'a coin not in the RWA categories is ignored');
+  assert.ok(!entries.some((e) => String(e.address).includes('sol')), 'Solana platform dropped');
 });
 
 tA('fetchAll sends the Bearer key, uses the v4 query= param, paginates, returns the flattened array', async () => {

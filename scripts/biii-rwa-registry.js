@@ -90,20 +90,106 @@ async function ingestRegistry(opts = {}) {
   return buildRegistry(tokens, assets, opts);
 }
 
-module.exports = { buildRegistry, fetchAll, ingestRegistry, toChainId, CHAIN_IDS, DEFAULT_CHAINS };
+// ── FREE alternative source: Coingecko (no API key) ──────────────────────────────────────────────
+// RWA.xyz's API key is gated; Coingecko's public API exposes the same thing for free: tokenized-stock /
+// RWA coins (by category) each carry a `platforms` map {chain-slug: contract address}. Aggregator-
+// authoritative (industry standard) — good enough for the genuine/impersonation verdict, and free.
+// Coingecko platform SLUGS → chainId (exact — do NOT fuzzy-match, "optimistic-ethereum" must be 10 not 1).
+const CG_PLATFORM = { ethereum: 1, base: 8453, 'arbitrum-one': 42161, 'optimistic-ethereum': 10,
+  'polygon-pos': 137, 'binance-smart-chain': 56, gnosis: 100, avalanche: 43114 };
+// tokenized/RWA category id → issuer/platform label (from the category; null = mixed, use the coin name)
+const CG_CATEGORIES = {
+  'xstocks-ecosystem': 'Backed (xStocks)', 'bstocks-ecosystem': 'Backed', 'ondo-tokenized-assets': 'Ondo',
+  'robinhood-chain-stocks-ecosystem': 'Robinhood', 'remona-tokenized-stocks': 'Remona',
+  'openstock-ecosystem': 'Openstock', 'republic-tokenized-pre-ipo-assets': 'Republic',
+  'real-world-assets-rwa': null, 'tokenized-treasury-bills-t-bills': null, 'tokenized-stock': null,
+};
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function cg(path, { fetchImpl, baseUrl = 'https://api.coingecko.com/api/v3', apiKey, timeoutMs = 20000, retries = 3 } = {}) {
+  const f = fetchImpl || fetch;
+  const headers = apiKey ? { 'x-cg-demo-api-key': apiKey, accept: 'application/json' } : { accept: 'application/json' };
+  for (let attempt = 0; ; attempt++) {
+    const res = await Promise.race([
+      f(baseUrl + path, { headers }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), timeoutMs)),
+    ]);
+    if (res && res.status === 429 && attempt < retries) { await sleep(15000 * (attempt + 1)); continue; }  // free-tier throttle → back off
+    if (!res || res.ok === false) throw new Error('coingecko HTTP ' + (res && res.status));
+    return res.json();
+  }
+}
+
+/**
+ * buildRegistryFromCoingecko — join category membership (coinId → issuer) with the platform map
+ * (coinId → {chain-slug: address}) into validated registry entries. Fail-safe: same strict validation.
+ * members: Map<coinId, {issuer, category, name?}>. platformList: [{ id, symbol, name, platforms }].
+ */
+function buildRegistryFromCoingecko(members, platformList, { chains = DEFAULT_CHAINS } = {}) {
+  const want = new Set(chains);
+  const entries = []; let seen = 0, dropped = 0; const seenKey = new Set();
+  for (const coin of Array.isArray(platformList) ? platformList : []) {
+    const meta = members instanceof Map ? members.get(coin && coin.id) : (members && members[coin && coin.id]);
+    if (!meta || !coin) continue;                                  // not a tokenized/RWA coin
+    const symbol = String(coin.symbol || '').trim().toUpperCase();
+    const name = coin.name || meta.name || null;
+    for (const [slug, addr] of Object.entries(coin.platforms || {})) {
+      seen++;
+      const chainId = CG_PLATFORM[slug] != null ? CG_PLATFORM[slug] : null;
+      const address = String(addr || '').trim().toLowerCase();
+      if (!ADDR_RE.test(address) || !Number.isInteger(chainId) || !symbol) { dropped++; continue; }  // FAIL-SAFE
+      if (want.size && !want.has(chainId)) { dropped++; continue; }
+      const key = chainId + ':' + address; if (seenKey.has(key)) continue; seenKey.add(key);
+      entries.push({ issuer: meta.issuer || null, symbol, name, chainId, address, source: 'coingecko:' + (meta.category || 'rwa') });
+    }
+  }
+  return { entries, seen, dropped };
+}
+
+/** Ingest the registry from Coingecko (free, no key needed — a demo key just raises the rate limit). */
+async function ingestFromCoingecko(opts = {}) {
+  const cats = opts.categories || CG_CATEGORIES;
+  const members = new Map();
+  const catEntries = Object.entries(cats);
+  for (let i = 0; i < catEntries.length; i++) {
+    const [catId, issuer] = catEntries[i];
+    if (i > 0 && !opts.fetchImpl) await sleep(2500);   // space real calls to stay under the free-tier limit
+    let coins = [];
+    try { coins = await cg(`/coins/markets?vs_currency=usd&category=${encodeURIComponent(catId)}&per_page=250&page=1`, opts); } catch { continue; }
+    for (const c of Array.isArray(coins) ? coins : []) {
+      if (!c || !c.id) continue;
+      const prev = members.get(c.id);
+      // prefer a specific (non-null) issuer over a mixed-category null
+      if (!prev || (!prev.issuer && issuer)) members.set(c.id, { issuer, category: catId, name: c.name });
+    }
+  }
+  if (!opts.fetchImpl) await sleep(2500);
+  const platformList = await cg('/coins/list?include_platform=true', opts);  // ~one big call, all coins+platforms
+  return buildRegistryFromCoingecko(members, platformList, opts);
+}
+
+module.exports = { buildRegistry, fetchAll, ingestRegistry, toChainId, CHAIN_IDS, DEFAULT_CHAINS,
+  buildRegistryFromCoingecko, ingestFromCoingecko, cg, CG_PLATFORM, CG_CATEGORIES };
 
 // ── run as a script ──────────────────────────────────────────────────────────────────────────
 if (require.main === module) {
   (async () => {
     const fs = require('node:fs'), path = require('node:path');
     try {
-      const { entries, seen, dropped } = await ingestRegistry({ apiKey: process.env.RWA_XYZ_API_KEY });
+      // Coingecko (free, no key) is the DEFAULT source — RWA.xyz's API is gated. Set RWA_XYZ_API_KEY to
+      // use the RWA.xyz v4 API instead; COINGECKO_API_KEY (optional demo key) just raises the rate limit.
+      const useRwaxyz = !!process.env.RWA_XYZ_API_KEY;
+      const src = useRwaxyz ? 'rwa.xyz/v4 (tokens⋈assets)' : 'coingecko (free)';
+      console.log(`[rwa-registry] sourcing from ${src}…`);
+      const { entries, seen, dropped } = useRwaxyz
+        ? await ingestRegistry({ apiKey: process.env.RWA_XYZ_API_KEY })
+        : await ingestFromCoingecko({ apiKey: process.env.COINGECKO_API_KEY });
       const dir = path.join(__dirname, '..', 'data'); fs.mkdirSync(dir, { recursive: true });
       const out = path.join(dir, 'rwa-registry.json');
-      fs.writeFileSync(out, JSON.stringify({ generatedFrom: 'rwa.xyz/v4 (tokens⋈assets)', count: entries.length, entries }, null, 2) + '\n');
-      console.log(`[rwa-registry] ${entries.length} verified contracts written to ${out} (${seen} tokens seen, ${dropped} dropped as off-chain/unvalidated)`);
+      fs.writeFileSync(out, JSON.stringify({ generatedFrom: src, count: entries.length, entries }, null, 2) + '\n');
+      console.log(`[rwa-registry] ${entries.length} verified contracts written to ${out} (${seen} seen, ${dropped} dropped as off-chain/unvalidated)`);
       if (entries.length) console.log('[rwa-registry] sample:', JSON.stringify(entries.slice(0, 3)));
-      else console.warn('[rwa-registry] EMPTY — confirm the /v4/tokens field mapping (address/network_name/asset_id) against the live response.');
+      else console.warn('[rwa-registry] EMPTY — confirm the source response shape.');
       process.exit(0);
     } catch (e) { console.error('[rwa-registry] failed:', e.message); process.exit(1); }
   })();
