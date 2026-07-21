@@ -25,6 +25,7 @@ const I = require('../lib/invoice');
 const { assessAsset, assetVertex } = require('../lib/asset');
 const L = require('../lib/ledger');
 const { DISCLAIMER } = require('../lib/disclaimer');
+const { loadScreen, screenAddress } = require('../lib/screen');
 const fs = require('node:fs'), path = require('node:path');
 
 // Authoritative verified-issuer registry, if it's been ingested (scripts/biii-rwa-registry.js → RWA.xyz).
@@ -32,17 +33,30 @@ const fs = require('node:fs'), path = require('node:path');
 let RWA_REGISTRY = null, RWA_SOURCE = null;
 try { const p = path.join(__dirname, '..', 'data', 'rwa-registry.json'); if (fs.existsSync(p)) { const j = JSON.parse(fs.readFileSync(p, 'utf8')); RWA_REGISTRY = j.entries; RWA_SOURCE = j.generatedFrom || 'file'; } } catch {}
 
+// DECENTRALIZED known-bad floor: a LOCAL, public, open-licensed list (data/known-bad.json). The node
+// screens against it with zero network, so a known-bad address BLOCKs even when the MainStreet oracle is
+// down — removing the single point of failure. Absent file ⇒ available:false ⇒ screening is UNAVAILABLE
+// (never a silent "clean"), which the verdict discloses.
+let KNOWN_BAD = loadScreen(null);
+try { const p = path.join(__dirname, '..', 'data', 'known-bad.json'); if (fs.existsSync(p)) KNOWN_BAD = loadScreen(JSON.parse(fs.readFileSync(p, 'utf8'))); } catch {}
+
 const MAINSTREET = (process.env.MAINSTREET_URL || 'https://avisradar-production.up.railway.app').replace(/\/$/, '');
 
-// MainStreet "safe to pay" reputation — ADVISORY, fail-closed (unreachable/absent ⇒ null). Shared by
-// till_trust and the opt-in advisory lens on till_check_payment. x-ms-monitor:1 keeps internal calls out
-// of the product metrics.
+// Reputation for the trust triangle. TWO layers, decentralization on purpose:
+//   1) LOCAL known-bad floor (no network) — a listed address is BLOCKed regardless of any oracle.
+//   2) MainStreet live behavioral score — ADVISORY, fail-closed (unreachable/absent ⇒ null ⇒ 'unknown',
+//      never 'clean'). x-ms-monitor:1 keeps internal calls out of the product metrics.
+// So MainStreet being slow/down can no longer let a known scammer through — the floor still fires.
 async function fetchReputation(address) {
+  const local = screenAddress(address, KNOWN_BAD);
+  if (local.blocked) return { decision: 'BLOCK', score: null, source: 'local-known-bad', reason: local.reason };
   try {
     const r = await fetch(`${MAINSTREET}/api/agent/preflight/${encodeURIComponent(String(address || '').toLowerCase())}`,
       { headers: { 'x-ms-monitor': '1' }, signal: AbortSignal.timeout(8000) });
-    if (r.ok) { const j = await r.json(); return { decision: j.decision ?? null, score: j.score ?? null }; }
+    if (r.ok) { const j = await r.json(); return { decision: j.decision ?? null, score: j.score ?? null, source: 'mainstreet-oracle' }; }
   } catch {}
+  // oracle down + not-locally-known-bad ⇒ no live signal. Honest: 'unknown', never 'clean'. The local
+  // screen still RAN (it just did not flag this address) — the floor held.
   return null;
 }
 

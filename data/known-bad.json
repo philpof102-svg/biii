@@ -1,0 +1,15 @@
+{
+  "asOf": "2026-07-21",
+  "note": "A DATED, bundled snapshot of PUBLIC, open-licensed known-bad addresses. The node screens against this LOCALLY — no hosted oracle is needed for the hard block, so a known-bad address is refused even when every service is down. This is a small SEED (refresh/expand via scripts/biii-known-bad-ingest.js against the sources below). It is re-verifiable: anyone can check these against the named public lists. Absence of an entry is NOT a clean verdict.",
+  "sources": [
+    "OFAC SDN — github.com/0xB10C/ofac-sanctioned-digital-currency-addresses (MIT)",
+    "ScamSniffer — github.com/scamsniffer/scam-database (GPL-3.0)",
+    "ethereum-lists darklist — github.com/MyEtherWallet/ethereum-lists (MIT)"
+  ],
+  "addresses": [
+    "0x098b716b8aaf21512996dc57eb0615e2383e2f96",
+    "0x0330070fd38ec3bb94f58fa55d40368271e9e54a",
+    "0x038989cbb1710c72b9920dc4fa529158f463e72c",
+    "0xf4377eda661e04b6dda78969796ed31658d602d4"
+  ]
+}
