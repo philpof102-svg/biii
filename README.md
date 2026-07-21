@@ -76,6 +76,10 @@ layer** that companies **who already have the merchants** plug in:
 > They bring the clientele. BIII brings the trusted USDC payment + the human/agent bridge +
 > the provable receipts. Sold to PSPs, neobanks, merchant platforms, Base ecosystem apps.
 
+The one-pager for that conversation — **the trust triangle**, the four verdict states, the
+white-label split, the receipt, and the honest landscape — is `pitch/trust-triangle.html`
+(self-contained, theme-aware, no external requests).
+
 Lyzi is white-label for PSPs but terminal/enterprise and human-only. BIII is white-label too —
 and it's the one that also lets **AI agents pay**, ships **un-fakeable consumer receipts**, and
 runs **non-custodially** (the partner never touches the merchant's funds, so no money-transmitter
