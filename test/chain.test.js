@@ -2,7 +2,7 @@
 // chain watcher + MCP bridge — offline (fake RPC / fake fetch). Run: node test/chain.test.js
 const assert = require('node:assert');
 const { findPayment, TRANSFER_TOPIC } = require('../lib/chain');
-const { callTool, TOOLS } = require('../bin/basetill-mcp');
+const { callTool, TOOLS } = require('../bin/biii-mcp');
 const T = require('../lib/till');
 
 let pass = 0, fail = 0;
@@ -19,7 +19,7 @@ const fakeRpc = (logs, head = '0x100') => async (url, init) => {
 };
 
 (async () => {
-  console.log('basetill chain — the till believes only Transfer logs:');
+  console.log('biii chain — the till believes only Transfer logs:');
 
   await t('findPayment: newest big-enough Transfer wins; confirmations = head - block + 1', async () => {
     const logs = [

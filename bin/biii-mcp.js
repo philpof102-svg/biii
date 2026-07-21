@@ -78,7 +78,7 @@ rl.on('line', async (line) => {
   try {
     if (method === 'initialize') return send({ jsonrpc: '2.0', id, result: {
       protocolVersion: '2024-11-05', capabilities: { tools: {} },
-      serverInfo: { name: 'basetill', version: '0.1.0' } } });
+      serverInfo: { name: 'biii', version: '0.1.0' } } });
     if (method === 'tools/list') return send({ jsonrpc: '2.0', id, result: { tools: TOOLS } });
     if (method === 'tools/call') {
       const out = await callTool(params.name, params.arguments || {});
