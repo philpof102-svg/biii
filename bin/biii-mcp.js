@@ -42,22 +42,28 @@ try { const p = path.join(__dirname, '..', 'data', 'known-bad.json'); if (fs.exi
 
 const MAINSTREET = (process.env.MAINSTREET_URL || 'https://avisradar-production.up.railway.app').replace(/\/$/, '');
 
-// Reputation for the trust triangle. TWO layers, decentralization on purpose:
-//   1) LOCAL known-bad floor (no network) — a listed address is BLOCKed regardless of any oracle.
-//   2) MainStreet live behavioral score — ADVISORY, fail-closed (unreachable/absent ⇒ null ⇒ 'unknown',
-//      never 'clean'). x-ms-monitor:1 keeps internal calls out of the product metrics.
-// So MainStreet being slow/down can no longer let a known scammer through — the floor still fires.
-async function fetchReputation(address) {
-  const local = screenAddress(address, KNOWN_BAD);
-  if (local.blocked) return { decision: 'BLOCK', score: null, source: 'local-known-bad', reason: local.reason };
+// fetchOracle — MainStreet's ORACLE-REPORTED behavioral read ONLY (no local floor here). Advisory,
+// fail-closed: unreachable/non-200 ⇒ {error, disclosure}. x-ms-monitor:1 keeps calls out of product metrics.
+async function fetchOracle(address) {
   try {
     const r = await fetch(`${MAINSTREET}/api/agent/preflight/${encodeURIComponent(String(address || '').toLowerCase())}`,
       { headers: { 'x-ms-monitor': '1' }, signal: AbortSignal.timeout(8000) });
-    if (r.ok) { const j = await r.json(); return { decision: j.decision ?? null, score: j.score ?? null, source: 'mainstreet-oracle' }; }
-  } catch {}
-  // oracle down + not-locally-known-bad ⇒ no live signal. Honest: 'unknown', never 'clean'. The local
-  // screen still RAN (it just did not flag this address) — the floor held.
-  return null;
+    if (r.ok) { const j = await r.json();
+      return { decision: j.decision ?? null, score: j.score ?? null,
+        disclosure: 'ORACLE-REPORTED — MainStreet\'s advisory read, not verified by this node; never overrides the local floor.' }; }
+    return { error: 'oracle HTTP ' + r.status, disclosure: 'advisory only — the local known-bad floor still holds' };
+  } catch (e) { return { error: 'oracle unreachable: ' + (e && e.message), disclosure: 'advisory only — the local known-bad floor still holds' }; }
+}
+
+// Reputation for the trust triangle, as ONE composed decision (LOCAL floor wins, else the oracle, else
+// null). The two-lens SPLIT for display lives in till_trust; this helper is what feeds assessTriangle and
+// the withTrust lens. So MainStreet being slow/down can never let a known scammer through — the floor fires.
+async function fetchReputation(address) {
+  const local = screenAddress(address, KNOWN_BAD);
+  if (local.blocked) return { decision: 'BLOCK', score: null, source: 'local-known-bad', reason: local.reason };
+  const o = await fetchOracle(address);
+  if (o.decision != null || o.score != null) return { decision: o.decision, score: o.score, source: 'mainstreet-oracle' };
+  return null;   // not-locally-known-bad + oracle down ⇒ no live signal. Honest 'unknown', never 'clean'.
 }
 
 const TOOLS = [
@@ -73,7 +79,7 @@ const TOOLS = [
       to: { type: 'string' }, amountMicro: { type: 'string' },
       lookbackBlocks: { type: 'number', description: 'default 900 (~30 min on Base)' },
       withTrust: { type: 'boolean', description: 'optional — also return advisoryTrust (MainStreet safe-to-pay on the payee); does NOT affect the chain-only paid verdict' } }, required: ['to', 'amountMicro'] } },
-  { name: 'till_trust', description: 'The TRUST TRIANGLE in one call: composes reputation (MainStreet safe-to-pay), standing (LAWBOR proven history, if BIII_LAWBOR_URL set) and settlement (on-chain, if amountMicro given) into ONE verdict (unsafe/unknown/trusted/settled). Fail-closed: absence is never trust.',
+  { name: 'till_trust', description: 'The TRUST TRIANGLE in one call: composes reputation, standing (LAWBOR proven history, if BIII_LAWBOR_URL set) and settlement (on-chain, if amountMicro given) into ONE verdict (unsafe/unknown/trusted/settled). Reputation is shown as TWO LENSES kept SEPARATE, never merged: `local` = this node\'s known-bad screen against public lists (no network, decisive — a BLOCK overrides everything) and `oracle` = MainStreet\'s advisory read (ORACLE-REPORTED, can raise trust but never lower a local block). Fail-closed: absence is never trust; a local BLOCK holds even if the oracle is down. Every verdict carries the list\'s freshness (asOf/ageDays/stale).',
     inputSchema: { type: 'object', properties: {
       counterparty: { type: 'string', description: '0x address to assess (the merchant, or a payer)' },
       amountMicro: { type: 'string', description: 'optional — if given, also check on-chain settlement to this address' } }, required: ['counterparty'] } },
@@ -140,8 +146,22 @@ async function callTool(name, a = {}) {
   }
   if (name === 'till_trust') {
     const cp = String(a.counterparty || '').toLowerCase();
-    // vertex 1 — reputation (MainStreet), advisory (shared helper, keeps x-ms-monitor discipline)
-    const reputation = await fetchReputation(cp);
+    // vertex 1 — reputation, shown as TWO LENSES kept SEPARATE (LAWBOR's discipline, verbatim): the LOCAL
+    // known-bad screen (verified by THIS node against public lists, no network — decisive on a BLOCK) and
+    // the ORACLE (MainStreet, ORACLE-REPORTED, advisory). They are never merged into one score — averaging
+    // would launder the oracle's word into local proof, and would let an oracle PROCEED dilute a local BLOCK.
+    const localScreen = screenAddress(cp, KNOWN_BAD);
+    const meta = screenMeta(KNOWN_BAD);
+    const oracle = localScreen.blocked ? { note: 'not consulted — the local BLOCK is decisive' } : await fetchOracle(cp);
+    // The single decision fed to assessTriangle: local BLOCK wins; else the oracle's; else null (unknown).
+    const reputation = localScreen.blocked ? { decision: 'BLOCK', score: null }
+      : ((oracle.decision != null || oracle.score != null) ? { decision: oracle.decision, score: oracle.score } : null);
+    const reputationLenses = {
+      local: { blocked: localScreen.blocked, available: meta.available, asOf: meta.asOf, ageDays: meta.ageDays, stale: meta.stale, reason: localScreen.reason,
+        disclosure: 'LOCAL — screened by THIS node against public known-bad lists (no network). A BLOCK here is decisive and overrides any oracle answer.' },
+      oracle,
+      note: 'Two lenses, SEPARATE and never merged into one score: LOCAL (verified here, decisive on a BLOCK) vs ORACLE (MainStreet, ORACLE-REPORTED, advisory). Averaging them would launder the oracle\'s word into local proof.',
+    };
     // vertex 2 — standing (LAWBOR proven history), optional (only if a node is configured).
     // LAWBOR GET /credit?of= returns directUsdcMicro: the direct, on-chain-PROVEN USDC settled with this
     // counterparty (agent↔agent). That IS standing. Fail-closed: unreachable/absent ⇒ null ⇒ 'none'.
@@ -158,12 +178,9 @@ async function callTool(name, a = {}) {
       const fact = await findPayment({ to: cp, minMicro: String(a.amountMicro), lookbackBlocks: 900 });
       settlement = T.verifyPayment({ to: cp, amountMicro: String(a.amountMicro), token: T.USDC_BASE, chainId: 8453 }, fact);
     }
-    // FRESHNESS disclosure: a verdict that is not a hard local BLOCK leans on the known-bad list's age.
-    // Surface it so "not-known-bad" is never read as "screened against a current list" when it isn't.
-    const screen = screenMeta(KNOWN_BAD);
     return { triangle: assessTriangle({ reputation, standing, settlement }),
-      sources: { reputation, standing: standing || null, settlementChecked: !!a.amountMicro, screen },
-      disclosure: screen.disclosure };
+      sources: { reputation: reputationLenses, standing: standing || null, settlementChecked: !!a.amountMicro },
+      disclosure: meta.disclosure };
   }
   if (name === 'till_create_invoice') {
     const invoice = I.createInvoice({ to: a.to, lineItems: a.lineItems, number: a.number, billTo: a.billTo,

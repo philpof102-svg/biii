@@ -28,7 +28,7 @@ const { callTool } = require('../bin/biii-mcp');
     const r = await callTool('till_trust', { counterparty: LAZARUS });
     assert.equal(r.triangle.trust, 'unsafe', 'the LOCAL known-bad BLOCK must override the green standing');
     assert.equal(r.triangle.payable, false);
-    assert.equal(r.sources.reputation.source, 'local-known-bad', 'the block came from the local list, not the (down) oracle');
+    assert.equal(r.sources.reputation.local.blocked, true, 'the block came from the LOCAL lens, not the (down) oracle');
   });
 
   await t('till_vet_merchant: Lazarus + MainStreet DOWN → local BLOCK, and no crash on the timeout', async () => {
