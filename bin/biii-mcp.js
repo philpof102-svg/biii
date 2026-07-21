@@ -27,8 +27,8 @@ const fs = require('node:fs'), path = require('node:path');
 
 // Authoritative verified-issuer registry, if it's been ingested (scripts/biii-rwa-registry.js → RWA.xyz).
 // Absent → assessAsset falls back to its small SEED. A stale/missing file can only UNDER-verify (safe).
-let RWA_REGISTRY = null;
-try { const p = path.join(__dirname, '..', 'data', 'rwa-registry.json'); if (fs.existsSync(p)) RWA_REGISTRY = JSON.parse(fs.readFileSync(p, 'utf8')).entries; } catch {}
+let RWA_REGISTRY = null, RWA_SOURCE = null;
+try { const p = path.join(__dirname, '..', 'data', 'rwa-registry.json'); if (fs.existsSync(p)) { const j = JSON.parse(fs.readFileSync(p, 'utf8')); RWA_REGISTRY = j.entries; RWA_SOURCE = j.generatedFrom || 'file'; } } catch {}
 
 const MAINSTREET = (process.env.MAINSTREET_URL || 'https://avisradar-production.up.railway.app').replace(/\/$/, '');
 
@@ -136,7 +136,7 @@ async function callTool(name, a = {}) {
     const verdict = assessAsset({ token: a.token, claimedIssuer: a.claimedIssuer, claimedSymbol: a.claimedSymbol },
       RWA_REGISTRY ? { registry: RWA_REGISTRY } : {});
     return { verdict, triangleReputation: assetVertex(verdict),
-      registrySource: RWA_REGISTRY ? `rwa.xyz (${RWA_REGISTRY.length} contracts)` : 'seed (run scripts/biii-rwa-registry.js with RWA_XYZ_API_KEY to source the authoritative registry)',
+      registrySource: RWA_REGISTRY ? `${RWA_SOURCE} · ${RWA_REGISTRY.length} contracts` : 'seed only (run `node scripts/biii-rwa-registry.js` — free Coingecko source, no key needed)',
       note: 'ADVISORY. genuine = the contract matches a verified issuer address; impersonation/unknown fail closed.' };
   }
   if (name === 'till_receipt') {
