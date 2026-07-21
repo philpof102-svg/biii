@@ -97,12 +97,18 @@ async function ingestRegistry(opts = {}) {
 // Coingecko platform SLUGS → chainId (exact — do NOT fuzzy-match, "optimistic-ethereum" must be 10 not 1).
 const CG_PLATFORM = { ethereum: 1, base: 8453, 'arbitrum-one': 42161, 'optimistic-ethereum': 10,
   'polygon-pos': 137, 'binance-smart-chain': 56, gnosis: 100, avalanche: 43114 };
-// tokenized/RWA category id → issuer/platform label (from the category; null = mixed, use the coin name)
+// tokenized/RWA category id → issuer/platform label (from the category; null = mixed, use the coin name).
+// Full set verified live via /coins/categories/list — issuer-specific ecosystems + the tokenized-* families.
 const CG_CATEGORIES = {
-  'xstocks-ecosystem': 'Backed (xStocks)', 'bstocks-ecosystem': 'Backed', 'ondo-tokenized-assets': 'Ondo',
-  'robinhood-chain-stocks-ecosystem': 'Robinhood', 'remona-tokenized-stocks': 'Remona',
-  'openstock-ecosystem': 'Openstock', 'republic-tokenized-pre-ipo-assets': 'Republic',
-  'real-world-assets-rwa': null, 'tokenized-treasury-bills-t-bills': null, 'tokenized-stock': null,
+  'xstocks-ecosystem': 'Backed (xStocks)', 'bstocks-ecosystem': 'Backed', 'dinari-ecosystem': 'Dinari',
+  'ondo-tokenized-assets': 'Ondo', 'robinhood-chain-stocks-ecosystem': 'Robinhood',
+  'remona-tokenized-stocks': 'Remona', 'openstock-ecosystem': 'Openstock',
+  'republic-tokenized-pre-ipo-assets': 'Republic',
+  'real-world-assets-rwa': null, 'tokenized-stock': null, 'tokenized-products': null,
+  'tokenized-treasuries': null, 'tokenized-t-bills': null, 'tokenized-treasury-bonds-t-bonds': null,
+  'tokenized-money-market-fund-mmfs': null, 'tokenized-exchange-traded-funds-etfs': null,
+  'tokenized-commodities': null, 'tokenized-gold': null, 'tokenized-pre-ipo-stocks': null,
+  'asset-backed-tokens': null,
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -151,16 +157,20 @@ async function ingestFromCoingecko(opts = {}) {
   const cats = opts.categories || CG_CATEGORIES;
   const members = new Map();
   const catEntries = Object.entries(cats);
-  for (let i = 0; i < catEntries.length; i++) {
-    const [catId, issuer] = catEntries[i];
-    if (i > 0 && !opts.fetchImpl) await sleep(2500);   // space real calls to stay under the free-tier limit
-    let coins = [];
-    try { coins = await cg(`/coins/markets?vs_currency=usd&category=${encodeURIComponent(catId)}&per_page=250&page=1`, opts); } catch { continue; }
-    for (const c of Array.isArray(coins) ? coins : []) {
-      if (!c || !c.id) continue;
-      const prev = members.get(c.id);
-      // prefer a specific (non-null) issuer over a mixed-category null
-      if (!prev || (!prev.issuer && issuer)) members.set(c.id, { issuer, category: catId, name: c.name });
+  let firstCall = true;
+  for (const [catId, issuer] of catEntries) {
+    for (let page = 1; page <= (opts.catMaxPages || 4); page++) {   // paginate — real-world-assets-rwa exceeds 250
+      if (!firstCall && !opts.fetchImpl) await sleep(2500);         // space real calls under the free-tier limit
+      firstCall = false;
+      let coins;
+      try { coins = await cg(`/coins/markets?vs_currency=usd&category=${encodeURIComponent(catId)}&per_page=250&page=${page}`, opts); } catch { break; }
+      if (!Array.isArray(coins) || !coins.length) break;
+      for (const c of coins) {
+        if (!c || !c.id) continue;
+        const prev = members.get(c.id);
+        if (!prev || (!prev.issuer && issuer)) members.set(c.id, { issuer, category: catId, name: c.name });  // specific issuer wins
+      }
+      if (coins.length < 250) break;                               // last page for this category
     }
   }
   if (!opts.fetchImpl) await sleep(2500);
