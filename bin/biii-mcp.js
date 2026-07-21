@@ -28,6 +28,14 @@ const { DISCLAIMER } = require('../lib/disclaimer');
 const { loadScreen, screenAddress, screenMeta } = require('../lib/screen');
 const fs = require('node:fs'), path = require('node:path');
 
+// trust-core — MainStreet's JUDGMENT extracted PURE (same classifier, zero DB/network). BIII runs it
+// LOCALLY so the "safe to pay" verdict is computed on THIS node, not fetched from the hosted oracle.
+// Resilient resolve: the published package name, else the local sibling repo; if neither is present TC
+// stays null and localClassify() returns null — the existing screen-based BLOCK path is independent and
+// still fires, so safety NEVER depends on trust-core being installed.
+let TC = null;
+try { TC = require('trust-core'); } catch { try { TC = require('../../trust-core'); } catch { TC = null; } }
+
 // Authoritative verified-issuer registry, if it's been ingested (scripts/biii-rwa-registry.js → RWA.xyz).
 // Absent → assessAsset falls back to its small SEED. A stale/missing file can only UNDER-verify (safe).
 let RWA_REGISTRY = null, RWA_SOURCE = null;
@@ -66,9 +74,31 @@ async function fetchReputation(address) {
   return null;   // not-locally-known-bad + oracle down ⇒ no live signal. Honest 'unknown', never 'clean'.
 }
 
+// localClassify — MainStreet's judgment run on THIS node via trust-core (pure, no oracle). The known-bad
+// screen supplies the fail-closed DENY lens; the endpoint URL (if known) supplies the phishing/http/admin
+// URL lens — a genuinely NEW local capability (BIII can flag a hostile endpoint even for an address on no
+// list). No behavioral score is available locally (that needs the indexer), so a clean read is capped at
+// PROCEED_LOW_VALUE, never a confident PROCEED. This is the decentralization payoff: the verdict is computed
+// here and holds when the oracle is down. It is surfaced as its OWN lens — never folded into the triangle's
+// reputation input, because a green-unverified PROCEED_LOW_VALUE there would read as false 'trusted'.
+function localClassify(address, { resourceUrl } = {}) {
+  if (!TC) return null;
+  const scr = screenAddress(address, KNOWN_BAD);
+  const meta = screenMeta(KNOWN_BAD);
+  const deny = { available: meta.available, asOf: meta.asOf, entry: scr.blocked ? { reason: scr.reason, severity: 'high' } : null };
+  const signals = { deny };
+  if (resourceUrl) signals.bazaar = { resourcePath: String(resourceUrl) };
+  // BIII's own screen + its own knowledge of the endpoint = a locally-trusted signal bag (trustedSignals).
+  const v = TC.verdict(signals, null, { trustedSignals: true });
+  return { decision: v.decision, allowed: v.allowed, color: v.shield.color, reasonShort: v.shield.reasonShort,
+    flags: v.shield.flags, explainer: v.shield.explainer,
+    disclosure: 'LOCAL CLASSIFIER — MainStreet\'s judgment reproduced on THIS node via trust-core (pure, zero-oracle). Known-bad screen + endpoint-URL lens only; no behavioral score locally ⇒ a clean read is PROCEED_LOW_VALUE (low-value only), never a confident PROCEED. Holds even when the oracle is down.' };
+}
+
 const TOOLS = [
-  { name: 'till_vet_merchant', description: 'MainStreet safe-to-pay preflight on a merchant address (advisory: decision + score). Vet the RECIPIENT before paying.',
-    inputSchema: { type: 'object', properties: { address: { type: 'string', description: '0x merchant address' } }, required: ['address'] } },
+  { name: 'till_vet_merchant', description: 'MainStreet safe-to-pay preflight on a merchant address. Returns the hosted oracle read (advisory) AND a LOCAL CLASSIFIER verdict computed on this node via trust-core (pure, zero-oracle) — so a verdict holds even if the oracle is down. Vet the RECIPIENT before paying.',
+    inputSchema: { type: 'object', properties: { address: { type: 'string', description: '0x merchant address' },
+      resourceUrl: { type: 'string', description: 'optional — the endpoint/resource URL you would pay; enables the local phishing/plain-http/admin-path URL lens' } }, required: ['address'] } },
   { name: 'till_create_charge', description: 'Create a USDC-on-Base charge for a real-world merchant. Returns the charge + the EIP-681 payment URI your OWN wallet must execute (basetill holds no key, moves no funds).',
     inputSchema: { type: 'object', properties: {
       to: { type: 'string', description: 'merchant 0x address (their own wallet — non-custodial)' },
@@ -82,7 +112,8 @@ const TOOLS = [
   { name: 'till_trust', description: 'The TRUST TRIANGLE in one call: composes reputation, standing (LAWBOR proven history, if BIII_LAWBOR_URL set) and settlement (on-chain, if amountMicro given) into ONE verdict (unsafe/unknown/trusted/settled). Reputation is shown as TWO LENSES kept SEPARATE, never merged: `local` = this node\'s known-bad screen against public lists (no network, decisive — a BLOCK overrides everything) and `oracle` = MainStreet\'s advisory read (ORACLE-REPORTED, can raise trust but never lower a local block). Fail-closed: absence is never trust; a local BLOCK holds even if the oracle is down. Every verdict carries the list\'s freshness (asOf/ageDays/stale).',
     inputSchema: { type: 'object', properties: {
       counterparty: { type: 'string', description: '0x address to assess (the merchant, or a payer)' },
-      amountMicro: { type: 'string', description: 'optional — if given, also check on-chain settlement to this address' } }, required: ['counterparty'] } },
+      amountMicro: { type: 'string', description: 'optional — if given, also check on-chain settlement to this address' },
+      resourceUrl: { type: 'string', description: 'optional — the endpoint/resource URL you would pay; enables the local phishing/plain-http/admin-path URL lens in the local classifier' } }, required: ['counterparty'] } },
   { name: 'till_create_invoice', description: 'Create a Web2-style INVOICE (number, line items, due date, bill-to) on the SAME non-custodial registry: paid by the same EIP-681 intent, verified by the same chain discipline, recorded in the same provable till roll. Returns the invoice + a human-readable bill (EN/FR) + the payment URI.',
     inputSchema: { type: 'object', properties: {
       to: { type: 'string', description: 'merchant 0x address (their own wallet — non-custodial)' },
@@ -116,17 +147,18 @@ async function callTool(name, a = {}) {
     // DECENTRALIZED floor FIRST: a locally-known-bad address is refused with zero network, even if the
     // oracle is slow/down — the block cannot vanish with the service (the SPOF this closes).
     const local = screenAddress(a.address, KNOWN_BAD);
-    if (local.blocked) return { decision: 'BLOCK', score: 0, source: 'local-known-bad', advisory: local.reason };
+    const localClassifier = localClassify(a.address, { resourceUrl: a.resourceUrl });   // this node's own verdict, no oracle
+    if (local.blocked) return { decision: 'BLOCK', score: 0, source: 'local-known-bad', advisory: local.reason, localClassifier };
     const screen = screenMeta(KNOWN_BAD);   // freshness of the floor a "not-known-bad" result leans on
     try {
       const r = await fetch(`${MAINSTREET}/api/agent/preflight/${encodeURIComponent(String(a.address || ''))}`,
         { headers: { 'x-ms-monitor': '1' }, signal: AbortSignal.timeout(8000) });
-      if (!r.ok) return { advisory: 'oracle unreachable (HTTP ' + r.status + ') — treat the merchant as UNKNOWN, not as safe', screen };
+      if (!r.ok) return { advisory: 'oracle unreachable (HTTP ' + r.status + ') — treat the merchant as UNKNOWN, not as safe', screen, localClassifier };
       const j = await r.json();
-      return { decision: j.decision ?? null, score: j.score ?? null, source: 'mainstreet-oracle', advisory: 'ORACLE-REPORTED — advisory only, never a guarantee', screen };
+      return { decision: j.decision ?? null, score: j.score ?? null, source: 'mainstreet-oracle', advisory: 'ORACLE-REPORTED — advisory only, never a guarantee', screen, localClassifier };
     } catch (e) {
       // a timeout used to THROW here (no catch) and crash the tool; degrade honestly instead.
-      return { advisory: 'oracle unreachable (' + (e && e.message) + ') — treat the merchant as UNKNOWN, not as safe', screen };
+      return { advisory: 'oracle unreachable (' + (e && e.message) + ') — treat the merchant as UNKNOWN, not as safe', screen, localClassifier };
     }
   }
   if (name === 'till_create_charge') {
@@ -191,8 +223,13 @@ async function callTool(name, a = {}) {
       const fact = await findPayment({ to: cp, minMicro: String(a.amountMicro), lookbackBlocks: 900 });
       settlement = T.verifyPayment({ to: cp, amountMicro: String(a.amountMicro), token: T.USDC_BASE, chainId: 8453 }, fact);
     }
+    // LOCAL CLASSIFIER lens — MainStreet's judgment reproduced on THIS node via trust-core (pure, no oracle).
+    // A SEPARATE lens, never merged into the triangle's reputation input: a green-unverified PROCEED_LOW_VALUE
+    // fed there would read as false 'trusted'. It proves the safe-to-pay verdict is computed here and holds
+    // when the oracle is down; on a known-bad address it BLOCKs identically to (and independently of) the floor.
+    const localClassifier = localClassify(cp, { resourceUrl: a.resourceUrl });
     return { triangle: assessTriangle({ reputation, standing, settlement }),
-      sources: { reputation: reputationLenses, standing: standingLens, settlementChecked: !!a.amountMicro },
+      sources: { reputation: reputationLenses, localClassifier, standing: standingLens, settlementChecked: !!a.amountMicro },
       disclosure: meta.disclosure };
   }
   if (name === 'till_create_invoice') {
@@ -266,4 +303,4 @@ rl.on('line', async (line) => {
   }
 });
 
-module.exports = { callTool, TOOLS };
+module.exports = { callTool, TOOLS, localClassify };
