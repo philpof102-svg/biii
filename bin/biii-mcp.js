@@ -20,6 +20,7 @@
 const readline = require('node:readline');
 const T = require('../lib/till');
 const { findPayment } = require('../lib/chain');
+const { assessTriangle } = require('../lib/trust');
 
 const MAINSTREET = (process.env.MAINSTREET_URL || 'https://avisradar-production.up.railway.app').replace(/\/$/, '');
 
@@ -35,6 +36,10 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: {
       to: { type: 'string' }, amountMicro: { type: 'string' },
       lookbackBlocks: { type: 'number', description: 'default 900 (~30 min on Base)' } }, required: ['to', 'amountMicro'] } },
+  { name: 'till_trust', description: 'The TRUST TRIANGLE in one call: composes reputation (MainStreet safe-to-pay), standing (LAWBOR proven history, if BIII_LAWBOR_URL set) and settlement (on-chain, if amountMicro given) into ONE verdict (unsafe/unknown/trusted/settled). Fail-closed: absence is never trust.',
+    inputSchema: { type: 'object', properties: {
+      counterparty: { type: 'string', description: '0x address to assess (the merchant, or a payer)' },
+      amountMicro: { type: 'string', description: 'optional — if given, also check on-chain settlement to this address' } }, required: ['counterparty'] } },
   { name: 'till_receipt', description: 'Produce the chain-anchored receipt for a VERIFIED payment (txHash + basescan link). Refuses without verification.',
     inputSchema: { type: 'object', properties: {
       to: { type: 'string' }, amountUsd: { type: 'string' }, label: { type: 'string' },
@@ -58,6 +63,30 @@ async function callTool(name, a = {}) {
     const charge = { to: String(a.to || '').toLowerCase(), amountMicro: String(a.amountMicro || ''), amountUsd: T.microToUsd(String(a.amountMicro || '0')), token: T.USDC_BASE, chainId: 8453 };
     const fact = await findPayment({ to: charge.to, minMicro: charge.amountMicro, lookbackBlocks: a.lookbackBlocks || 900 });
     return { verdict: T.verifyPayment(charge, fact), fact: fact || null };
+  }
+  if (name === 'till_trust') {
+    const cp = String(a.counterparty || '').toLowerCase();
+    // vertex 1 — reputation (MainStreet), advisory
+    let reputation = null;
+    try {
+      const r = await fetch(`${MAINSTREET}/api/agent/preflight/${encodeURIComponent(cp)}`, { headers: { 'x-ms-monitor': '1' }, signal: AbortSignal.timeout(8000) });
+      if (r.ok) { const j = await r.json(); reputation = { decision: j.decision ?? null, score: j.score ?? null }; }
+    } catch {}
+    // vertex 2 — standing (LAWBOR proven history), optional (only if a node is configured)
+    let standing = null;
+    if (process.env.BIII_LAWBOR_URL) {
+      try {
+        const r = await fetch(`${process.env.BIII_LAWBOR_URL.replace(/\/$/, '')}/peer?of=${encodeURIComponent(cp)}`, { signal: AbortSignal.timeout(8000) });
+        if (r.ok) { const j = await r.json(); standing = { paidMicro: (j.trust && (j.trust.inboundMicro || j.trust.directMicro)) || '0' }; }
+      } catch {}
+    }
+    // vertex 3 — settlement (on-chain), only if an amount is being checked
+    let settlement = null;
+    if (a.amountMicro) {
+      const fact = await findPayment({ to: cp, minMicro: String(a.amountMicro), lookbackBlocks: 900 });
+      settlement = T.verifyPayment({ to: cp, amountMicro: String(a.amountMicro), token: T.USDC_BASE, chainId: 8453 }, fact);
+    }
+    return { triangle: assessTriangle({ reputation, standing, settlement }), sources: { reputation, standing: standing || null, settlementChecked: !!a.amountMicro } };
   }
   if (name === 'till_receipt') {
     const charge = T.createCharge({ to: a.to, amountUsd: a.amountUsd, label: a.label, nowMs: Date.now() });
