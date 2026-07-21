@@ -146,6 +146,7 @@ const rl = readline.createInterface({ input: process.stdin });
 const send = (o) => process.stdout.write(JSON.stringify(o) + '\n');
 rl.on('line', async (line) => {
   let m; try { m = JSON.parse(line); } catch { return; }
+  if (m === null || typeof m !== 'object' || Array.isArray(m)) return;  // JSON.parse("null") is valid → would crash the destructure OUTSIDE the try below, killing every tool
   const { id, method, params } = m;
   try {
     if (method === 'initialize') return send({ jsonrpc: '2.0', id, result: {

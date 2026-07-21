@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>BIII — Caisse</title>
 <meta name="theme-color" content="#0A0A0F">
@@ -49,6 +50,9 @@
 </style>
 </head>
 <body>
+
+<!-- non-blocking inline error toast (never a native alert() on a POS UI) -->
+<div id="toast" style="display:none;position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#2a1416;border:1px solid #f87171;color:#fca5a5;padding:12px 18px;border-radius:12px;font-size:13px;max-width:90%;text-align:center;z-index:60"></div>
 
 <!-- SCREEN 1: KEYPAD -->
 <div id="screen-keypad">
@@ -99,17 +103,28 @@
   "use strict";
 
   // ── CONFIG ──
-  // Same-origin by default: the BIII server serves this PWA AND the API, so relative paths work wherever
-  // it's deployed (open the server URL on the phone → the till loads and polls itself). Override with
-  // ?api=https://host only if hosting the PWA separately from the server.
-  const API = new URLSearchParams(location.search).get("api") || "";
-  const DEMO = new URLSearchParams(location.search).get("demo") === "1";
+  // Same-origin ONLY. The BIII server serves this PWA AND the API. A caller-supplied API origin (?api=) is
+  // NOT honored: a crafted "?api=https://evil" link would otherwise make the till mint the QR from — and poll
+  // "paid" from — the attacker, redirecting the customer's payment and faking Payé. (CSP connect-src 'self'
+  // also blocks cross-origin fetch as defense-in-depth.)
+  const API = "";
+  // DEMO fakes a PAID screen with NO real payment. A URL flag would let anyone spoof "Payé", so it is gated
+  // behind a build constant, OFF by default. Set DEMO_ENABLED=true only in a throwaway local test build.
+  const DEMO_ENABLED = false;
+  const DEMO = DEMO_ENABLED && new URLSearchParams(location.search).get("demo") === "1";
 
   // ── STATE ──
   let rawCents = 0;          // ex: 450 = $4.50
   let charge = null;          // charge object from POST /charge
   let pollTimer = null;
   let lastVerdict = null;     // the verified payment, for the receipt
+  let charging = false;       // re-entrancy guard for Encaisser (no double-charge)
+  let chargeToken = 0;        // identity of the current sale — a stale poll/cancel can't flip a new one
+  let pollFails = 0;          // consecutive /status failures → surface after N instead of spinning silently
+
+  const microToUsd = function(micro){ var m=String(micro||"0"); if(!/^\d+$/.test(m)) return null; while(m.length<7)m="0"+m; var w=m.slice(0,-6); var f=m.slice(-6).replace(/0+$/,""); if(f.length<2)f=(f+"00").slice(0,2); return w+"."+f; };
+  let toastTimer = null;
+  function showError(msg){ var t=document.getElementById("toast"); t.textContent=msg; t.style.display="block"; if(toastTimer)clearTimeout(toastTimer); toastTimer=setTimeout(function(){t.style.display="none";},5000); }
 
   // ── DOM ──
   const $keypad     = document.getElementById("screen-keypad");
@@ -164,94 +179,86 @@
 
   // ── ENCAISSER ──
   $btnCharge.addEventListener("click", async function() {
-    if (rawCents === 0) return;
+    if (rawCents === 0 || charging) return;                 // re-entrancy: a double-tap can't double-charge
+    charging = true; $btnCharge.disabled = true;
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }   // kill any leaked prior poll
+    pollFails = 0;
     const amountUsd = formatDisplay(rawCents);
-
     try {
       const res = await fetch(API + "/charge", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
+        method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ amountUsd: amountUsd })
       });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      const data = await res.json().catch(function(){ return {}; });
+      if (!res.ok || data.error) throw new Error(data.error || ("serveur " + res.status));
       charge = data.charge;
       // the server returns paymentURI as a SIBLING of charge ({charge, paymentURI}), not charge.paymentURI
       const paymentURI = data.paymentURI || (charge && charge.paymentURI);
-      if (!paymentURI) throw new Error("no payment URI in charge response");
+      if (!charge || !paymentURI) throw new Error("réponse de charge invalide");
+      const myToken = ++chargeToken;                         // this sale's identity for the poll/cancel race
 
-      // Show QR
       $qrAmount.textContent = amountUsd + " USDC";
       $qrBox.innerHTML = "";
       $statusText.textContent = "En attente du paiement…";
-
-      // Generate QR
       const qr = qrcode(0, "M");
       qr.addData(paymentURI);
       qr.make();
       $qrBox.innerHTML = qr.createImgTag(6);
-
       show($qrScreen);
 
-      // DEMO mode: simulate paid after 6s
-      if (DEMO) {
-        setTimeout(() => showPaid({ paid: true, txHash: "0xDEMO", from: "0xDemo", tier: "standard" }), 6000);
-        return;
-      }
+      if (DEMO) { setTimeout(function(){ if (chargeToken === myToken) showPaid({ paid: true, tier: "demo", paidMicro: charge.amountMicro }); }, 6000); return; }
 
-      // Start polling
-      pollTimer = setInterval(checkPayment, 3000);
-      checkPayment();
-
+      pollTimer = setInterval(function(){ checkPayment(myToken); }, 3000);
+      checkPayment(myToken);
     } catch (err) {
-      alert("Erreur: " + err.message);
+      showError("Vente impossible : " + (err.message || "erreur réseau"));   // inline, never a blocking alert
+      show($keypad);
+    } finally {
+      charging = false; $btnCharge.disabled = (rawCents === 0);
     }
   });
 
-  // ── POLL STATUS ──
-  async function checkPayment() {
-    if (!charge) return;
+  // ── POLL STATUS ── (bound to a sale token so a cancelled/superseded sale can't flip a new one)
+  async function checkPayment(myToken) {
+    if (!charge || myToken !== chargeToken) return;
     try {
-      const url = API + "/status?amountMicro=" + charge.amountMicro;
+      const url = API + "/status?amountMicro=" + encodeURIComponent(charge.amountMicro) +
+        "&createdAtMs=" + encodeURIComponent(charge.createdAtMs || 0);   // bound the window → no prior-payment false PAID
       const res = await fetch(url);
-      const data = await res.json();
-      if (data.verdict && data.verdict.paid) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-        showPaid(data.verdict);
-      }
-    } catch(e) { /* ignore network blips */ }
+      const data = await res.json().catch(function(){ return {}; });
+      if (myToken !== chargeToken) return;                  // cancelled while awaiting → ignore
+      if (!res.ok || data.error) { pollFails++; }
+      else if (data.verdict && data.verdict.paid) { clearInterval(pollTimer); pollTimer = null; showPaid(data.verdict); return; }
+      else { pollFails = 0; $statusText.textContent = "En attente du paiement…"; }
+    } catch (e) { pollFails++; }
+    if (pollFails >= 5) $statusText.textContent = "⚠ Vérification indisponible — nouvel essai…";  // never a silent forever-spinner
   }
 
-  // ── SHOW PAID ──
+  // ── SHOW PAID ── (renders what the CHAIN verified; every field escaped — the /status JSON is external)
   function showPaid(verdict) {
     lastVerdict = verdict;
-    const amountUsd = formatDisplay(rawCents);
-    $paidAmount.textContent = amountUsd + " USDC";
-
+    const shown = microToUsd(verdict.paidMicro) || formatDisplay(rawCents);
+    $paidAmount.textContent = shown + " USDC";
     let html = "";
-    if (verdict.txHash) html += "<b>Tx:</b> " + verdict.txHash.slice(0, 10) + "…<br>";
-    if (verdict.from)  html += "<b>De:</b> " + verdict.from.slice(0, 8) + "…<br>";
-    if (verdict.tier)   html += "<b>Tier:</b> " + verdict.tier;
+    if (verdict.txHash) html += "<b>Tx:</b> " + esc(String(verdict.txHash).slice(0, 10)) + "…<br>";
+    if (verdict.from)   html += "<b>De:</b> " + esc(String(verdict.from).slice(0, 8)) + "…<br>";
+    if (verdict.tier)   html += "<b>Tier:</b> " + esc(String(verdict.tier));
     $paidDetails.innerHTML = html;
-
-    // vibrate if supported
     if (navigator.vibrate) navigator.vibrate(200);
-
     show($paidScreen);
   }
 
   // ── CANCEL ──
   $btnCancel.addEventListener("click", function() {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-    charge = null;
+    charge = null; chargeToken++;   // invalidate any in-flight poll so it can't flip this cancelled sale to PAID
     show($keypad);
   });
 
   // ── NEW SALE ──
   $btnNew.addEventListener("click", function() {
     rawCents = 0;
-    charge = null;
+    charge = null; chargeToken++;
     updateDisplay();
     show($keypad);
   });
@@ -259,7 +266,7 @@
   // ── RECEIPT — the bon de caisse, anchored to the on-chain tx (the real proof) ──
   $btnReceipt.addEventListener("click", function() {
     const v = lastVerdict || {};
-    const amountUsd = formatDisplay(rawCents);
+    const amountUsd = microToUsd(v.paidMicro) || formatDisplay(rawCents);   // what the chain verified
     const tx = v.txHash && v.txHash !== "0xDEMO" ? v.txHash : null;
     const explorer = tx ? "https://basescan.org/tx/" + tx : null;
     const when = new Date().toLocaleString();

@@ -62,6 +62,27 @@ function req(server, method, path, body) {
     assert.equal(no.status, 404);
   });
 
+  await t('the configured merchant is FIXED — a caller cannot redirect the charge to another address', async () => {
+    const other = '0x' + '99'.repeat(20);
+    const r = await req(server, 'POST', '/charge', { amountUsd: '4.50', to: other });
+    assert.equal(r.body.charge.to, M.toLowerCase(), 'caller-supplied `to` is ignored when a merchant is configured');
+  });
+
+  await t('/status rejects a non-positive amountMicro (400) — no dust reads as paid', async () => {
+    assert.equal((await req(server, 'GET', '/status?amountMicro=0')).status, 400);
+    assert.equal((await req(server, 'GET', '/status?amountMicro=')).status, 400);
+    assert.equal((await req(server, 'GET', '/status?amountMicro=-5')).status, 400);
+  });
+
+  await t('false-PAID binding: a fresh charge NARROWS the lookback so a prior payment cannot satisfy it', async () => {
+    let seen = null;
+    const s2 = build({ merchant: M, findPayment: async ({ lookbackBlocks }) => { seen = lookbackBlocks; return null; } });
+    await new Promise((r) => s2.listen(0, r));
+    await req(s2, 'GET', `/status?amountMicro=4500000&createdAtMs=${Date.now()}`);
+    assert.ok(seen < 900 && seen >= 1, `a just-created charge must narrow the window (got ${seen}), not scan 900 blocks of history`);
+    s2.close();
+  });
+
   server.close();
   console.log(`\n${pass} passed · ${fail} failed`);
   process.exit(fail ? 1 : 0);
