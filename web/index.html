@@ -47,6 +47,8 @@
   .paid-details b { color: #fff; }
   .btn-new { background: #fff; color: var(--green); border-radius: 14px; padding: 16px 40px; font-size: 18px; font-weight: 700; }
   .btn-receipt { background: transparent; border: 1px solid rgba(255,255,255,0.4); color: #fff; border-radius: 14px; padding: 12px 28px; font-size: 14px; margin-top: 12px; }
+  /* honest non-custodial footer on the merchant home — the caisse states what it is, and isn't */
+  .disclaimer { font-size: 11px; color: var(--text-dim); text-align: center; padding: 14px 22px 22px; line-height: 1.5; opacity: 0.75; max-width: 420px; margin: 0 auto; }
 </style>
 </head>
 <body>
@@ -75,6 +77,7 @@
     <button class="key del" data-key="del">⌫</button>
     <button class="key enter" id="btn-charge" disabled>Encaisser ▶</button>
   </div>
+  <p class="disclaimer">Non-custodial — BIII ne détient aucune clé et ne touche aucun fonds. Le client paie <b>directement votre wallet</b>, en USDC sur Base. Reçu ancré au txHash, re-vérifiable on-chain par tous.</p>
 </div>
 
 <!-- SCREEN 2: QR -->
@@ -93,6 +96,7 @@
   <div class="paid-title">Payé</div>
   <div class="paid-amount" id="paid-amount"></div>
   <div class="paid-details" id="paid-details"></div>
+  <p style="font-size:11px;color:rgba(255,255,255,0.75);margin-bottom:20px;max-width:320px">Reçu ancré au txHash — re-vérifiable par tous sur BaseScan. Aucun fonds ne transite par BIII.</p>
   <button class="btn-new" id="btn-new">Nouvelle vente</button>
   <button class="btn-receipt" id="btn-receipt">Reçu</button>
 </div>
