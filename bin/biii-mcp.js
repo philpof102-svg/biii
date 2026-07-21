@@ -32,6 +32,18 @@ try { const p = path.join(__dirname, '..', 'data', 'rwa-registry.json'); if (fs.
 
 const MAINSTREET = (process.env.MAINSTREET_URL || 'https://avisradar-production.up.railway.app').replace(/\/$/, '');
 
+// MainStreet "safe to pay" reputation — ADVISORY, fail-closed (unreachable/absent ⇒ null). Shared by
+// till_trust and the opt-in advisory lens on till_check_payment. x-ms-monitor:1 keeps internal calls out
+// of the product metrics.
+async function fetchReputation(address) {
+  try {
+    const r = await fetch(`${MAINSTREET}/api/agent/preflight/${encodeURIComponent(String(address || '').toLowerCase())}`,
+      { headers: { 'x-ms-monitor': '1' }, signal: AbortSignal.timeout(8000) });
+    if (r.ok) { const j = await r.json(); return { decision: j.decision ?? null, score: j.score ?? null }; }
+  } catch {}
+  return null;
+}
+
 const TOOLS = [
   { name: 'till_vet_merchant', description: 'MainStreet safe-to-pay preflight on a merchant address (advisory: decision + score). Vet the RECIPIENT before paying.',
     inputSchema: { type: 'object', properties: { address: { type: 'string', description: '0x merchant address' } }, required: ['address'] } },
@@ -40,10 +52,11 @@ const TOOLS = [
       to: { type: 'string', description: 'merchant 0x address (their own wallet — non-custodial)' },
       amountUsd: { type: 'string', description: 'e.g. "4.50"' },
       label: { type: 'string' }, orderId: { type: 'string' } }, required: ['to', 'amountUsd'] } },
-  { name: 'till_check_payment', description: 'Watch Base for the USDC transfer paying a charge and verify it FIELD-FOR-FIELD (wrong chain/token/recipient/underpay/unconfirmed = NOT paid). Only the chain says paid.',
+  { name: 'till_check_payment', description: 'Watch Base for the USDC transfer paying a charge and verify it FIELD-FOR-FIELD (wrong chain/token/recipient/underpay/unconfirmed = NOT paid). Only the chain says paid — verification is chain-only and never depends on any trust signal. Pass withTrust:true to ALSO get the payee\'s advisory MainStreet trust in the same call (advisory, never changes the paid verdict).',
     inputSchema: { type: 'object', properties: {
       to: { type: 'string' }, amountMicro: { type: 'string' },
-      lookbackBlocks: { type: 'number', description: 'default 900 (~30 min on Base)' } }, required: ['to', 'amountMicro'] } },
+      lookbackBlocks: { type: 'number', description: 'default 900 (~30 min on Base)' },
+      withTrust: { type: 'boolean', description: 'optional — also return advisoryTrust (MainStreet safe-to-pay on the payee); does NOT affect the chain-only paid verdict' } }, required: ['to', 'amountMicro'] } },
   { name: 'till_trust', description: 'The TRUST TRIANGLE in one call: composes reputation (MainStreet safe-to-pay), standing (LAWBOR proven history, if BIII_LAWBOR_URL set) and settlement (on-chain, if amountMicro given) into ONE verdict (unsafe/unknown/trusted/settled). Fail-closed: absence is never trust.',
     inputSchema: { type: 'object', properties: {
       counterparty: { type: 'string', description: '0x address to assess (the merchant, or a payer)' },
@@ -87,16 +100,18 @@ async function callTool(name, a = {}) {
   if (name === 'till_check_payment') {
     const charge = { to: String(a.to || '').toLowerCase(), amountMicro: String(a.amountMicro || ''), amountUsd: T.microToUsd(String(a.amountMicro || '0')), token: T.USDC_BASE, chainId: 8453 };
     const fact = await findPayment({ to: charge.to, minMicro: charge.amountMicro, lookbackBlocks: a.lookbackBlocks || 900 });
-    return { verdict: T.verifyPayment(charge, fact), fact: fact || null };
+    const out = { verdict: T.verifyPayment(charge, fact), fact: fact || null };
+    // OPT-IN advisory (default OFF, so verification stays chain-only — the decoupling that IS the product):
+    // an agent that wants "did it land AND is this payee still safe?" in one call opts in. It is ADVISORY
+    // and NEVER changes `verdict` — only the chain says paid.
+    if (a.withTrust) out.advisoryTrust = { reputation: await fetchReputation(charge.to),
+      note: 'ADVISORY only — MainStreet safe-to-pay on the payee. Does NOT affect the paid verdict (chain-only).' };
+    return out;
   }
   if (name === 'till_trust') {
     const cp = String(a.counterparty || '').toLowerCase();
-    // vertex 1 — reputation (MainStreet), advisory
-    let reputation = null;
-    try {
-      const r = await fetch(`${MAINSTREET}/api/agent/preflight/${encodeURIComponent(cp)}`, { headers: { 'x-ms-monitor': '1' }, signal: AbortSignal.timeout(8000) });
-      if (r.ok) { const j = await r.json(); reputation = { decision: j.decision ?? null, score: j.score ?? null }; }
-    } catch {}
+    // vertex 1 — reputation (MainStreet), advisory (shared helper, keeps x-ms-monitor discipline)
+    const reputation = await fetchReputation(cp);
     // vertex 2 — standing (LAWBOR proven history), optional (only if a node is configured).
     // LAWBOR GET /credit?of= returns directUsdcMicro: the direct, on-chain-PROVEN USDC settled with this
     // counterparty (agent↔agent). That IS standing. Fail-closed: unreachable/absent ⇒ null ⇒ 'none'.
