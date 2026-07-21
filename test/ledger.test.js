@@ -65,5 +65,44 @@ t('reverify: a past receipt re-checks against the chain — an un-fakeable line'
   assert.equal(L.reverify(rows[0], { ...goodFact, valueMicro: '1' }).ok, false);
 });
 
+t('renderRoll: a shareable statement — every line carries its txHash, footer says re-verify on Base', () => {
+  let rows = [];
+  ({ rows } = L.appendReceipt(rows, mkReceipt('0x' + '11'.repeat(32), '4.50', '0', 1700000000)));
+  ({ rows } = L.appendReceipt(rows, mkReceipt('0x' + '22'.repeat(32), '3.00', '500000', 1700003600)));
+  const roll = L.renderRoll(rows, { merchantName: 'Café Demo' });
+  assert.match(roll, /PROVABLE TILL ROLL/);
+  assert.match(roll, /Receipts: 2/);
+  assert.match(roll, /Gross: 7\.50 USDC/);
+  assert.match(roll, /Tips: 0\.50 USDC/);
+  assert.match(roll, /B3-0001/); assert.match(roll, /B3-0002/);
+  assert.match(roll, /0x11111111…111111/, 'a line carries its (shortened) txHash so the reader can re-check it');
+  assert.match(roll, /trust no one/i);
+  assert.match(roll, /Non-custodial/i);
+  const fr = L.renderRoll(rows, { merchantName: 'Café Demo', lang: 'fr' });
+  assert.match(fr, /PROUVABLE/); assert.match(fr, /confiance à personne/);
+});
+
+t('reverifyRoll: allVerified ONLY when every line re-checks on Base — fail-closed on a missing/tampered fact', () => {
+  const tx1 = '0x' + '11'.repeat(32), tx2 = '0x' + '22'.repeat(32);
+  let rows = [];
+  ({ rows } = L.appendReceipt(rows, mkReceipt(tx1, '4.50')));
+  ({ rows } = L.appendReceipt(rows, mkReceipt(tx2, '3.00')));
+  const f = (tx, micro) => ({ txHash: tx, chainId: 8453, token: T.USDC_BASE, to: M.toLowerCase(), valueMicro: micro, confirmations: 20 });
+  const facts = new Map([[tx1, f(tx1, '4500000')], [tx2, f(tx2, '3000000')]]);
+  const all = L.reverifyRoll(rows, facts);
+  assert.equal(all.total, 2); assert.equal(all.verified, 2); assert.equal(all.allVerified, true);
+  // a MISSING fact fails that line, never passes it (fail-closed)
+  const partial = L.reverifyRoll(rows, new Map([[tx1, f(tx1, '4500000')]]));
+  assert.equal(partial.verified, 1); assert.equal(partial.allVerified, false);
+  assert.equal(partial.results.find((r) => r.txHash === tx2).ok, false);
+  // a TAMPERED amount fails that line
+  const tampered = new Map([[tx1, f(tx1, '4500000')], [tx2, f(tx2, '1')]]);
+  assert.equal(L.reverifyRoll(rows, tampered).allVerified, false);
+  // facts may also be a function
+  assert.equal(L.reverifyRoll(rows, (h) => facts.get(String(h).toLowerCase())).allVerified, true);
+  // empty roll is not "allVerified" (nothing proven is not everything proven)
+  assert.equal(L.reverifyRoll([], facts).allVerified, false);
+});
+
 console.log(`\n${pass} passed · ${fail} failed`);
 process.exit(fail ? 1 : 0);
