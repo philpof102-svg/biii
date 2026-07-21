@@ -38,7 +38,10 @@ because the product now passes it.*
   into the verdict (the list lives in MainStreet, not BIII; BIII does no screening itself).
 - The provable till-roll: human-readable receipts + a day-roll re-checkable on Base.
 - Up to **5,000 verdicts / month + unlimited receipts** (overage billed at list — see §Fees).
-- White-label headers/branding on request; a shared Slack/email channel for integration support.
+- White-label: partner branding on every receipt + till-roll is SHIPPED (`brand` on `till_roll` /
+  renderReceipt — "via <Partner>", optionally "· powered by BIII"; the non-custodial disclosure always
+  stays). Full app theming (logo/colours/custom domain) is on the roadmap. A shared Slack/email channel
+  for integration support.
 
 **What BIII does NOT do (by construction):** hold any key, move or custody any funds, or act as a
 money transmitter. The Partner's (or their merchant's) own wallet signs; the chain decides "paid."
