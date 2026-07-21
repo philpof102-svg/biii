@@ -6,7 +6,7 @@
   "type": "commonjs",
   "main": "lib/till.js",
   "scripts": {
-    "test": "node test/till.test.js && node test/chain.test.js && node test/server.test.js && node test/ledger.test.js && node test/trust.test.js && node test/invoice.test.js",
+    "test": "node test/till.test.js && node test/chain.test.js && node test/server.test.js && node test/ledger.test.js && node test/trust.test.js && node test/invoice.test.js && node test/asset.test.js",
     "serve": "node lib/server.js"
   },
   "engines": {

@@ -68,6 +68,10 @@ BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface,
 - `lib/invoice.js` — **the same registry for Web2-style invoices**: number, line items (exact micro
   math), due date, bill-to — paid by the same EIP-681, verified by the same chain discipline,
   settled/overdue lifecycle, and its receipt lands in the SAME provable till roll as a café sale
+- `lib/asset.js` — **the same registry for TOKENIZED ASSETS** (stocks / treasuries / RWA): is a token
+  contract the *genuine* issuer's or an impersonator? `genuine` / `impersonation` / `unsafe` / `unknown`,
+  fail-closed — catches the FBI-flagged lookalike-token fraud, and composes into the trust triangle
+  (`till_vet_asset`). The verified-issuer registry is authoritative: seed only, sourced from issuer docs.
 - `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (7 tools: `till_vet_merchant`,
   `till_create_charge`, `till_check_payment`, `till_trust`, `till_create_invoice`,
   `till_check_invoice`, `till_receipt`) — an agent can vet a merchant, get the whole trust triangle

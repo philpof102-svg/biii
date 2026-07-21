@@ -41,8 +41,8 @@ const fakeRpc = (logs, head = '0x100') => async (url, init) => {
 
   console.log('\nthe MCP bridge (phase 3: agents pay real-world humans):');
 
-  await t('4 tools exposed, descriptor-only posture in the descriptions', () => {
-    assert.deepEqual(TOOLS.map((x) => x.name), ['till_vet_merchant', 'till_create_charge', 'till_check_payment', 'till_trust', 'till_create_invoice', 'till_check_invoice', 'till_receipt']);
+  await t('8 tools exposed, descriptor-only posture in the descriptions', () => {
+    assert.deepEqual(TOOLS.map((x) => x.name), ['till_vet_merchant', 'till_create_charge', 'till_check_payment', 'till_trust', 'till_create_invoice', 'till_check_invoice', 'till_vet_asset', 'till_receipt']);
     assert.match(TOOLS[1].description, /holds no key|moves no funds/i);
   });
 

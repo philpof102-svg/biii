@@ -22,6 +22,7 @@ const T = require('../lib/till');
 const { findPayment } = require('../lib/chain');
 const { assessTriangle } = require('../lib/trust');
 const I = require('../lib/invoice');
+const { assessAsset, assetVertex } = require('../lib/asset');
 
 const MAINSTREET = (process.env.MAINSTREET_URL || 'https://avisradar-production.up.railway.app').replace(/\/$/, '');
 
@@ -53,6 +54,11 @@ const TOOLS = [
       to: { type: 'string' }, totalMicro: { type: 'string', description: 'the invoice totalMicro' },
       number: { type: 'string' }, dueDateMs: { type: 'number' }, merchantName: { type: 'string' },
       lookbackBlocks: { type: 'number', description: 'default 43200 (~1 day on Base); invoices are slower than tills' } }, required: ['to', 'totalMicro'] } },
+  { name: 'till_vet_asset', description: 'Is a TOKENIZED ASSET (stock/treasury/RWA) contract the GENUINE issuer\'s, or an impersonator? genuine / impersonation / unsafe / unknown — fail-closed (unknown is never genuine). Catches the FBI-flagged lookalike-token fraud. Registry is authoritative: seed only; source real addresses from issuer official docs.',
+    inputSchema: { type: 'object', properties: {
+      token: { type: 'string', description: '0x contract address of the token' },
+      claimedIssuer: { type: 'string', description: 'what it claims to be, e.g. "BlackRock"' },
+      claimedSymbol: { type: 'string', description: 'e.g. "BUIDL", "TSLAx"' } }, required: ['token'] } },
   { name: 'till_receipt', description: 'Produce the chain-anchored receipt for a VERIFIED payment (txHash + basescan link). Refuses without verification.',
     inputSchema: { type: 'object', properties: {
       to: { type: 'string' }, amountUsd: { type: 'string' }, label: { type: 'string' },
@@ -119,6 +125,11 @@ async function callTool(name, a = {}) {
     const status = I.invoiceStatus(invoice, verdict, Date.now());
     return { status, verdict, fact: fact || null,
       receipt: verdict.paid === true ? I.invoiceReceipt(invoice, verdict, { merchantName: a.merchantName }) : null };
+  }
+  if (name === 'till_vet_asset') {
+    const verdict = assessAsset({ token: a.token, claimedIssuer: a.claimedIssuer, claimedSymbol: a.claimedSymbol });
+    return { verdict, triangleReputation: assetVertex(verdict),
+      note: 'ADVISORY. The verified-issuer registry is a seed — a wrong "genuine" address would bless a fake, so source real addresses from each issuer\'s official contract page before trusting in production.' };
   }
   if (name === 'till_receipt') {
     const charge = T.createCharge({ to: a.to, amountUsd: a.amountUsd, label: a.label, nowMs: Date.now() });
