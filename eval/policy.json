@@ -1,0 +1,43 @@
+{
+  "artifact": "biii-verdict-policy",
+  "generatedFrom": "lib/trust.assessTriangle + lib/asset.assessAsset",
+  "policy": {
+    "minScoreDefault": 40,
+    "reputationClassification": {
+      "PROCEED": "safe",
+      "PROCEED_LOW_VALUE": "safe",
+      "CAUTION": "weak",
+      "BLOCK": "unsafe",
+      "REFUSE": "unsafe",
+      "AVOID": "unsafe",
+      "DENY": "unsafe",
+      "DECLINE": "unsafe",
+      "UNSAFE": "unsafe",
+      "MAYBE": "weak"
+    },
+    "overrideRule": "reputation.status===\"unsafe\" forces trust=\"unsafe\" and payable=false, over any other green",
+    "failClosed": "unknown / CAUTION / below-floor / non-finite-score are never payable on reputation alone",
+    "assetStatuses": [
+      "genuine (payable)",
+      "impersonation/unsafe (blocked)",
+      "unknown (not payable)"
+    ],
+    "denylistSource": "OFAC SDN extract (0xB10C) sample; production injects the full MainStreet denylist"
+  },
+  "corpus": {
+    "fingerprint": "3c287fd4accf5f21",
+    "size": 17,
+    "negatives": 7,
+    "failclosed": 6,
+    "positives": 4
+  },
+  "metrics": {
+    "recall": 1,
+    "failClosedHeld": 1,
+    "positivesPayable": 1
+  },
+  "gates": {
+    "recall": 1,
+    "failClosedHeld": 1
+  }
+}
