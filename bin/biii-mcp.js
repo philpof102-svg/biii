@@ -25,7 +25,7 @@ const I = require('../lib/invoice');
 const { assessAsset, assetVertex } = require('../lib/asset');
 const L = require('../lib/ledger');
 const { DISCLAIMER } = require('../lib/disclaimer');
-const { loadScreen, screenAddress } = require('../lib/screen');
+const { loadScreen, screenAddress, screenMeta } = require('../lib/screen');
 const fs = require('node:fs'), path = require('node:path');
 
 // Authoritative verified-issuer registry, if it's been ingested (scripts/biii-rwa-registry.js → RWA.xyz).
@@ -110,15 +110,16 @@ async function callTool(name, a = {}) {
     // oracle is slow/down — the block cannot vanish with the service (the SPOF this closes).
     const local = screenAddress(a.address, KNOWN_BAD);
     if (local.blocked) return { decision: 'BLOCK', score: 0, source: 'local-known-bad', advisory: local.reason };
+    const screen = screenMeta(KNOWN_BAD);   // freshness of the floor a "not-known-bad" result leans on
     try {
       const r = await fetch(`${MAINSTREET}/api/agent/preflight/${encodeURIComponent(String(a.address || ''))}`,
         { headers: { 'x-ms-monitor': '1' }, signal: AbortSignal.timeout(8000) });
-      if (!r.ok) return { advisory: 'oracle unreachable (HTTP ' + r.status + ') — treat the merchant as UNKNOWN, not as safe' };
+      if (!r.ok) return { advisory: 'oracle unreachable (HTTP ' + r.status + ') — treat the merchant as UNKNOWN, not as safe', screen };
       const j = await r.json();
-      return { decision: j.decision ?? null, score: j.score ?? null, source: 'mainstreet-oracle', advisory: 'ORACLE-REPORTED — advisory only, never a guarantee' };
+      return { decision: j.decision ?? null, score: j.score ?? null, source: 'mainstreet-oracle', advisory: 'ORACLE-REPORTED — advisory only, never a guarantee', screen };
     } catch (e) {
       // a timeout used to THROW here (no catch) and crash the tool; degrade honestly instead.
-      return { advisory: 'oracle unreachable (' + (e && e.message) + ') — treat the merchant as UNKNOWN, not as safe' };
+      return { advisory: 'oracle unreachable (' + (e && e.message) + ') — treat the merchant as UNKNOWN, not as safe', screen };
     }
   }
   if (name === 'till_create_charge') {
@@ -157,7 +158,12 @@ async function callTool(name, a = {}) {
       const fact = await findPayment({ to: cp, minMicro: String(a.amountMicro), lookbackBlocks: 900 });
       settlement = T.verifyPayment({ to: cp, amountMicro: String(a.amountMicro), token: T.USDC_BASE, chainId: 8453 }, fact);
     }
-    return { triangle: assessTriangle({ reputation, standing, settlement }), sources: { reputation, standing: standing || null, settlementChecked: !!a.amountMicro } };
+    // FRESHNESS disclosure: a verdict that is not a hard local BLOCK leans on the known-bad list's age.
+    // Surface it so "not-known-bad" is never read as "screened against a current list" when it isn't.
+    const screen = screenMeta(KNOWN_BAD);
+    return { triangle: assessTriangle({ reputation, standing, settlement }),
+      sources: { reputation, standing: standing || null, settlementChecked: !!a.amountMicro, screen },
+      disclosure: screen.disclosure };
   }
   if (name === 'till_create_invoice') {
     const invoice = I.createInvoice({ to: a.to, lineItems: a.lineItems, number: a.number, billTo: a.billTo,
