@@ -23,6 +23,12 @@ const { findPayment } = require('../lib/chain');
 const { assessTriangle } = require('../lib/trust');
 const I = require('../lib/invoice');
 const { assessAsset, assetVertex } = require('../lib/asset');
+const fs = require('node:fs'), path = require('node:path');
+
+// Authoritative verified-issuer registry, if it's been ingested (scripts/biii-rwa-registry.js → RWA.xyz).
+// Absent → assessAsset falls back to its small SEED. A stale/missing file can only UNDER-verify (safe).
+let RWA_REGISTRY = null;
+try { const p = path.join(__dirname, '..', 'data', 'rwa-registry.json'); if (fs.existsSync(p)) RWA_REGISTRY = JSON.parse(fs.readFileSync(p, 'utf8')).entries; } catch {}
 
 const MAINSTREET = (process.env.MAINSTREET_URL || 'https://avisradar-production.up.railway.app').replace(/\/$/, '');
 
@@ -127,9 +133,11 @@ async function callTool(name, a = {}) {
       receipt: verdict.paid === true ? I.invoiceReceipt(invoice, verdict, { merchantName: a.merchantName }) : null };
   }
   if (name === 'till_vet_asset') {
-    const verdict = assessAsset({ token: a.token, claimedIssuer: a.claimedIssuer, claimedSymbol: a.claimedSymbol });
+    const verdict = assessAsset({ token: a.token, claimedIssuer: a.claimedIssuer, claimedSymbol: a.claimedSymbol },
+      RWA_REGISTRY ? { registry: RWA_REGISTRY } : {});
     return { verdict, triangleReputation: assetVertex(verdict),
-      note: 'ADVISORY. The verified-issuer registry is a seed — a wrong "genuine" address would bless a fake, so source real addresses from each issuer\'s official contract page before trusting in production.' };
+      registrySource: RWA_REGISTRY ? `rwa.xyz (${RWA_REGISTRY.length} contracts)` : 'seed (run scripts/biii-rwa-registry.js with RWA_XYZ_API_KEY to source the authoritative registry)',
+      note: 'ADVISORY. genuine = the contract matches a verified issuer address; impersonation/unknown fail closed.' };
   }
   if (name === 'till_receipt') {
     const charge = T.createCharge({ to: a.to, amountUsd: a.amountUsd, label: a.label, nowMs: Date.now() });
