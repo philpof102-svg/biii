@@ -56,16 +56,19 @@ wallet signs, and the chain — not us — is the only thing allowed to say "pai
 ## Run it
 
 ```bash
-npm test                               # 14/14, fully offline
+npm test                               # 24/24, fully offline
 BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface, :4700
 ```
 
 - `lib/till.js` — pure core: money math, charges, EIP-681 URIs, verification, receipts
 - `lib/chain.js` — read-only Base watcher (finds the paying transfer; never invents)
 - `lib/server.js` — thin HTTP: `/charge`, `/status`, `/receipt`
+- `lib/trust.js` — **the trust triangle**: composes reputation (MainStreet) + standing (LAWBOR) +
+  settlement (chain) into one fail-closed verdict (`unsafe`/`unknown`/`trusted`/`settled`)
 - `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (`till_vet_merchant`,
-  `till_create_charge`, `till_check_payment`, `till_receipt`) — an agent can vet a merchant,
-  pay in USDC with its own wallet, and keep a receipt
+  `till_create_charge`, `till_check_payment`, `till_trust`, `till_receipt`) — an agent can vet a
+  merchant, get the whole trust triangle in one call, pay in USDC with its own wallet, keep a receipt
+- `pitch/trust-triangle.html` — the sellable white-label one-pager (self-contained, theme-aware)
 - `web/` — the merchant phone app (PWA): amount → QR → **PAID ✓** → receipt
 
 ## Business model — the trust+bridge layer partners resell
