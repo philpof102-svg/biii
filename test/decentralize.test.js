@@ -16,7 +16,7 @@ process.env.BIII_LAWBOR_URL = 'http://lawbor.test';
 global.fetch = async (url) => {
   const u = String(url);
   if (u.includes('avisradar') || u.includes('/api/agent/preflight')) throw new Error('MainStreet DOWN');
-  if (u.includes('/credit')) return { ok: true, json: async () => ({ directUsdcMicro: '5000000' }) };
+  if (u.includes('/why')) return { ok: true, json: async () => ({ directMicro: '5000000', direct: [{ txHash: '0x' + 'cd'.repeat(32), jobId: 'j1', amountMicro: '5000000' }], bound: { maxTotalMicro: '7500000' } }) };
   throw new Error('unexpected fetch ' + u);
 };
 const { callTool } = require('../bin/biii-mcp');
@@ -48,6 +48,18 @@ const { callTool } = require('../bin/biii-mcp');
     // clean + proven LAWBOR standing → trusted is CORRECT (standing is on-chain, needs no oracle); the fix
     // must not over-block. The point is only that KNOWN-BAD can never reach here.
     assert.notEqual(r.triangle.trust, 'unsafe');
+  });
+
+  await t('HARDENED STANDING: the LAWBOR standing is ORACLE-REPORTED and shipped WITH re-verifiable txHashes', async () => {
+    const r = await callTool('till_trust', { counterparty: CLEAN });
+    const s = r.sources.standing;
+    assert.ok(s, 'a standing lens is present');
+    assert.match(s.disclosure, /ORACLE-REPORTED by the LAWBOR node/);
+    assert.match(s.disclosure, /RE-VERIFY each txHash/);
+    assert.match(s.disclosure, /Never merged into reputation/);
+    assert.ok(Array.isArray(s.evidence) && s.evidence.length === 1, 'the number ships with its evidence');
+    assert.match(s.evidence[0].txHash, /^0x[0-9a-f]{64}$/);
+    assert.match(s.evidence[0].reVerify, /basescan\.org\/tx\/0x/);
   });
 
   console.log('\n' + pass + ' passed, ' + fail + ' failed');

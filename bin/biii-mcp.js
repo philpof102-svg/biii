@@ -162,14 +162,26 @@ async function callTool(name, a = {}) {
       oracle,
       note: 'Two lenses, SEPARATE and never merged into one score: LOCAL (verified here, decisive on a BLOCK) vs ORACLE (MainStreet, ORACLE-REPORTED, advisory). Averaging them would launder the oracle\'s word into local proof.',
     };
-    // vertex 2 — standing (LAWBOR proven history), optional (only if a node is configured).
-    // LAWBOR GET /credit?of= returns directUsdcMicro: the direct, on-chain-PROVEN USDC settled with this
-    // counterparty (agent↔agent). That IS standing. Fail-closed: unreachable/absent ⇒ null ⇒ 'none'.
-    let standing = null;
+    // vertex 2 — STANDING (LAWBOR proven paid history), optional. HARDENED like the reputation oracle:
+    // it is a SECOND service BIII does not control, so it is labeled ORACLE-REPORTED and shipped WITH its
+    // EVIDENCE — the txHashes behind the number — so the reader RE-VERIFIES on Base instead of trusting a
+    // node's bare figure. Use /why (number + evidence) not /credit (number alone). Fail-closed on absence.
+    let standing = null;        // the decision fed to assessTriangle: { paidMicro }
+    let standingLens = null;    // the auditable display lens (re-verifiable, never merged into reputation)
     if (process.env.BIII_LAWBOR_URL) {
       try {
-        const r = await fetch(`${process.env.BIII_LAWBOR_URL.replace(/\/$/, '')}/credit?of=${encodeURIComponent(cp)}`, { signal: AbortSignal.timeout(8000) });
-        if (r.ok) { const j = await r.json(); standing = { paidMicro: String(j.directUsdcMicro || '0') }; }
+        const r = await fetch(`${process.env.BIII_LAWBOR_URL.replace(/\/$/, '')}/why?of=${encodeURIComponent(cp)}`, { signal: AbortSignal.timeout(8000) });
+        if (r.ok) {
+          const j = await r.json();
+          const directMicro = String(j.directMicro || '0');
+          standing = { paidMicro: directMicro };
+          standingLens = {
+            paidUsdc: T.microToUsd(directMicro), directMicro, node: process.env.BIII_LAWBOR_URL,
+            evidence: (Array.isArray(j.direct) ? j.direct : []).slice(0, 20).map((e) => ({ txHash: e.txHash, jobId: e.jobId, amountMicro: e.amountMicro, reVerify: 'https://basescan.org/tx/' + e.txHash })),
+            bound: j.bound || null,
+            disclosure: 'ORACLE-REPORTED by the LAWBOR node (BIII does not control it) — its viewer-relative view. RE-VERIFY each txHash on Base: a number without its evidence is not proof. Never merged into reputation.',
+          };
+        }
       } catch {}
     }
     // vertex 3 — settlement (on-chain), only if an amount is being checked
@@ -179,7 +191,7 @@ async function callTool(name, a = {}) {
       settlement = T.verifyPayment({ to: cp, amountMicro: String(a.amountMicro), token: T.USDC_BASE, chainId: 8453 }, fact);
     }
     return { triangle: assessTriangle({ reputation, standing, settlement }),
-      sources: { reputation: reputationLenses, standing: standing || null, settlementChecked: !!a.amountMicro },
+      sources: { reputation: reputationLenses, standing: standingLens, settlementChecked: !!a.amountMicro },
       disclosure: meta.disclosure };
   }
   if (name === 'till_create_invoice') {
