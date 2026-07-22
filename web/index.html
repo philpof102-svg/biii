@@ -7,6 +7,10 @@
 <title>BIII — Caisse</title>
 <meta name="theme-color" content="#0A0A0F">
 <link rel="manifest" href="manifest.json">
+<!-- iOS: treat the caisse as a standalone app when added to the home screen (iOS ignores the manifest) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BIII">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   :root { --bg: #0A0A0F; --accent: #0052FF; --green: #16C784; --text: #F5F7FF; --text-dim: #8A8FA0; --surface: #14141F; --border: #1E1E2E; }
