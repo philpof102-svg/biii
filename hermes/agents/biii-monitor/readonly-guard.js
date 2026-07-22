@@ -23,6 +23,10 @@ const DENY = new Set([
   'webhook_create', 'webhook_delete', 'agent_register', 'ucan_delegate', 'identity_sign',
   // base-mcp (if ever added) — the absolute never-autonomous set
   'send', 'swap', 'sign', 'send_calls',
+  // lawbor — the agent-to-agent economy WRITES (post/offer/bid/settle/block). Descriptor-only, but an
+  // unattended monitor must not autonomously speak, list, bid, lock a price, or bind a settlement.
+  'lawbor_say', 'lawbor_bot_say', 'lawbor_offer', 'lawbor_post_job', 'lawbor_bid', 'lawbor_confirm',
+  'lawbor_quote', 'lawbor_settle', 'lawbor_validate', 'lawbor_block', 'lawbor_unblock', 'lawbor_accept',
 ]);
 
 // Backstop for UNKNOWN paid toolsets (e.g. monid, whose tools we can't enumerate until OAuth): block any
