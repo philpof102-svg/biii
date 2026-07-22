@@ -56,7 +56,7 @@ wallet signs, and the chain — not us — is the only thing allowed to say "pai
 ## Run it
 
 ```bash
-npm test                               # 206 assertions across 30 files + a 17-case eval harness, all offline
+npm test                               # 226 assertions across 35 files + a 17-case eval harness, all offline
 BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface, :4700
 ```
 
@@ -77,15 +77,21 @@ BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface,
   contract the *genuine* issuer's or an impersonator? `genuine` / `impersonation` / `unsafe` / `unknown`,
   fail-closed — catches the FBI-flagged lookalike-token fraud, and composes into the trust triangle
   (`till_vet_asset`).
-- `scripts/biii-rwa-registry.js` — builds the verified-issuer registry. **Shipped default: Coingecko's
-  free tier** (no key) — the committed `data/rwa-registry.json` is `generatedFrom: "coingecko (free)"`
-  (620 entries). Coingecko is an AGGREGATOR, so treat a `genuine` verdict as aggregator-sourced, not
-  issuer-authoritative. **Optional authoritative source:** set `RWA_XYZ_API_KEY` to switch to RWA.xyz
-  (`/v4/tokens` ⋈ `/v4/assets`, Bearer-auth) — a key-gated path that exists but is not the default and did
-  not produce the shipped data. **Fail-safe:** every entry must validate (0x-40hex · integer chainId ·
-  symbol · wanted chain) or it's dropped — a schema drift yields an EMPTY registry, never a wrong "genuine"
-  address. **In progress:** issuer-official / on-chain sourcing (Dinari factory + Backed tokenlist) to make
-  a `genuine` verdict authoritative rather than aggregator-sourced.
+- **Issuer-verified registry (`data/issuer-verified.json`, committed, multi-chain)** — the AUTHORITATIVE,
+  no-key, commercial-safe layer that earns the strong **green "issuer-verified"** badge. **147 entries across
+  9 chains**, all from ISSUER-DIRECT sources: **Dinari dShares** (40, Base — enumerated on-chain from the
+  factory's `DShareAdded` event, each re-verified via `symbol()`/`name()`; `scripts/biii-rwa-issuer-direct.js`),
+  **Backed / xStocks** (100, across Ethereum/Arbitrum/Optimism/BSC/Mantle/XLayer/Ink — Backed's own public API
+  `api.backed.fi`, no key; `scripts/biii-issuer-backed.js`), and **Ondo** (7 OUSG/USDY/rUSDY — official docs,
+  each on-chain-verified). `lib/asset-registry` merges this over the aggregator by address, so a verified
+  address reads `provenance: issuer-official` (green) while everything else stays aggregator-teal.
+- `scripts/biii-rwa-registry.js` — builds the AGGREGATOR fallback (the teal "listed" layer). **Coingecko's
+  free tier** (no key) → `data/rwa-registry.json`, `generatedFrom: "coingecko (free)"`. Coingecko is an
+  AGGREGATOR, so a match here is `provenance: aggregator` (teal "listed"), never the issuer-verified green —
+  and the cross-check (`scripts/biii-issuer-registry.js`) flags any symbol the aggregator lists at a
+  *different* address than the issuer-official one (potential lookalike). **Fail-safe:** every entry must
+  validate (0x-40hex · integer chainId · symbol) or it's dropped — a schema drift yields an EMPTY registry,
+  never a wrong "genuine" address.
 - `lib/export.js` — **the accounting export finance teams need**: `till_export` turns the same verified
   receipts into an accountant-ready CSV (QuickBooks / Xero / Excel import it) where every row carries its
   txHash + Basescan link — a pointer to the chain, not a book to trust. Non-custodial, re-verifiable.
