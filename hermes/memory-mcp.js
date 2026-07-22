@@ -8,6 +8,10 @@
  * path-locked to the configured roots. Zero deps (node built-ins). Same stdio shape as biii-mcp.
  *
  * Roots via MEMORY_ROOTS (colon-separated dirs); defaults to the Obsidian vault + the mainstreet memory dir.
+ *
+ * NOTE: wire this under a Hermes toolset key that is NOT "memory" — Hermes ships a built-in `memory`
+ * toolset (add/replace/remove) that shadows an MCP server of the same key, so `-t memory` silently
+ * selects the built-in and our search/read/index never appear. We register it as `recall`.
  */
 const readline = require('node:readline');
 const fs = require('node:fs'), path = require('node:path');
@@ -86,7 +90,7 @@ rl.on('line', (line) => {
   if (m === null || typeof m !== 'object' || Array.isArray(m)) return;
   const { id, method, params } = m;
   try {
-    if (method === 'initialize') return send({ jsonrpc: '2.0', id, result: { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'memory', version: '0.1.0' } } });
+    if (method === 'initialize') return send({ jsonrpc: '2.0', id, result: { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'recall', version: '0.1.0' } } });
     if (method === 'tools/list') return send({ jsonrpc: '2.0', id, result: { tools: TOOLS } });
     if (method === 'tools/call') return send({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(callTool(params.name, params.arguments || {})) }] } });
     if (id != null) send({ jsonrpc: '2.0', id, result: {} });

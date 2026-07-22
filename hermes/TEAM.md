@@ -5,13 +5,14 @@ with a tight **job description**, chain them (output → input), keep a **human 
 publishes/spends, and keep a **Corrections Log** so each agent sharpens over time. Built on ONE local Hermes
 (`~/.hermes-biii`) running four of our servers as toolsets.
 
-## The economy (four toolsets, ~95 tools, all in one Hermes)
+## The economy (five toolsets, ~98 tools, all in one Hermes)
 | Toolset | What it gives the team |
 |---|---|
 | **biii** (15) | Base trust / safe-to-pay verdicts; token genuineness; the x402 paid vet surface |
 | **gitlawb** (40) | decentralized git, PRs, issues, **bounties + agent-task delegation**, DID resolution |
 | **monid** (13) | discover + pay-per-call 1,800+ data/tools (Exa, TikHub, enrichment) |
 | **lawbor** (27) | **agent-to-agent messaging + bazaar + jobs (post/bid/quote/confirm/settle) + reputation** |
+| **recall** (3) | READ-ONLY recall of our second brain (Obsidian vault + mainstreet memory); `memory_search/read/index`, path-locked, so the agent stops losing what we decided. Wired as key `recall`, not `memory` (Hermes ships a built-in `memory` that shadows it). |
 
 Models (OpenRouter): default `tencent/hy3` (cheap routine), `-m moonshotai/kimi-k3` for hard RC tasks.
 
