@@ -39,6 +39,14 @@ input schema + cap fields before `monid_run`. As of last discovery the useful on
 5. **Synthesize** → a brief: for each NEW item — name, one-line what-it-is, link, and **"integration angle for us"** (a 4th toolset? a new issuer to add? a pattern? a distribution channel?). Skip noise; only genuinely-new, relevant items.
 6. **Self-improve**: append the brief to `cache/devradar.json`. Items tagged `integrate` become the backlog the operator (or a follow-up agent run) acts on.
 
+## Known gotchas (learned from live runs, 2026-07-22)
+- **Exa search date filter**: the monid gateway coerces an ISO `startPublishedDate` string into a JS Date the
+  provider then rejects. Use **`maxAgeHours` nested under `contents`** instead — e.g.
+  `{"body":{"query":"…","type":"auto","numResults":5,"contents":{"maxAgeHours":4320}}}`.
+- **Gateway flakiness**: monid may go "unreachable after 3 consecutive failures" mid-cycle (auto-retry ~47s).
+  On that, STOP + report $0 — never fabricate. Prefer FEW calls per cycle so a flaky window wastes nothing.
+- Always `monid_balance` at the start (free) — refuse to run if the balance can't cover the capped cycle.
+
 ## Report format (tight)
 ```
 X DEV-RADAR — <n> new items (cycle ~$X):
