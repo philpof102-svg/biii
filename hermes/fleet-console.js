@@ -77,6 +77,29 @@ async function gather() {
   return data;
 }
 
+// ── Observability: REAL LLM spend from OpenRouter. Key is read server-side and NEVER sent to the browser. ──
+function openrouterKey() {
+  if (process.env.OPENROUTER_API_KEY) return process.env.OPENROUTER_API_KEY;
+  try { const m = fs.readFileSync(path.join(HOME_DIR, '.env'), 'utf8').match(/^OPENROUTER_API_KEY=(.+)$/m); return m ? m[1].trim() : null; } catch { return null; }
+}
+let spendCache = { t: 0, data: null };
+async function fetchSpend() {
+  if (Date.now() - spendCache.t < 60000 && spendCache.data) return spendCache.data;
+  const key = openrouterKey();
+  if (!key) return { ok: false, reason: 'no key' };
+  const H = { Authorization: 'Bearer ' + key };
+  const [k, c] = await Promise.all([
+    fetch('https://openrouter.ai/api/v1/key', { headers: H }).then((r) => r.json()).catch(() => null),
+    fetch('https://openrouter.ai/api/v1/credits', { headers: H }).then((r) => r.json()).catch(() => null),
+  ]);
+  const kd = (k && k.data) || {}; const cd = (c && c.data) || {};
+  const data = { ok: true,
+    keyUsage: +kd.usage || 0, daily: +kd.usage_daily || 0, weekly: +kd.usage_weekly || 0, monthly: +kd.usage_monthly || 0,
+    credits: +cd.total_credits || 0, acctUsage: +cd.total_usage || 0, remaining: (+cd.total_credits || 0) - (+cd.total_usage || 0) };
+  spendCache = { t: Date.now(), data };   // aggregates only — the key itself never leaves the server
+  return data;
+}
+
 const HTML = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MainStreet — Fleet (live)</title><style>
 :root{--bg:#0a0e14;--panel:#111a26;--panel2:#0f1620;--line:#1c2836;--line2:#243244;--tx:#cdd8e8;--muted:#6f8098;--dim:#4a5a72;
@@ -114,11 +137,19 @@ h1{margin:6px 0 0;font-size:25px;font-weight:650;letter-spacing:-.01em}h1 .thin{
 .jflag.f{color:var(--sched)}.jflag.c{color:var(--up)}
 .jmore{display:none;grid-column:1/-1;margin-top:8px;padding:10px 12px;background:#0a141e;border:1px solid var(--line);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--muted);white-space:pre-wrap;line-height:1.6}
 .jitem.open .jmore{display:block}.jitem.open .jhd{white-space:normal}
+.obs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:14px}
+.stat{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.stat .l{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.stat .n{font-family:var(--mono);font-size:23px;font-weight:600;color:var(--tx);margin-top:7px;font-variant-numeric:tabular-nums}
+.stat .s{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px}
+.stat.warn .n{color:var(--sched)}.stat.zero .n{color:var(--up)}
 </style></head><body><div class="wrap">
 <header><div><div class="eyebrow">MainStreet · Living Economy · LIVE</div><h1>Fleet <span class="thin">— qui bosse, qui pas</span></h1></div>
 <div class="meta"><span class="livedot"></span><b id="act">…</b> · <span id="ts">…</span><br>guard read-only: <b style="color:var(--up)">ON</b> · refresh 12s</div></header>
 <div class="grid" id="grid"></div>
 <div class="legend"><span><i style="background:var(--up)"></i>working</span><span><i style="background:var(--sched)"></i>scheduled</span><span><i style="background:var(--pend)"></i>pending</span><span><i style="background:var(--down)"></i>down</span><span><i style="background:var(--off)"></i>idle</span></div>
+<div class="jhead"><div class="eyebrow">Observabilité · dépense LLM (OpenRouter, live)</div><h2>Combien les robots dépensent</h2></div>
+<div id="obs" class="obs"><div class="foot">chargement de la dépense…</div></div>
 <div class="jhead"><div class="eyebrow">Journal · historique réel des runs</div><h2>Ce que les bots ont fait <span class="thin">— dernières exécutions cron</span></h2></div>
 <div id="journal" class="journal"><div class="foot">chargement du journal…</div></div>
 <div class="foot" id="foot">chargement…</div></div>
@@ -147,8 +178,21 @@ async function jtick(){let d;try{d=await (await fetch('/api/journal')).json()}ca
  const el=document.getElementById('journal');
  if(!d.runs||!d.runs.length){el.innerHTML='<div class="foot" style="padding:14px 16px;margin:0">aucun run enregistré pour l\\'instant — la sentinelle écrit ici à chaque passage (toutes les 30 min)</div>';return}
  el.innerHTML=d.runs.map(jrow).join('')}
+async function stick(){let d;try{d=await (await fetch('/api/spend')).json()}catch(e){return}
+ const el=document.getElementById('obs');
+ if(!d||!d.ok){el.innerHTML='<div class="stat"><div class="l">dépense LLM</div><div class="n">—</div><div class="s">indisponible ('+((d&&d.reason)||'?')+')</div></div>';return}
+ const usd=x=>'$'+Number(x).toFixed(2);const low=d.remaining<5;
+ const rows=[
+  ['clé fleet · total',usd(d.keyUsage),'runs Hermes (hy3·kimi·grok)',''],
+  ['aujourd\\'hui',usd(d.daily),'semaine '+usd(d.weekly),''],
+  ['ce mois',usd(d.monthly),'facturé OpenRouter',''],
+  ['crédits restants',usd(d.remaining),'sur '+usd(d.credits)+' du compte',low?'warn':''],
+  ['sentinelle biii-watch','$0.00','no_agent · zéro appel LLM','zero'],
+ ];
+ el.innerHTML=rows.map(s=>\`<div class="stat \${s[3]}"><div class="l">\${s[0]}</div><div class="n">\${s[1]}</div><div class="s">\${s[2]}</div></div>\`).join('')}
 tick();setInterval(tick,12000);
 jtick();setInterval(jtick,30000);
+stick();setInterval(stick,60000);
 </script></body></html>`;
 
 http.createServer(async (req, res) => {
@@ -159,6 +203,10 @@ http.createServer(async (req, res) => {
   if (req.url.startsWith('/api/journal')) {
     try { const j = readJournal(24); res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ts: new Date().toISOString(), runs: j })); }
     catch (e) { res.writeHead(500, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: String(e.message || e) })); }
+  }
+  if (req.url.startsWith('/api/spend')) {
+    try { const d = await fetchSpend(); res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify(d)); }
+    catch (e) { res.writeHead(500, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: false, reason: String(e.message || e) })); }
   }
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(HTML);
 }).listen(PORT, () => console.log('fleet-console → http://localhost:' + PORT));
