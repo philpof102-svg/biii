@@ -36,6 +36,11 @@ process.stdin.on('end', () => {
   let tool = '';
   try { tool = String(JSON.parse(raw || '{}').tool_name || ''); } catch { /* malformed → treat as unknown */ }
   const seg = tool.split(/__|[.:/\s]/).pop();       // strip server namespace (., :, /, ws, or __), keep single _ in names
+  // Supervised spend opt-in: MONID_ALLOW_SPEND=1 lets THIS run use monid's paid tools (the x-devradar
+  // research skill, ~$0.025/cycle). It ONLY unblocks the monid namespace — base send/swap/sign and every
+  // gitlawb/biii write stay blocked regardless. Unattended runs (no env) keep monid spend blocked too.
+  const isMonid = seg.toLowerCase().startsWith('monid') || /(^|[._:/])monid_/i.test(tool);
+  if (process.env.MONID_ALLOW_SPEND === '1' && isMonid) { process.exit(0); }
   if (DENY.has(tool) || DENY.has(seg) || MONEY_VERB.test(seg) || MONEY_VERB.test(tool)) {
     process.stdout.write(JSON.stringify({
       action: 'block',
