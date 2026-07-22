@@ -26,6 +26,7 @@ const { assessAsset, assetVertex } = require('../lib/asset');
 const L = require('../lib/ledger');
 const X = require('../lib/export');
 const { meterUsage } = require('../lib/meter');
+const { erc8004Lens } = require('../lib/erc8004');
 const { DISCLAIMER } = require('../lib/disclaimer');
 const { loadScreen, screenAddress, screenMeta } = require('../lib/screen');
 const fs = require('node:fs'), path = require('node:path');
@@ -115,7 +116,10 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: {
       counterparty: { type: 'string', description: '0x address to assess (the merchant, or a payer)' },
       amountMicro: { type: 'string', description: 'optional — if given, also check on-chain settlement to this address' },
-      resourceUrl: { type: 'string', description: 'optional — the endpoint/resource URL you would pay; enables the local phishing/plain-http/admin-path URL lens in the local classifier' } }, required: ['counterparty'] } },
+      resourceUrl: { type: 'string', description: 'optional — the endpoint/resource URL you would pay; enables the local phishing/plain-http/admin-path URL lens in the local classifier' },
+      agentId: { type: 'string', description: 'optional — the counterparty\'s ERC-8004 agentId; surfaces a SEPARATE, advisory, re-verifiable ERC-8004 reputation lens (interop, never rival)' },
+      erc8004Summary: { type: 'object', description: 'optional — a ReputationRegistry.getSummary result {count, summaryValue, summaryValueDecimals} for the agentId; BIII applies the sybil-honest lens + a re-verify pointer (BIII does not read the registry live yet)' },
+      erc8004TrustedClients: { type: 'boolean', description: 'optional — attest the getSummary was filtered to clients YOU trust (drops the sybil caveat; still advisory)' } }, required: ['counterparty'] } },
   { name: 'till_create_invoice', description: 'Create a Web2-style INVOICE (number, line items, due date, bill-to) on the SAME non-custodial registry: paid by the same EIP-681 intent, verified by the same chain discipline, recorded in the same provable till roll. Returns the invoice + a human-readable bill (EN/FR) + the payment URI.',
     inputSchema: { type: 'object', properties: {
       to: { type: 'string', description: 'merchant 0x address (their own wallet — non-custodial)' },
@@ -242,8 +246,15 @@ async function callTool(name, a = {}) {
     // fed there would read as false 'trusted'. It proves the safe-to-pay verdict is computed here and holds
     // when the oracle is down; on a known-bad address it BLOCKs identically to (and independently of) the floor.
     const localClassifier = localClassify(cp, { resourceUrl: a.resourceUrl });
+    // ERC-8004 lens — INTEROP with the dominant agent-reputation standard, surfaced only when the caller
+    // opts in (agentId or a getSummary result). It is a SEPARATE, ADVISORY, re-verifiable signal: feedback
+    // is client-submitted (sybil-farmable), so it never enters the triangle's payable decision — it informs,
+    // and always points to re-verify getSummary on Base. Absent opt-in ⇒ omitted (absence is never trust).
+    const erc8004 = (a.agentId != null || a.erc8004Summary)
+      ? erc8004Lens(a.erc8004Summary, { agentId: a.agentId, trustedClientsOnly: !!a.erc8004TrustedClients })
+      : null;
     return { triangle: assessTriangle({ reputation, standing, settlement }),
-      sources: { reputation: reputationLenses, localClassifier, standing: standingLens, settlementChecked: !!a.amountMicro },
+      sources: { reputation: reputationLenses, localClassifier, standing: standingLens, ...(erc8004 ? { erc8004 } : {}), settlementChecked: !!a.amountMicro },
       disclosure: meta.disclosure };
   }
   if (name === 'till_create_invoice') {

@@ -56,7 +56,7 @@ wallet signs, and the chain — not us — is the only thing allowed to say "pai
 ## Run it
 
 ```bash
-npm test                               # 131 assertions across 21 files + a 17-case eval harness, all offline
+npm test                               # 142 assertions across 22 files + a 17-case eval harness, all offline
 BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface, :4700
 ```
 
@@ -87,6 +87,10 @@ BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface,
 - `lib/meter.js` — **the usage→bill mechanic for a white-label pilot**: `till_meter` turns a month's
   receipts into a bill against an injected plan, split by trust — settled receipts are ON-CHAIN (provable),
   the verdict count is SELF-REPORTED (advisory) and labeled as such. Pure, stateless, non-custodial.
+- `lib/erc8004.js` — **interop with the dominant agent-reputation standard** (ERC-8004): turns a
+  `ReputationRegistry.getSummary` result into a SEPARATE, advisory, re-verifiable lens on `till_trust`.
+  Feedback is client-submitted (sybil-farmable), so it never enters the payable decision — it informs, keeps
+  the sybil caveat unless filtered to trusted clients, and always points to re-verify getSummary on Base.
 - `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (11 tools: `till_vet_merchant`,
   `till_create_charge`, `till_check_payment`, `till_trust`, `till_create_invoice`,
   `till_check_invoice`, `till_vet_asset`, `till_receipt`, `till_roll`, `till_export`, `till_meter`) — an

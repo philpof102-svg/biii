@@ -61,6 +61,14 @@ Coinbase / Experian behind them. **Read them as signal sources** into BIII's rep
 **compose identity+reputation WITH real on-chain settlement into a payment decision**, and keep the
 **provable receipt + books** for the commerce that follows.
 
+**Shipped (2026-07-21):** `lib/erc8004.js` reads the ERC-8004 **ReputationRegistry** (`getSummary`) as a
+SEPARATE, advisory lens on `till_trust`. The honest wrinkle we handle: feedback is client-submitted, so a
+raw all-clients summary is **sybil-farmable** — the lens carries that caveat (dropped only when filtered to
+trusted clients) and it **never enters the payable decision** (a known-bad address stays unsafe no matter
+its ERC-8004 score). It always ships a re-verify pointer (`getSummary` on Base). The live on-chain read
+(ABI-encoding the call — needs a keccak selector + a verified registry address) is the next step, not yet
+claimed; today the caller supplies the summary and BIII applies the sybil-honest judgment + re-verify pointer.
+
 ### 4. Merchant orchestration / POS (mostly custodial, network-bound)
 - **Helio** ($1.5B+ processed, Shopify, Solana/BTC/ETH/L2s, card→stablecoin via Onramper), **Mesh**
   (300+ wallets, 120+ tokens, 24+ chains, settle USDC/PYUSD/USDT/RLUSD/fiat), **Sphere** (cross-border,
