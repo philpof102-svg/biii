@@ -1,0 +1,22 @@
+# Wire BIII into a Hermes Agent as a toolset. Add this block to ~/.hermes/config.yaml (merge under an
+# existing `mcp_servers:` key if you already have one). The `base-token-trust` SKILL.md calls these tools.
+#
+# Path A — LOCAL stdio (no key, self-contained; clone github.com/philpof102-svg/biii and `npm ci`):
+mcp_servers:
+  biii:
+    command: node
+    args: ["/abs/path/to/biii/bin/biii-mcp.js"]
+    enabled: true
+    # optional: point the advisory oracle at your MainStreet URL; the local floor + issuer-verified
+    # registry work with zero network, so this is not required for the fail-closed verdicts.
+    env:
+      MAINSTREET_URL: "https://avisradar-production.up.railway.app"
+    tools:
+      include: [till_vet_asset, till_vet_merchant, till_trust, till_create_charge, till_check_payment, till_receipt]
+
+# Path B — HOSTED HTTP (if you run BIII behind an MCP HTTP endpoint):
+#   biii:
+#     url: "https://your-biii-host/mcp"
+#     headers:
+#       Authorization: "Bearer ${BIII_TOKEN}"
+#     enabled: true

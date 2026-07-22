@@ -36,6 +36,14 @@ t('gitlawb-agent-pays: a did:key binds (npub:null), release is BLOCKED for a san
   assert.doesNotMatch(out, /demo error/, 'the demo ran clean');
 });
 
+t('hermes-base-trust: a genuine token reads issuer-verified, a look-alike reads IMPERSONATION, a bad wallet BLOCKS', () => {
+  const out = capture('../examples/hermes-base-trust.js');
+  assert.match(out, /issuer-verified.*Dinari AAPL/s, 'the real Dinari dAAPL reads issuer-verified');
+  assert.match(out, /IMPERSONATION/, 'a claimed-but-wrong issuer is caught as impersonation (the look-alike fraud)');
+  assert.match(out, /BLOCKED — do not pay/, 'a known-bad wallet is blocked (safe-to-pay)');
+  assert.doesNotMatch(out, /demo error/, 'the demo ran clean');
+});
+
 t('both examples agree on the non-custodial invariant (BIII holds no key)', () => {
   const buzz = capture('../examples/buzz-agent-pays.js');
   const glb = capture('../examples/gitlawb-agent-pays.js');
