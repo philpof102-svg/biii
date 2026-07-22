@@ -32,12 +32,14 @@ const { kyaLens, authorizeCharge } = require('../lib/skyfire');
 const { DISCLAIMER } = require('../lib/disclaimer');
 const { screenAddress, screenMeta, floorProvenance } = require('../lib/screen');
 const V = require('../lib/vet');   // the LOCAL verdict, shared with GET /trust — one judgment, many mouths
+const { loadAssetRegistry } = require('../lib/asset-registry');   // issuer-verified merged over aggregator (shared with /asset)
 const fs = require('node:fs'), path = require('node:path');
 
-// Authoritative verified-issuer registry, if it's been ingested (scripts/biii-rwa-registry.js → RWA.xyz).
-// Absent → assessAsset falls back to its small SEED. A stale/missing file can only UNDER-verify (safe).
-let RWA_REGISTRY = null, RWA_SOURCE = null;
-try { const p = path.join(__dirname, '..', 'data', 'rwa-registry.json'); if (fs.existsSync(p)) { const j = JSON.parse(fs.readFileSync(p, 'utf8')); RWA_REGISTRY = j.entries; RWA_SOURCE = j.generatedFrom || 'file'; } } catch {}
+// Verified-issuer registry: committed issuer-official entries (green) merged over the generated aggregator
+// registry (teal). Absent → assessAsset falls back to its small SEED. A stale/missing file can only
+// UNDER-verify (a non-registry token reads 'unknown', never a false 'genuine'). Same loader the server uses.
+const _assetReg = loadAssetRegistry();
+const RWA_REGISTRY = _assetReg.entries, RWA_SOURCE = _assetReg.source;
 
 // DECENTRALIZED known-bad floor: a LOCAL, public, open-licensed list (data/known-bad.json). The node
 // screens against it with zero network, so a known-bad address BLOCKs even when the MainStreet oracle is
@@ -286,7 +288,7 @@ async function callTool(name, a = {}) {
     const verdict = assessAsset({ token: a.token, claimedIssuer: a.claimedIssuer, claimedSymbol: a.claimedSymbol },
       RWA_REGISTRY ? { registry: RWA_REGISTRY } : {});
     return { verdict, triangleReputation: assetVertex(verdict),
-      registrySource: RWA_REGISTRY ? `${RWA_SOURCE} · ${RWA_REGISTRY.length} contracts` : 'seed only (run `node scripts/biii-rwa-registry.js` — free Coingecko source, no key needed)',
+      registrySource: RWA_REGISTRY ? `${RWA_SOURCE} (${RWA_REGISTRY.length} contracts)` : 'seed only (run `node scripts/biii-rwa-registry.js` — free Coingecko source, no key needed)',
       note: 'ADVISORY. genuine = the contract matches a verified issuer address; impersonation/unknown fail closed.' };
   }
   if (name === 'till_receipt') {
