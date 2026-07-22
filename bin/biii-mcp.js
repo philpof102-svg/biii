@@ -28,6 +28,7 @@ const X = require('../lib/export');
 const { meterUsage } = require('../lib/meter');
 const { erc8004Lens } = require('../lib/erc8004');
 const { bindingLens } = require('../lib/identity');
+const { kyaLens } = require('../lib/skyfire');
 const { DISCLAIMER } = require('../lib/disclaimer');
 const { loadScreen, screenAddress, screenMeta, floorProvenance } = require('../lib/screen');
 const fs = require('node:fs'), path = require('node:path');
@@ -172,6 +173,11 @@ const TOOLS = [
       sigNostr: { type: 'string', description: 'the Nostr key\'s signature over the canonical message' },
       sigBase: { type: 'string', description: 'the Base key\'s signature over the canonical message' },
       verified: { type: 'boolean', description: 'attest that BOTH signatures verified (BIII does not check secp256k1 itself)' } }, required: ['npub', 'address'] } },
+  { name: 'till_kya', description: 'IDENTITY STANDARD (interop): read a Skyfire KYA ("Know Your Agent") JWT — the signed token binding a real human/business to an agent (Experian\'s identity layer). The IDENTITY counterpart to till_trust\'s ERC-8004 reputation lens. Parses the JWT + validates fail-closed (iss/sub present, not expired, aud matches YOU — anti-replay), and treats it as ATTESTED only when you confirm the signature verified against the issuer JWKS (BIII does not verify JWT signatures itself — no dep; supply verified:true or re-verify with the pointer). Advisory: attesting WHO backs an agent is NOT "safe to pay" — run till_trust on the address.',
+    inputSchema: { type: 'object', properties: {
+      token: { type: 'string', description: 'the compact KYA JWT (header.payload.signature)' },
+      expectedAudience: { type: 'string', description: 'the recipient this token must be addressed to (its aud) — anti-replay; recommended' },
+      verified: { type: 'boolean', description: 'attest the JWT signature verified against the issuer\'s JWKS (BIII does not check it itself)' } }, required: ['token'] } },
 ];
 
 async function callTool(name, a = {}) {
@@ -355,6 +361,16 @@ async function callTool(name, a = {}) {
       note: binding.bound
         ? 'Bound. Now assess this address with till_trust / till_vet_merchant — a resolved address is not a safe one. ' + DISCLAIMER
         : 'NOT bound (' + binding.reason + '). Do not resolve payment to it. ' + DISCLAIMER };
+  }
+  if (name === 'till_kya') {
+    // IDENTITY STANDARD (interop, never rival): read a Skyfire KYA JWT as a SEPARATE, advisory identity
+    // lens — attested only when the caller confirms the signature + the aud matches (anti-replay). BIII
+    // does not verify JWT signatures itself. Attesting who backs an agent is NOT safe-to-pay (run the triangle).
+    const kya = kyaLens(a.token, { verified: !!a.verified, expectedAudience: a.expectedAudience, now: Date.now() });
+    return { kya,
+      note: kya.attested
+        ? 'KYA-attested identity. This is WHO backs the agent, not that its address is safe to pay — run till_trust on the address. ' + DISCLAIMER
+        : 'NOT attested (' + kya.reason + '). Treat as an unverified claim. ' + DISCLAIMER };
   }
   throw new Error('unknown tool ' + name);
 }
