@@ -35,12 +35,24 @@ function req(server, path) {
     }
   });
 
-  await t('a registry contract → genuine (issuer + symbol surfaced), source labeled', async () => {
+  await t('a registry contract → genuine (issuer + symbol + PROVENANCE surfaced), source labeled', async () => {
     const r = await req(server, '/asset?token=' + REAL);
     assert.equal(r.body.verdict.status, 'genuine');
     assert.equal(r.body.verdict.issuer, 'Ondo');
+    assert.equal(r.body.verdict.provenance, 'issuer-official', 'the endpoint carries how authoritative the match is');
     assert.match(r.body.registrySource, /test · 1 contracts/);
     assert.match(r.body.note, /Non-custodial/, 'the DISCLAIMER rides the response');
+  });
+
+  await t('PROVENANCE rides the endpoint: an aggregator-sourced match is labeled weaker, not issuer-verified', async () => {
+    const aggServer = build({ merchant: '0x' + 'ab'.repeat(20),
+      assetRegistry: { entries: [{ issuer: 'Ondo', symbol: 'OUSG', address: REAL, source: 'coingecko:ondo' }], source: 'coingecko (free)' },
+      findPayment: async () => null });
+    await new Promise((r) => aggServer.listen(0, r));
+    const r = await req(aggServer, '/asset?token=' + REAL);
+    assert.equal(r.body.verdict.status, 'genuine');
+    assert.equal(r.body.verdict.provenance, 'aggregator', 'a Coingecko match is aggregator-sourced, surfaced as such');
+    await aggServer.close();
   });
 
   await t('IMPERSONATION: the real contract but a WRONG claimed issuer → impersonation (the dangerous case)', async () => {

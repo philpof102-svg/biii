@@ -8,9 +8,10 @@
  *
  * ADDRESS badge (/trust) — no green "SAFE" by design: a LOCAL floor can prove "known-bad" / "not on the
  * floor", never "safe":  ✗ BLOCKED (red) · ~ not on known-bad floor (yellow) · ? unverified (grey).
- * ASSET badge (/asset) — here "genuine" IS a positive fact (the contract matches a VERIFIED issuer in the
- * registry), so green is honest:  ✓ genuine (green) · ✗ IMPERSONATION (red, the dangerous case) ·
- *   ✗ unsafe (red, denylisted) · ~ unknown (grey, unverified — never a false "genuine") · ? unverified (grey).
+ * ASSET badge (/asset) — a registry match IS a positive fact, but its STRENGTH is calibrated to the source:
+ *   ✓ issuer-verified (green — matches the issuer's OFFICIAL address) · ✓ listed (teal — an aggregator
+ *   listing, weaker, never wears the strong green) · ✗ IMPERSONATION (red, the dangerous case) · ✗ unsafe
+ *   (red, denylisted) · ~ unknown (yellow — never a false "genuine") · ? unverified (grey).
  * Shadow DOM (no style leak either way). Clicking opens the raw JSON — re-checkable, not a logo to trust.
  * Non-custodial, advisory. The badge informs a human; it authorizes nothing.
  */
@@ -28,7 +29,8 @@
     unverified: { badge: '? unverified', bg: '#17181d', fg: '#8a8fa0', bd: '#3a3d47', title: 'No verdict available (endpoint unreachable, floor unavailable, or malformed address). Absence of a verdict is not safety.' }
   };
   var ASSET_STATES = {
-    genuine: { badge: '✓ genuine', bg: '#0f2318', fg: '#16C784', bd: '#16794a', title: 'Contract matches a VERIFIED issuer in the registry (registry-sourced — re-verify on-chain).' },
+    genuine: { badge: '✓ issuer-verified', bg: '#0f2318', fg: '#16C784', bd: '#16794a', title: 'Contract matches the ISSUER’S OFFICIAL address (issuer-sourced). Strongest match — still re-verify on-chain.' },
+    listed: { badge: '✓ listed (aggregator)', bg: '#0e2024', fg: '#38bdf8', bd: '#155e75', title: 'Matches an aggregator listing (e.g. Coingecko), NOT the issuer’s official source. Positive but WEAKER — re-verify on-chain.' },
     impersonation: { badge: '✗ IMPERSONATION', bg: '#2a1416', fg: '#f87171', bd: '#f87171', title: 'This contract is NOT the claimed issuer’s — a lookalike/impersonator. Do not acquire.' },
     unsafe: { badge: '✗ unsafe', bg: '#2a1416', fg: '#f87171', bd: '#f87171', title: 'Contract is denylisted (scam / known-bad).' },
     unknown: { badge: '~ unknown', bg: '#221d0f', fg: '#eab308', bd: '#a16207', title: 'Not a verified issuer contract — unverified. Never assume genuine.' },
@@ -46,7 +48,9 @@
   function assetStateOf(payload) {
     try {
       var v = payload && payload.verdict; if (!v) return 'unverified';
-      if (v.status === 'genuine') return 'genuine';
+      // calibrate the green to the SOURCE: only an issuer-official match earns "issuer-verified" green;
+      // an aggregator listing is the weaker teal "listed" — never let aggregator data wear the strong badge.
+      if (v.status === 'genuine') return v.provenance === 'issuer-official' ? 'genuine' : 'listed';
       if (v.status === 'impersonation') return 'impersonation';
       if (v.status === 'unsafe') return 'unsafe';
       return 'unknown';                                        // unknown/invalid → never a false "genuine"

@@ -26,6 +26,25 @@ t('GENUINE: a verified issuer contract is genuine + safe to acquire', () => {
   assert.equal(r.issuer, 'BlackRock'); assert.equal(r.symbol, 'BUIDL');
 });
 
+t('PROVENANCE: the green is calibrated to the source — issuer-official vs aggregator vs seed', () => {
+  const off = assessAsset({ token: BUIDL }, { registry: [{ issuer: 'BlackRock', symbol: 'BUIDL', address: BUIDL, source: 'issuer:securitize.io official' }] });
+  assert.equal(off.provenance, 'issuer-official');
+  assert.equal(assetVertex(off).score, 80, 'issuer-official scores full');
+  assert.match(assetVertex(off).note, /issuer-verified/);
+
+  const agg = assessAsset({ token: BUIDL }, { registry: [{ issuer: 'BlackRock', symbol: 'BUIDL', address: BUIDL, source: 'coingecko:tokenized-treasuries' }] });
+  assert.equal(agg.provenance, 'aggregator', 'a Coingecko listing is the WEAKER aggregator provenance');
+  assert.equal(assetVertex(agg).score, 55, 'aggregator scores lower — not the same as issuer-verified');
+  assert.match(assetVertex(agg).note, /not issuer-verified/);
+
+  const seed = assessAsset({ token: BUIDL }, { registry: [{ issuer: 'BlackRock', symbol: 'BUIDL', address: BUIDL, source: 'BlackRock official — RE-VERIFY at securitize.io' }] });
+  assert.equal(seed.provenance, 'seed', 'a RE-VERIFY example is not yet authoritative');
+
+  // FAIL-SAFE: an unrecognized/empty source is the WEAKER aggregator, NEVER issuer-official (no over-stating)
+  const blank = assessAsset({ token: BUIDL }, { registry: [{ issuer: 'X', symbol: 'X', address: BUIDL, source: '' }] });
+  assert.equal(blank.provenance, 'aggregator');
+});
+
 t('IMPERSONATION (claim mismatch): a real contract labelled as the WRONG asset is refused', () => {
   const r = assessAsset({ token: BUIDL, claimedSymbol: 'AAPLx' }, { registry: REGISTRY });
   assert.equal(r.status, 'impersonation'); assert.equal(r.safeToAcquire, false);
