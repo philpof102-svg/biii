@@ -8,11 +8,46 @@
  * Run in WSL where hermes lives:  node fleet-console.js   →   open http://localhost:4799
  */
 const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
 const { execFile } = require('node:child_process');
 
 const HERMES = process.env.HERMES_BIN || '/root/.hermes-venv/bin/hermes';
-const ENV = { ...process.env, HERMES_HOME: process.env.HERMES_HOME || '/root/.hermes-biii', PATH: '/usr/local/bin:/usr/bin:/bin' };
+const HOME_DIR = process.env.HERMES_HOME || '/root/.hermes-biii';
+const ENV = { ...process.env, HERMES_HOME: HOME_DIR, PATH: '/usr/local/bin:/usr/bin:/bin' };
 const PORT = Number(process.env.FLEET_PORT || 4799);
+
+// ── Journal: the REAL run history the scheduler already writes (cron/output/<jobId>/<ts>.md). ──
+const CRON_OUT = path.join(HOME_DIR, 'cron', 'output');
+const JOBS_JSON = path.join(HOME_DIR, 'cron', 'jobs.json');
+const jobNames = () => { try { const j = JSON.parse(fs.readFileSync(JOBS_JSON, 'utf8'));
+  return Object.fromEntries((j.jobs || []).map((x) => [x.id, x.name || x.id])); } catch { return {}; } };
+function summarize(md) {
+  const body = md.split(/\n-{3,}\n/).slice(1).join('\n---\n') || md;   // drop the header block
+  const lines = body.split('\n').map((s) => s.trim()).filter(Boolean);
+  const flags = (body.match(/🚩/g) || []).length;
+  const head = (lines.find((l) => !l.startsWith('#')) || '(sortie vide)').replace(/\s+/g, ' ');
+  const ok = !/error|traceback|failed|exception/i.test(body);
+  return { head: head.slice(0, 200), flags, ok, lines: lines.slice(0, 10) };
+}
+function readJournal(limit = 24) {
+  const names = jobNames();
+  let entries = [];
+  let dirs = [];
+  try { dirs = fs.readdirSync(CRON_OUT); } catch { return []; }
+  for (const jid of dirs) {
+    let files = [];
+    try { files = fs.readdirSync(path.join(CRON_OUT, jid)).filter((f) => f.endsWith('.md')); } catch { continue; }
+    for (const f of files) entries.push({ jid, ts: f.replace(/\.md$/, ''), file: path.join(CRON_OUT, jid, f) });
+  }
+  entries.sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));   // ISO-ish filename → lexicographic = chronological
+  return entries.slice(0, limit).map((e) => {
+    let md = ''; try { md = fs.readFileSync(e.file, 'utf8'); } catch {}
+    const s = summarize(md);
+    const [d, t] = e.ts.split('_');
+    return { job: names[e.jid] || e.jid, time: d + ' ' + String(t || '').replace(/-/g, ':'), ...s };
+  });
+}
 
 const sh = (cmd, args, timeout = 15000) => new Promise((r) =>
   execFile(cmd, args, { env: ENV, timeout, maxBuffer: 4 << 20 }, (_e, so, se) => r(String(so || '') + String(se || ''))));
@@ -68,11 +103,24 @@ h1{margin:6px 0 0;font-size:25px;font-weight:650;letter-spacing:-.01em}h1 .thin{
 .legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:22px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:7px}.legend i{width:8px;height:8px;border-radius:50%}
 .foot{margin-top:18px;font-size:11px;color:var(--dim);font-family:var(--mono)}
+.jhead{margin-top:30px;padding-top:18px;border-top:1px solid var(--line)}.jhead h2{margin:6px 0 0;font-size:18px;font-weight:600;letter-spacing:-.01em}.jhead .thin{color:var(--muted);font-weight:400}
+.journal{margin-top:14px;display:flex;flex-direction:column;gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel2)}
+.jitem{display:grid;grid-template-columns:150px 128px 1fr auto;gap:12px;align-items:baseline;padding:11px 16px;border-top:1px solid var(--line);cursor:pointer}
+.jitem:first-child{border-top:none}.jitem:hover{background:#0f1a26}
+.jtime{font-family:var(--mono);font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.jjob{font-family:var(--mono);font-size:11px;color:var(--accent2);border:1px solid var(--line2);border-radius:5px;padding:2px 8px;justify-self:start}
+.jhd{font-size:12.5px;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jflag{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.04em;white-space:nowrap}
+.jflag.f{color:var(--sched)}.jflag.c{color:var(--up)}
+.jmore{display:none;grid-column:1/-1;margin-top:8px;padding:10px 12px;background:#0a141e;border:1px solid var(--line);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--muted);white-space:pre-wrap;line-height:1.6}
+.jitem.open .jmore{display:block}.jitem.open .jhd{white-space:normal}
 </style></head><body><div class="wrap">
 <header><div><div class="eyebrow">MainStreet · Living Economy · LIVE</div><h1>Fleet <span class="thin">— qui bosse, qui pas</span></h1></div>
 <div class="meta"><span class="livedot"></span><b id="act">…</b> · <span id="ts">…</span><br>guard read-only: <b style="color:var(--up)">ON</b> · refresh 12s</div></header>
 <div class="grid" id="grid"></div>
 <div class="legend"><span><i style="background:var(--up)"></i>working</span><span><i style="background:var(--sched)"></i>scheduled</span><span><i style="background:var(--pend)"></i>pending</span><span><i style="background:var(--down)"></i>down</span><span><i style="background:var(--off)"></i>idle</span></div>
+<div class="jhead"><div class="eyebrow">Journal · historique réel des runs</div><h2>Ce que les bots ont fait <span class="thin">— dernières exécutions cron</span></h2></div>
+<div id="journal" class="journal"><div class="foot">chargement du journal…</div></div>
 <div class="foot" id="foot">chargement…</div></div>
 <script>
 const C={up:'var(--up)',sched:'var(--sched)',pend:'var(--pend)',down:'var(--down)',off:'var(--off)'};
@@ -93,12 +141,23 @@ async function tick(){let d;try{d=await (await fetch('/api/fleet')).json()}catch
  document.getElementById('ts').textContent='maj '+new Date(d.ts).toLocaleTimeString('fr-FR');
  document.getElementById('foot').textContent='Read-only partout · non-custodial · données live via le CLI Hermes + /health. Refresh 12s.';
 }
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function jrow(r){const cls=r.flags>0?'f':'c';const badge=r.flags>0?(r.flags+' flag'+(r.flags>1?'s':'')):(r.ok?'clean':'erreur');const more=esc((r.lines||[]).join('\\n'))||'(pas de détail)';return \`<div class="jitem" onclick="this.classList.toggle('open')"><span class="jtime">\${esc(r.time)}</span><span class="jjob">\${esc(r.job)}</span><span class="jhd">\${esc(r.head)}</span><span class="jflag \${cls}">\${badge}</span><div class="jmore">\${more}</div></div>\`}
+async function jtick(){let d;try{d=await (await fetch('/api/journal')).json()}catch(e){return}
+ const el=document.getElementById('journal');
+ if(!d.runs||!d.runs.length){el.innerHTML='<div class="foot" style="padding:14px 16px;margin:0">aucun run enregistré pour l\\'instant — la sentinelle écrit ici à chaque passage (toutes les 30 min)</div>';return}
+ el.innerHTML=d.runs.map(jrow).join('')}
 tick();setInterval(tick,12000);
+jtick();setInterval(jtick,30000);
 </script></body></html>`;
 
 http.createServer(async (req, res) => {
   if (req.url.startsWith('/api/fleet')) {
     try { const d = await gather(); res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify(d)); }
+    catch (e) { res.writeHead(500, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: String(e.message || e) })); }
+  }
+  if (req.url.startsWith('/api/journal')) {
+    try { const j = readJournal(24); res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ts: new Date().toISOString(), runs: j })); }
     catch (e) { res.writeHead(500, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: String(e.message || e) })); }
   }
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(HTML);
