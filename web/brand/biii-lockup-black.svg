@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 200" role="img" aria-label="BIII — safe to pay on Base">
+  <title>BIII</title>
+  <desc>The BIII wordmark on a deep-black card: white B with blue, green and orange bars.</desc>
+  <rect width="560" height="200" rx="22" fill="#06080d"/>
+  <text x="200" y="118" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-weight="700" font-size="76" fill="#ffffff" letter-spacing="1">B</text>
+  <rect x="260" y="59" width="14" height="60" rx="7" fill="#0052ff"/>
+  <rect x="284" y="59" width="14" height="60" rx="7" fill="#16c784"/>
+  <rect x="308" y="59" width="14" height="60" rx="7" fill="#f7931a"/>
+  <text x="280" y="152" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-weight="400" font-size="15" fill="#9aa4b5" letter-spacing="1">safe to pay · Base · non-custodial</text>
+</svg>

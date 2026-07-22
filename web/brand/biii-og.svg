@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="BIII — safe to pay on Base">
+  <title>BIII</title>
+  <desc>Social card: the BIII wordmark on deep black — white B with blue, green and orange bars, tagline safe to pay on Base.</desc>
+  <rect width="1200" height="630" fill="#06080d"/>
+  <rect x="0" y="0" width="1200" height="6" fill="#0052ff"/>
+  <rect x="400" y="0" width="200" height="6" fill="#16c784"/>
+  <rect x="600" y="0" width="200" height="6" fill="#f7931a"/>
+  <text x="486" y="360" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-weight="700" font-size="150" fill="#ffffff" letter-spacing="2">B</text>
+  <rect x="606" y="238" width="26" height="112" rx="13" fill="#0052ff"/>
+  <rect x="648" y="238" width="26" height="112" rx="13" fill="#16c784"/>
+  <rect x="690" y="238" width="26" height="112" rx="13" fill="#f7931a"/>
+  <text x="600" y="432" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-weight="500" font-size="34" fill="#cdd8e8" letter-spacing="1">safe to pay · token-genuineness verdicts on Base</text>
+  <text x="600" y="480" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-weight="400" font-size="24" fill="#6f8098" letter-spacing="1">fail-closed · non-custodial · re-verifiable on-chain</text>
+</svg>

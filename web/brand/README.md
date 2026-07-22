@@ -12,6 +12,8 @@ Vector SVG only (crisp at any size, editable, no raster blur).
 | `biii-icon-maskable.svg` | full-bleed square, art inside the safe zone — PWA `maskable` icon |
 | `biii-wordmark.svg` | horizontal `B` + three bars, dark ink — on light backgrounds |
 | `biii-wordmark-dark.svg` | same, white ink — on dark backgrounds |
+| `biii-lockup-black.svg` | wordmark + tagline on a filled deep-black card — the "on black" lockup |
+| `biii-og.svg` | 1200×630 deep-black social card — `og:image` / `twitter:image` |
 
 Served by the app at `/brand/<file>` and wired into `manifest.json` + `index.html`.
 
