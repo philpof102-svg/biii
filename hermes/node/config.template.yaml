@@ -1,0 +1,39 @@
+# BIII Hermes trust NODE — portable config template.
+# Rendered by bootstrap.sh (envsubst) into $HERMES_NODE_HOME/config.yaml on any host.
+# Vars: ${BIII_DIR} ${LAWBOR_DIR} ${GL_BIN} ${GITLAWB_NODE} ${MAINSTREET_URL} ${HERMES_MODEL}
+# READ-ONLY BY DESIGN: the pre_tool_call guard blocks every write/spend across all toolsets.
+# Never add a wallet key to this node. A node that is hard to kill MUST stay a monitor, not an actor.
+model:
+  default: ${HERMES_MODEL}
+  provider: openrouter
+skills:
+  external_dirs:
+    - ${BIII_DIR}/hermes/skills
+hooks:
+  pre_tool_call:
+    - command: node ${BIII_DIR}/hermes/agents/biii-monitor/readonly-guard.js
+mcp_servers:
+  biii:
+    command: node
+    args:
+      - ${BIII_DIR}/bin/biii-mcp.js
+    enabled: true
+    env:
+      MAINSTREET_URL: ${MAINSTREET_URL}
+  gitlawb:
+    command: node
+    args:
+      - ${BIII_DIR}/hermes/gl-mcp-bridge.js
+    enabled: true
+    env:
+      GITLAWB_NODE: ${GITLAWB_NODE}
+      GL_BIN: ${GL_BIN}
+  lawbor:
+    command: node
+    args:
+      - ${LAWBOR_DIR}/bin/lawbor-mcp.js
+    enabled: true
+    env:
+      LAWBOR_MIN_SCORE: "40"
+# recall (our private second-brain) is appended by bootstrap ONLY when MEMORY_ROOTS is set —
+# it is host-specific and privacy-sensitive, so a remote/VPS node runs WITHOUT it by default.

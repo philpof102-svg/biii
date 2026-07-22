@@ -1,0 +1,4 @@
+# never commit secrets or rendered runtime artifacts
+.env
+*.env
+config.yaml
