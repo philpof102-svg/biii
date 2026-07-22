@@ -1,0 +1,2 @@
+# cmd.exe mis-parses LF-only batch files — keep our launchers CRLF on checkout.
+*.cmd text eol=crlf
