@@ -24,9 +24,9 @@ function req(server, method, path, body, headers) {
     if (data) r.write(data); r.end();
   });
 }
-// stub verifyTxHash: GOODTX = a confirmed USDC payment to M for 0.01 USDC (≥ the 0.002 price); else unpaid.
+// stub verifyTxHash: GOODTX = a confirmed USDC payment to M for 0.30 USDC (≥ the 0.25 verdict price); else unpaid.
 const stubVerify = async ({ txHash }) => (txHash === GOODTX || txHash === GOODTX2)
-  ? { paid: true, txHash, from: '0x' + 'ee'.repeat(20), to: M.toLowerCase(), valueMicro: '10000', confirmations: 3, blockNumber: 5000, explorer: 'https://basescan.org/tx/' + txHash }
+  ? { paid: true, txHash, from: '0x' + 'ee'.repeat(20), to: M.toLowerCase(), valueMicro: '300000', confirmations: 3, blockNumber: 5000, explorer: 'https://basescan.org/tx/' + txHash }
   : { paid: false, txHash, reason: 'not found' };
 async function mkServer() { const s = build({ merchant: M, verifyTxHash: stubVerify }); await new Promise((r) => s.listen(0, r)); return s; }
 
@@ -54,7 +54,7 @@ async function mkServer() { const s = build({ merchant: M, verifyTxHash: stubVer
     assert.equal(a.network, 'base');
     assert.equal(a.asset.toLowerCase(), T.USDC_BASE.toLowerCase());
     assert.equal(a.payTo, M.toLowerCase());
-    assert.equal(a.amount, '2000');                         // 0.002 USDC in atomic units
+    assert.equal(a.amount, '250000');                       // 0.25 USDC in atomic units (the verdict corridor; see PRICING.md)
     assert.match(String(r.headers['www-authenticate'] || ''), /MPP/);
   });
 

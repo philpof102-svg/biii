@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="BIII">
+  <title>BIII</title>
+  <rect width="100" height="100" rx="22" fill="#0b1220"/>
+  <rect x="20.5" y="28" width="11" height="44" rx="5.5" fill="#2f6bff"/>
+  <rect x="44.5" y="28" width="11" height="44" rx="5.5" fill="#16b364"/>
+  <rect x="68.5" y="28" width="11" height="44" rx="5.5" fill="#f5921b"/>
+</svg>

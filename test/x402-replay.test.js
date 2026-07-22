@@ -58,7 +58,7 @@ function req(server, method, p, body, headers) {
   // ── integration: the paid endpoint, same payment twice ────────────────────
   settle._reset();
   const PTX = tx(42);
-  const server = build({ verifyTxHash: async ({ txHash }) => ({ paid: true, txHash, to: M.toLowerCase(), valueMicro: '10000', confirmations: 3, blockNumber: 6000 }) })
+  const server = build({ verifyTxHash: async ({ txHash }) => ({ paid: true, txHash, to: M.toLowerCase(), valueMicro: '300000', confirmations: 3, blockNumber: 6000 }) })
     .listen(0);
   await new Promise((r) => server.once('listening', r));
   const asset = { address: '0x' + '12'.repeat(20), claimedIssuer: 'BlackRock', claimedSymbol: 'BUIDL' };
