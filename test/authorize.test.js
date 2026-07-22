@@ -77,5 +77,38 @@ t('no cumulative cap set → per-charge limit still applies, remaining is null (
   assert.equal(r.remainingMicro, null);
 });
 
+// ── ADVERSARIAL (audit 2026-07-22): a MALFORMED limit must FAIL-CLOSED, not silently become "no limit" ──
+t('FAIL-OPEN CLOSED: a present-but-unparseable cap/max ("1e999"/"abc"/decimal) is REFUSED, not ignored', () => {
+  const huge = () => T.createCharge({ to: MERCHANT, amountMicro: '999999999999999', nowMs: Date.now() }); // ~$1B
+  // the security property for EVERY malformed/edge limit is the same: NEVER unlimited spend.
+  for (const bad of ['1e999', 'abc', '50000000.5', '0x50', '', 'Infinity', '1_000']) {
+    const r = authorizeCharge(auth({ cumulativeCapMicro: bad, maxPerChargeMicro: bad }), huge(), { spentMicro: '0' });
+    assert.equal(r.authorized, false, 'a "' + bad + '" limit must not become unlimited spend');
+  }
+  // the truly-unparseable ones (BigInt THROWS: scientific / letters / decimals) fail-closed as "malformed"
+  for (const bad of ['1e999', 'abc', '50000000.5']) {
+    assert.match(authorizeCharge(auth({ cumulativeCapMicro: bad }), huge(), {}).reason, /malformed|not a valid integer/i, '"' + bad + '" is malformed');
+  }
+  // whitespace is fine — BigInt trims it (" 50000000 " parses)
+  assert.equal(authorizeCharge(auth({ cumulativeCapMicro: ' 50000000 ', maxPerChargeMicro: ' 50000000 ' }), charge('10'), {}).authorized, true);
+});
+
+t('FAIL-OPEN CLOSED: an authorization with NO limit at all is REFUSED (unbounded is a footgun)', () => {
+  const r = authorizeCharge({ token: 'USDC', chainId: 8453, verified: true }, charge('40'), {});
+  assert.equal(r.authorized, false);
+  assert.match(r.reason, /neither a per-charge max nor a cumulative cap|unbounded/i);
+  // ...unless the owner DELIBERATELY opts in
+  assert.equal(authorizeCharge({ token: 'USDC', chainId: 8453, verified: true, unlimited: true }, charge('40'), {}).authorized, true);
+});
+
+t('FAIL-OPEN CLOSED: a garbage or negative spentMicro is REFUSED (cannot trust the cumulative)', () => {
+  const a = auth({ cumulativeCapMicro: '200000000' });
+  assert.equal(authorizeCharge(a, charge('10'), { spentMicro: 'abc' }).authorized, false);
+  assert.equal(authorizeCharge(a, charge('10'), { spentMicro: '-5000000' }).authorized, false);
+  assert.match(authorizeCharge(a, charge('10'), { spentMicro: '-5000000' }).reason, /non-negative|running total/i);
+  // absent spentMicro still defaults to 0 (a fresh authorization) — that path stays valid
+  assert.equal(authorizeCharge(a, charge('10'), {}).authorized, true);
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
