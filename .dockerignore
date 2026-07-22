@@ -1,0 +1,8 @@
+node_modules
+.git
+.env
+out
+dist
+*.log
+npm-debug.log*
+# keep vendor/ and data/known-bad.json — they ship in the image (self-contained deploy).

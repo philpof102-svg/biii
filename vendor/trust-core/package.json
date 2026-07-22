@@ -1,0 +1,9 @@
+{
+  "name": "trust-core",
+  "version": "0.1.0",
+  "description": "Vendored copy of trust-core (MainStreet's pure safe-to-pay classifier) so BIII deploys self-contained. See VENDORED.md.",
+  "license": "MIT",
+  "type": "commonjs",
+  "main": "index.js",
+  "files": ["index.js", "score.js", "LICENSE"]
+}
