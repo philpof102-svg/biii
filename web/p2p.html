@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>BIII — Payer un ami</title>
+<meta name="theme-color" content="#0A0A0F">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root { --bg:#0A0A0F; --surface:#14141F; --border:#1E1E2E; --text:#F5F7FF; --dim:#8A8FA0; --accent:#0052FF; --green:#16C784; --red:#f87171; }
+  body { font-family:-apple-system,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); min-height:100dvh; padding:20px 16px; }
+  .wrap { max-width:440px; margin:0 auto; }
+  h1 { font-size:20px; margin-bottom:2px; }
+  .sub { color:var(--dim); font-size:13px; margin-bottom:18px; line-height:1.5; }
+  .tabs { display:flex; gap:8px; margin-bottom:18px; }
+  .tab { flex:1; background:var(--surface); border:1px solid var(--border); color:var(--dim); border-radius:12px; padding:12px; font-size:15px; font-weight:600; cursor:pointer; }
+  .tab.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  input { width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:12px; padding:14px; font-size:16px; font-family:ui-monospace,Menlo,monospace; margin-bottom:10px; }
+  button.act { width:100%; background:var(--accent); color:#fff; border:none; border-radius:12px; padding:15px; font-size:16px; font-weight:700; cursor:pointer; }
+  button.act:active { transform:scale(.98); }
+  .qr-box { width:min(280px,72vw); aspect-ratio:1; background:#fff; border-radius:16px; display:flex; align-items:center; justify-content:center; padding:12px; margin:16px auto; }
+  .qr-box img { width:100%; height:100%; }
+  video { width:100%; border-radius:16px; background:#000; margin:8px 0; }
+  .pane { display:none; }
+  .pane.on { display:block; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px; margin-top:12px; }
+  .card b { color:var(--text); } .card .a { font-family:ui-monospace,Menlo,monospace; font-size:12px; color:var(--dim); word-break:break-all; }
+  .ok { color:var(--green); } .err { color:var(--red); font-size:13px; margin-top:8px; }
+  .foot { color:var(--dim); font-size:11px; margin-top:20px; line-height:1.6; text-align:center; }
+  .mono-small { font-size:12px; color:var(--dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Payer un ami — direct wallet-à-wallet</h1>
+  <p class="sub">USDC sur Base, non-custodial. L'un montre son QR, l'autre le scanne et paie depuis son propre wallet. BIII ne détient aucune clé.</p>
+
+  <div class="tabs">
+    <button class="tab on" id="tab-recv">Recevoir</button>
+    <button class="tab" id="tab-scan">Scanner &amp; payer</button>
+  </div>
+
+  <!-- RECEIVE -->
+  <div class="pane on" id="pane-recv">
+    <input id="my-addr" placeholder="Votre adresse Base (0x…)" autocomplete="off" spellcheck="false">
+    <input id="my-amt" placeholder="Montant demandé (USDC, optionnel)" inputmode="decimal">
+    <button class="act" id="btn-show">Afficher mon QR</button>
+    <div class="qr-box" id="recv-qr" style="display:none"></div>
+    <p class="mono-small" id="recv-hint" style="text-align:center"></p>
+  </div>
+
+  <!-- SCAN -->
+  <div class="pane" id="pane-scan">
+    <video id="cam" playsinline muted></video>
+    <p class="mono-small" id="scan-status">Appuyez pour activer la caméra.</p>
+    <button class="act" id="btn-cam">Activer la caméra</button>
+    <input id="paste-qr" placeholder="…ou collez le contenu du QR ici" style="margin-top:10px" autocomplete="off">
+    <button class="act" id="btn-paste" style="background:var(--surface);border:1px solid var(--border);margin-top:8px">Valider le texte collé</button>
+    <div class="card" id="pay-card" style="display:none"></div>
+    <div class="err" id="scan-err"></div>
+  </div>
+
+  <p class="foot">Le paiement part de VOTRE wallet vers l'adresse scannée — BIII ne touche aucun fonds. Chaque paiement peut être re-vérifié on-chain (<span class="mono-small">/verify?txHash</span>).</p>
+</div>
+<script src="qrcode.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  var esc = function(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); };
+  function showPane(which){
+    $("tab-recv").classList.toggle("on", which==="recv"); $("tab-scan").classList.toggle("on", which==="scan");
+    $("pane-recv").classList.toggle("on", which==="recv"); $("pane-scan").classList.toggle("on", which==="scan");
+    if(which!=="scan") stopCam();
+  }
+  $("tab-recv").onclick=function(){showPane("recv");}; $("tab-scan").onclick=function(){showPane("scan");};
+
+  // ── RECEIVE ──
+  $("btn-show").onclick=function(){
+    var addr=$("my-addr").value.trim(), amt=$("my-amt").value.trim();
+    var q="/receive?address="+encodeURIComponent(addr)+(amt?"&amountUsd="+encodeURIComponent(amt):"");
+    fetch(q).then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});}).then(function(res){
+      if(!res.ok||!res.j.paymentURI){ $("recv-hint").textContent="Adresse invalide."; $("recv-qr").style.display="none"; return; }
+      var box=$("recv-qr"); box.innerHTML=""; var qr=qrcode(0,"M"); qr.addData(res.j.paymentURI); qr.make(); box.innerHTML=qr.createImgTag(6); box.style.display="flex";
+      $("recv-hint").textContent = amt ? "On vous doit "+esc(amt)+" USDC — faites scanner ce QR." : "Faites scanner ce QR ; le payeur saisit le montant.";
+    }).catch(function(){ $("recv-hint").textContent="Réseau indisponible."; });
+  };
+
+  // ── SCAN ──
+  var stream=null, scanning=false, detector=null;
+  function stopCam(){ scanning=false; if(stream){ stream.getTracks().forEach(function(t){t.stop();}); stream=null; } }
+  function onDecoded(text){
+    stopCam(); $("scan-status").textContent="QR lu, validation…";
+    fetch("/parse-qr?text="+encodeURIComponent(text)).then(function(r){return r.json();}).then(function(res){
+      var p=res.parsed;
+      if(!p||!p.valid){ $("scan-err").textContent="✗ QR refusé : "+esc((p&&p.reason)||"non valide"); $("pay-card").style.display="none"; return; }
+      $("scan-err").textContent="";
+      // build the pay URI (with the amount if present; else prompt for one)
+      var amtMicro=p.amountMicro;
+      if(!amtMicro){ var v=prompt("Montant à envoyer en USDC :"); if(!v){ $("scan-status").textContent="Annulé."; return; }
+        var n=Math.round(parseFloat(v.replace(",","."))*1e6); if(!(n>0)){ $("scan-err").textContent="Montant invalide."; return; } amtMicro=String(n); }
+      var uri="ethereum:0x833589fcd6edb6e08f4c7c32d4f71b54bda02913@8453/transfer?address="+p.to+"&uint256="+amtMicro;
+      var usd=(Number(amtMicro)/1e6).toFixed(2);
+      $("pay-card").style.display="block";
+      $("pay-card").innerHTML="<div class='ok'><b>✓ Prêt à payer</b></div><div style='margin:8px 0'>À <span class='a'>"+esc(p.to)+"</span></div>"
+        +"<div style='font-size:22px;font-weight:800;margin-bottom:12px'>"+usd+" USDC</div>"
+        +"<a class='act' style='display:block;text-align:center;text-decoration:none' href='"+esc(uri)+"'>Ouvrir mon wallet pour payer ▶</a>";
+      $("scan-status").textContent="Validé.";
+    }).catch(function(){ $("scan-err").textContent="Validation indisponible."; });
+  }
+  $("btn-cam").onclick=function(){
+    if(!("BarcodeDetector" in window)){ $("scan-status").textContent="La caméra-scan n'est pas supportée ici (iOS) — collez le texte du QR ci-dessous."; return; }
+    navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}}).then(function(s){
+      stream=s; var cam=$("cam"); cam.srcObject=s; cam.play(); scanning=true; $("scan-status").textContent="Visez le QR…";
+      detector=detector||new window.BarcodeDetector({formats:["qr_code"]});
+      (function loop(){ if(!scanning) return;
+        detector.detect(cam).then(function(codes){ if(codes&&codes[0]&&codes[0].rawValue){ onDecoded(codes[0].rawValue); } else if(scanning){ requestAnimationFrame(loop); } })
+          .catch(function(){ if(scanning) requestAnimationFrame(loop); });
+      })();
+    }).catch(function(){ $("scan-status").textContent="Accès caméra refusé — collez le texte du QR ci-dessous."; });
+  };
+  $("btn-paste").onclick=function(){ var t=$("paste-qr").value.trim(); if(t) onDecoded(t); };
+})();
+</script>
+</body>
+</html>

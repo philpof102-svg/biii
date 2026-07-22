@@ -56,6 +56,8 @@ const mkCharge = async (s, amountUsd) => (await req(s, 'POST', '/charge', { amou
     assert.match(String(demo.raw || ''), /embed\.js|data-biii-address/, 'the badge demo page is served');
     const radar = await req(server, 'GET', '/radar.html');
     assert.match(String(radar.raw || ''), /Trust Radar/, 'the radar dashboard page is served');
+    const p2p = await req(server, 'GET', '/p2p.html');
+    assert.match(String(p2p.raw || ''), /Payer un ami|parse-qr/, 'the P2P pay-a-friend page is served');
   });
 
   await t('POST /charge → charge + chargeId + EIP-681 URI (uses configured merchant)', async () => {
@@ -91,6 +93,18 @@ const mkCharge = async (s, amountUsd) => (await req(s, 'POST', '/charge', { amou
   await t('the configured merchant is FIXED — a caller cannot redirect the charge to another address', async () => {
     const r = await req(server, 'POST', '/charge', { amountUsd: '4.50', to: '0x' + '99'.repeat(20) });
     assert.equal(r.body.charge.to, M.toLowerCase(), 'caller-supplied `to` is ignored when a merchant is configured');
+  });
+
+  await t('P2P: /receive builds a show-to-receive QR, /parse-qr validates a scanned one (Base USDC, fail-closed)', async () => {
+    const alice = '0x' + 'a1'.repeat(20);
+    const rec = await req(server, 'GET', `/receive?address=${alice}&amountUsd=7.50`);
+    assert.match(rec.body.paymentURI, /^ethereum:.*@8453\/transfer\?address=.*uint256=7500000$/);
+    const ok = await req(server, 'GET', `/parse-qr?text=${encodeURIComponent(rec.body.paymentURI)}`);
+    assert.equal(ok.status, 200); assert.equal(ok.body.parsed.to, alice); assert.equal(ok.body.parsed.amountUsd, '7.50');
+    // fail-closed: a non-Base / garbage QR → 422, not valid
+    assert.equal((await req(server, 'GET', '/parse-qr?text=hello')).status, 422);
+    assert.equal((await req(server, 'GET', `/parse-qr?text=${encodeURIComponent('ethereum:0x' + '2b'.repeat(20) + '@1')}`)).body.parsed.valid, false);
+    assert.equal((await req(server, 'GET', '/receive?address=nope')).status, 400);
   });
 
   await t('GET /verify?txHash — accounting proof: 400 on a bad hash, chain facts on a real one', async () => {
