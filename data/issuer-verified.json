@@ -1,7 +1,7 @@
 {
-  "generatedFrom": "issuer-official (verified: Dinari factory on-chain + Backed API + Ondo docs)",
+  "generatedFrom": "issuer-official (verified: Dinari factory on-chain + Backed API + Ondo docs) + workflow-confirmed Base issuers (on-chain re-verified)",
   "generatedAt": "2026-07-22",
-  "count": 149,
+  "count": 176,
   "entries": [
     {
       "issuer": "Dinari",
@@ -1314,6 +1314,303 @@
       "chainId": 98866,
       "address": "0xd2b65e851be3d80d3c2ce795eb2e78f16cb088b2",
       "source": "https://docs.ondo.finance/addresses (Ondo official) — on-chain verified"
+    },
+    {
+      "issuer": "Backed Finance",
+      "symbol": "bIB01",
+      "name": "Backed IB01 $ Treasury Bond 0-1yr",
+      "chainId": 8453,
+      "address": "0xca30c93b02514f86d5c86a6e375e3a330b435fb5",
+      "source": "https://github.com/backed-fi/tokenlists",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "bIB01",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Backed Finance",
+      "symbol": "bC3M",
+      "name": "Backed GOVIES 0-6 months EURO investment grade",
+      "chainId": 8453,
+      "address": "0x2f123cf3f37ce3328cc9b5b8415f9ec5109b45e7",
+      "source": "https://github.com/backed-fi/tokenlists",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "bC3M",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Backed Finance",
+      "symbol": "bCSPX",
+      "name": "Backed CSPX Core S&P 500",
+      "chainId": 8453,
+      "address": "0xc3ce78b037dda1b966d31ec7979d3f3a38571a8e",
+      "source": "https://github.com/backed-fi/tokenlists",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "bCSPX",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Backed Finance",
+      "symbol": "bCOIN",
+      "name": "Backed Coinbase Global",
+      "chainId": 8453,
+      "address": "0xbbcb0356bb9e6b3faa5cbf9e5f36185d53403ac9",
+      "source": "https://github.com/backed-fi/tokenlists",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "bCOIN",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Backed Finance",
+      "symbol": "bIBTA",
+      "name": "Backed IBTA $ Treasury Bond 1-3yr",
+      "chainId": 8453,
+      "address": "0x52d134c6db5889fad3542a09eaf7aa90c0fdf9e4",
+      "source": "https://github.com/backed-fi/tokenlists",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "bIBTA",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Backed Finance",
+      "symbol": "bNIU",
+      "name": "Backed Niu Technologies",
+      "chainId": 8453,
+      "address": "0x2f11eeee0bf21e7661a22dbbbb9068f4ad191b86",
+      "source": "https://github.com/backed-fi/tokenlists",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "bNIU",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Backed Finance",
+      "symbol": "bHIGH",
+      "name": "Backed HIGH € High Yield Corp Bond",
+      "chainId": 8453,
+      "address": "0x20c64dee8fda5269a78f2d5bdba861ca1d83df7a",
+      "source": "https://github.com/backed-fi/tokenlists",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "bHIGH",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Backed Finance",
+      "symbol": "bERNX",
+      "name": "Backed ERNX € Ultrashort Bond",
+      "chainId": 8453,
+      "address": "0x3f95aa88ddbb7d9d484aa3d482bf0a80009c52c9",
+      "source": "https://github.com/backed-fi/tokenlists",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "bERNX",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Backed Finance",
+      "symbol": "bERNA",
+      "name": "Backed ERNA $ Ultrashort Bond",
+      "chainId": 8453,
+      "address": "0x0f76d32cdccdcbd602a55af23eaf58fd1ee17245",
+      "source": "https://github.com/backed-fi/tokenlists",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "bERNA",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Backed Finance",
+      "symbol": "bZPR1",
+      "name": "Backed $ ZPR1 1-3 Month T-Bill",
+      "chainId": 8453,
+      "address": "0xade6057fcafa57d6d51ffa341c64ce4814995995",
+      "source": "https://github.com/backed-fi/tokenlists",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "bZPR1",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Dinari",
+      "symbol": "AVGO",
+      "name": "Broadcom Inc. Common Stock - Dinari",
+      "chainId": 8453,
+      "address": "0x0f6c508ef7257c4b99bd1bc8aef750da64840813",
+      "source": "https://docs.dinari.com",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "AVGO",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Dinari",
+      "symbol": "XOM",
+      "name": "Exxon Mobil Corporation - Dinari",
+      "chainId": 8453,
+      "address": "0x78bb8ff6baa486c31ce0ef1a157798f7a606565c",
+      "source": "https://docs.dinari.com",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "XOM",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Dinari",
+      "symbol": "CSCO",
+      "name": "Cisco Systems, Inc. Common Stock (DE) - Dinari",
+      "chainId": 8453,
+      "address": "0x341c9b4e5566a2ae22a337c84e3c006064731925",
+      "source": "https://docs.dinari.com",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "CSCO",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Dinari",
+      "symbol": "TJX",
+      "name": "TJX Companies, Inc. (The) - Dinari",
+      "chainId": 8453,
+      "address": "0xf61558b2bc330c55ae85679be03a76dc0a8c9ed2",
+      "source": "https://docs.dinari.com",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "TJX",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Dinari",
+      "symbol": "PG",
+      "name": "Procter & Gamble Company - Dinari",
+      "chainId": 8453,
+      "address": "0x437b5acc7d6f0eacb97431e649c61e98badb3f92",
+      "source": "https://docs.dinari.com",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "PG",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Dinari",
+      "symbol": "AZN",
+      "name": "AstraZeneca PLC - Dinari",
+      "chainId": 8453,
+      "address": "0xa9c380050b07f8c2bb38dc57bcdbe267cc794fe8",
+      "source": "https://docs.dinari.com",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "AZN",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Dinari",
+      "symbol": "IAU",
+      "name": "iShares Gold Trust - Dinari",
+      "chainId": 8453,
+      "address": "0xe6cf0d54079bfb0e441c1ef37e69a234e9e4e4c0",
+      "source": "https://docs.dinari.com",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "IAU",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Dinari",
+      "symbol": "UBER",
+      "name": "Uber Technologies, Inc. - Dinari",
+      "chainId": 8453,
+      "address": "0x068b598c2e4711b1b993415358038d71ea715f2d",
+      "source": "https://docs.dinari.com",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "UBER",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Dinari",
+      "symbol": "SIVR",
+      "name": "abrdn Physical Silver Shares ETF - Dinari",
+      "chainId": 8453,
+      "address": "0x2b98ba07619c3ee14854983a83fe1f0aecff19c8",
+      "source": "https://docs.dinari.com",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "SIVR",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Dinari",
+      "symbol": "CVX",
+      "name": "Chevron Corporation - Dinari",
+      "chainId": 8453,
+      "address": "0x25aa7b1ecf5d3fcd1b3b9f2445a4fa5597ffb189",
+      "source": "https://docs.dinari.com",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "CVX",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Franklin Templeton",
+      "symbol": "BENJI",
+      "name": "Franklin OnChain U.S. Government Money Fund",
+      "chainId": 8453,
+      "address": "0x60cfc2b186a4cf647486e42c42b11cc6d571d1e4",
+      "source": "https://digitalassets.franklintempleton.com/benji/benji-contracts/",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "BENJI",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Dinari",
+      "symbol": "ADBE",
+      "name": "Adobe Inc. - Dinari",
+      "chainId": 8453,
+      "address": "0xf20c96fffbda91b07f78592c1c887ba922ce9b7f",
+      "source": "https://docs.dinari.com",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "ADBE",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Dinari",
+      "symbol": "USHY",
+      "name": "iShares Broad USD High Yield Corporate Bond ETF - Dinari",
+      "chainId": 8453,
+      "address": "0xd194fdcbc9b98d829f7a35fde25feef8f8e41ef1",
+      "source": "https://docs.dinari.com",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "USHY",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Dinari",
+      "symbol": "VXX",
+      "name": "iPath Series B S&P 500 VIX Short-Term Futures ETN - Dinari",
+      "chainId": 8453,
+      "address": "0x0dbff26347082381f035ed54dea12edb6d9ed2f4",
+      "source": "https://docs.dinari.com",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "VXX",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Dinari",
+      "symbol": "ETHE",
+      "name": "Grayscale Ethereum Trust (ETH) - Dinari",
+      "chainId": 8453,
+      "address": "0x5aa9bd9364cc3644bb7f35f092283dae7fd17e11",
+      "source": "https://docs.dinari.com",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "ETHE",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Backed Finance",
+      "symbol": "bNVDA",
+      "name": "Backed NVIDIA Corp",
+      "chainId": 8453,
+      "address": "0xa34c5e0abe843e10461e2c9586ea03e55dbcc495",
+      "source": "https://github.com/backed-fi/tokenlists",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "bNVDA",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Backed Finance",
+      "symbol": "bMSTR",
+      "name": "Backed MicroStrategy Inc",
+      "chainId": 8453,
+      "address": "0xac28c9178acc8ba4a11a29e013a3a2627086e422",
+      "source": "https://github.com/backed-fi/tokenlists",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "bMSTR",
+      "crossCheck": "new"
     }
   ]
 }
