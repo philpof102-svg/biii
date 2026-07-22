@@ -25,13 +25,18 @@ const DENY = new Set([
   'send', 'swap', 'sign', 'send_calls',
 ]);
 
+// Backstop for UNKNOWN paid toolsets (e.g. monid, whose tools we can't enumerate until OAuth): block any
+// tool whose name carries an unambiguous MONEY / execute verb. `monid.run` / `*.pay` / `*.checkout` spend
+// per call — an unattended monitor must never trigger them. Read verbs (discover/inspect/list/get/…) pass.
+const MONEY_VERB = /(^|_)(run|pay|buy|purchase|order|checkout|charge|spend|exec|execute|withdraw|deposit|transfer|remit|topup)($|_)/i;
+
 let raw = '';
 process.stdin.on('data', (c) => { raw += c; });
 process.stdin.on('end', () => {
   let tool = '';
   try { tool = String(JSON.parse(raw || '{}').tool_name || ''); } catch { /* malformed → treat as unknown */ }
-  const seg = tool.split(/[.:/\s]/).pop();          // strip any server namespace, keep underscores in the name
-  if (DENY.has(tool) || DENY.has(seg)) {
+  const seg = tool.split(/__|[.:/\s]/).pop();       // strip server namespace (., :, /, ws, or __), keep single _ in names
+  if (DENY.has(tool) || DENY.has(seg) || MONEY_VERB.test(seg) || MONEY_VERB.test(tool)) {
     process.stdout.write(JSON.stringify({
       action: 'block',
       message: `biii-monitor is READ-ONLY: '${tool}' is a write/spend tool, blocked by policy. ` +

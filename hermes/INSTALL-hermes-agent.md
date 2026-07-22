@@ -132,14 +132,31 @@ Verified: `hermes mcp test gitlawb` → ✓ Connected, **40 tools**. With biii (
 vet a Base address/token AND operate the decentralized git network — the trust/pay layer beside the
 collaboration layer, both re-verifiable and keypair-native.
 
+## Optional third toolset: Monid (agent tool-router) — OAuth-gated
+
+[Monid](https://monid.ai) routes 1,800+ paid tools over a remote MCP server (`https://mcp.monid.ai/v1`). It
+is **OAuth-protected** (`401` + `WWW-Authenticate: Bearer resource_metadata=…/.well-known/oauth-protected-resource`),
+so connecting is the operator's grant — `hermes mcp login monid` (or the claude.ai connector flow). Config:
+
+```yaml
+mcp_servers:
+  monid:
+    url: https://mcp.monid.ai/v1
+    enabled: true          # enable AFTER `hermes mcp login monid` — before that it 401s on every start
+```
+
+Monid tools **spend per call** (`monid.run`, `*.pay`, …). The read-only guard below already blocks them via
+its money-verb backstop, so an unattended monitor can only `monid.discover`/`monid.inspect`, never spend.
+
 ## Safety: read-only enforcement (survives `/yolo`)
 
 An unattended agent must never autonomously write or move value. Hermes' approval modes (`smart` default /
 `manual` / `off` = YOLO) gate *prompts*, but a **`pre_tool_call` shell hook** is a hard block that YOLO does
 **not** bypass. `readonly-guard.js` (in `agents/biii-monitor/hooks/`) blocks every write/spend tool in both
 toolsets — `till_create_charge/invoice/authorize`, all gitlawb writes (`repo_create`, `pr_merge`, `bounty_*`,
-`task_*`, `ucan_delegate`, `identity_sign`) and the base-mcp `send/swap/sign` set — and allows only
-reads/verdicts. Wire it:
+`task_*`, `ucan_delegate`, `identity_sign`) and the base-mcp `send/swap/sign` set — **plus a money-verb
+backstop** (`run|pay|buy|checkout|charge|withdraw|…`) that catches unknown paid toolsets like Monid
+(`monid.run`) before their tool names are even known — and allows only reads/verdicts. Wire it:
 
 ```yaml
 hooks:
