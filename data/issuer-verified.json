@@ -1,7 +1,7 @@
 {
-  "generatedFrom": "issuer-official (verified)",
+  "generatedFrom": "issuer-official (verified: Dinari factory on-chain + Backed API + Ondo docs)",
   "generatedAt": "2026-07-22",
-  "count": 40,
+  "count": 147,
   "entries": [
     {
       "issuer": "Dinari",
@@ -442,6 +442,862 @@
       "verifiedAt": "2026-07-22",
       "onchainSymbol": "AMC",
       "crossCheck": "new"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "SKHYx",
+      "name": "SK hynix xStock",
+      "chainId": 42161,
+      "address": "0x58100046a4afcd4ee4fadbd4244f3f895a341c56",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "DOCx",
+      "name": "Healthpeak Properties xStock",
+      "chainId": 56,
+      "address": "0x2b51b5162d39a20ae5ca52b89e5d12526d63e4dc",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "JLLx",
+      "name": "Jones Lang LaSalle xStock",
+      "chainId": 196,
+      "address": "0x958cde73ca93020050c6eb8677b98c141bb575b2",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "LECOx",
+      "name": "Lincoln Electric xStock",
+      "chainId": 196,
+      "address": "0xfcd20501af3268360625431aa677c2c8607a1067",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "WRBx",
+      "name": "W.R. Berkley xStock",
+      "chainId": 10,
+      "address": "0xb8004fd562bdd80f515a9e9d439f7804041a9bd4",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "BRx",
+      "name": "Broadridge Financial Solutions xStock",
+      "chainId": 196,
+      "address": "0x44a81c9d99b59bcc19ee2b852ac2abdf81062869",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "SUIx",
+      "name": "Sun Communities xStock",
+      "chainId": 42161,
+      "address": "0x89c87b91352e05c1a4dc917aa0790cede828c5c7",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "ROLx",
+      "name": "Rollins xStock",
+      "chainId": 5000,
+      "address": "0x17d4c17b892b663b24df264200434c28f6f5e5ff",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "MAAx",
+      "name": "Mid-America Apartment Communities xStock",
+      "chainId": 56,
+      "address": "0x4fe141616da62b8633efac1935dd6662c25a6538",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "THCx",
+      "name": "Tenet Healthcare xStock",
+      "chainId": 1,
+      "address": "0x27052f2459d0892112cd597735d885bfeec9dd88",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "EQHx",
+      "name": "Equitable xStock",
+      "chainId": 42161,
+      "address": "0xceb3f01585a4b8763fd2635cfd25e8bbfbf67193",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "EXELx",
+      "name": "Exelixis xStock",
+      "chainId": 196,
+      "address": "0xda74bfe8d9b19fb3e5c5a7a827965735c5151a30",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "UNMx",
+      "name": "Unum xStock",
+      "chainId": 42161,
+      "address": "0x7f599e426c11b810ea2bdd887a6b279b7ff45507",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "DECKx",
+      "name": "Deckers Outdoor xStock",
+      "chainId": 42161,
+      "address": "0xafd798910608fd531912f9262c2a5eb1ebe78e07",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "NBIXx",
+      "name": "Neurocrine Biosciences xStock",
+      "chainId": 56,
+      "address": "0xbb398dd3ed4050d222e5853a9872646a81e8affe",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "SGIx",
+      "name": "Somnigroup International xStock",
+      "chainId": 196,
+      "address": "0xb5a30e0b5aa1def87c8c9ff28609cde3a3f88753",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "REGx",
+      "name": "Regency Centers xStock",
+      "chainId": 196,
+      "address": "0xd1d32d11319471c4c0b00f95ad34cf0855184dd2",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "LDOSx",
+      "name": "Leidos xStock",
+      "chainId": 42161,
+      "address": "0x080bce6ba1cbed26d071df86eb4cd3a627e283dd",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "Jx",
+      "name": "Jacobs Solutions xStock",
+      "chainId": 56,
+      "address": "0xc895a27f05a15db9b5ad980ee669102160e4394f",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "DKSx",
+      "name": "Dick's Sporting Goods xStock",
+      "chainId": 196,
+      "address": "0x8e2fb41b55937ea5f939723a2b9e4a55632fd8dd",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "PNFPx",
+      "name": "Pinnacle Financial Partners xStock",
+      "chainId": 1,
+      "address": "0x75ed2324543a3a1d8e1b5339d91c2598cdfa1f94",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "PFGCx",
+      "name": "Performance Food xStock",
+      "chainId": 10,
+      "address": "0xa77d88b4c383042b0c1dc4d72d9d2ab21e30d44a",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "ROKUx",
+      "name": "Roku xStock",
+      "chainId": 196,
+      "address": "0xd00cbf0e9eb52a446814ff0becf39d1cfd684a3d",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "BWAx",
+      "name": "BorgWarner xStock",
+      "chainId": 56,
+      "address": "0xdeddf43e79fa035bd86d976751bfdae474a29580",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "BALLx",
+      "name": "Ball xStock",
+      "chainId": 42161,
+      "address": "0x60143db3b316a95771435b5cf6a1d71b7a09bbed",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "RRXx",
+      "name": "Regal Rexnord xStock",
+      "chainId": 56,
+      "address": "0xedf9acf668012a016a5d614a638c17545102aec5",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "CBREx",
+      "name": "CBRE xStock",
+      "chainId": 196,
+      "address": "0xc7acc638da6a8f61559342a36bfb3ce8d5032cb4",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "SSNCx",
+      "name": "SS&C Technologies xStock",
+      "chainId": 5000,
+      "address": "0x93663705e383b3cd200607abd8fcf0a793a22738",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "ARMKx",
+      "name": "Aramark xStock",
+      "chainId": 10,
+      "address": "0x0b5409f293f78a290a7e8d63c70963e2c06d5e07",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "RLx",
+      "name": "Ralph Lauren xStock",
+      "chainId": 196,
+      "address": "0x858364eff838f2efa51a6ba51eb7e4a7697b3c2e",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "CLHx",
+      "name": "Clean Harbors xStock",
+      "chainId": 10,
+      "address": "0x7a1c7312aa5ab60d6ded33bb5cf23e1b15430b65",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "GPCx",
+      "name": "Genuine Parts xStock",
+      "chainId": 56,
+      "address": "0x17b5845b2ca231d8c59696d2abd378e80234f25b",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "XYZx",
+      "name": "Block xStock",
+      "chainId": 10,
+      "address": "0xae7267bda08c44f0422e3c85d0967c7a71f120df",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "AAx",
+      "name": "Alcoa xStock",
+      "chainId": 57073,
+      "address": "0x6362767df5bf9d9b6c945d1ff5e2bf96188a1df1",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "TOLx",
+      "name": "Toll Brothers xStock",
+      "chainId": 5000,
+      "address": "0xd722acd6fd5006ef303107cb12d5930da1f41803",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "RDDTx",
+      "name": "Reddit xStock",
+      "chainId": 10,
+      "address": "0x52ce422d81e62a2c4bb87653d66f2235c73b152e",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "KMIx",
+      "name": "Kinder Morgan xStock",
+      "chainId": 57073,
+      "address": "0x52b950de3c686c464161d9edc8ea9f877bd3997f",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "HEIx",
+      "name": "Heico xStock",
+      "chainId": 56,
+      "address": "0x88b195ab3db3f3f6001ba231737041bf6a9ae94b",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "CVNAx",
+      "name": "Carvana xStock",
+      "chainId": 42161,
+      "address": "0x3783c4704b2fb000b8426250661a3959441dec2c",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "SCCOx",
+      "name": "Southern Copper xStock",
+      "chainId": 1,
+      "address": "0x59fb22b2ee80d5630db4aebb80fac4a9a5fb778c",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "BBYx",
+      "name": "Best Buy xStock",
+      "chainId": 56,
+      "address": "0x44be932030afb9fccd22621f5f5f5c2fe72efc5c",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "Px",
+      "name": "Everpure xStock",
+      "chainId": 42161,
+      "address": "0x982b371bf69683065f2a32a4cf785751272aba9d",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "TEAMx",
+      "name": "Atlassian xStock",
+      "chainId": 57073,
+      "address": "0x592c21777443d7f857fb517c799abfb6c36e730f",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "LVSx",
+      "name": "Las Vegas Sands xStock",
+      "chainId": 42161,
+      "address": "0x13326eadd0f8323dddf0522f4a71993bf21b0d05",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "CSLx",
+      "name": "Carlisle Companies xStock",
+      "chainId": 5000,
+      "address": "0x77bc8f5aeacf2ded90307c9207da1746ca1e9241",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "NDAQx",
+      "name": "Nasdaq Inc. xStock",
+      "chainId": 42161,
+      "address": "0x378958e63e196e29047db1f9899b1c3b52375cfb",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "MLIx",
+      "name": "Mueller Industries xStock",
+      "chainId": 57073,
+      "address": "0x4623de3596f4688cb5d1087f2e57efe36f81fd7c",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "GNRCx",
+      "name": "Generac xStock",
+      "chainId": 1,
+      "address": "0xdd9a9feb64be689810fb2db010ba701bfe3aaf5d",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "WPCx",
+      "name": "W.P. Carey xStock",
+      "chainId": 1,
+      "address": "0x97de0627fb50bfc50c00ec14ff90f5c3a0ca3ca1",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "MASx",
+      "name": "Masco xStock",
+      "chainId": 56,
+      "address": "0x5d8ca21519abd2f3cd3cfcfe659b71d828357ad9",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "ITTx",
+      "name": "ITT xStock",
+      "chainId": 42161,
+      "address": "0x2318c8a06a522572604fb0247827b8dd9c5681ce",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "OKTAx",
+      "name": "Okta xStock",
+      "chainId": 42161,
+      "address": "0x46e75757bdd40f3be9f6be392cb233e8772d946d",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "TSNx",
+      "name": "Tyson Foods xStock",
+      "chainId": 10,
+      "address": "0xabd1dc87e0ddd489cd260d5455941e380391194f",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "OVVx",
+      "name": "Ovintiv xStock",
+      "chainId": 57073,
+      "address": "0x9f2327d8e3e6db28afc34cd9a46cfcfd3b014b37",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "NLYx",
+      "name": "Annaly Capital Management xStock",
+      "chainId": 57073,
+      "address": "0xfa5cb298ac2eaf852699bb08309dc6f701de286f",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "IBKRx",
+      "name": "Interactive Brokers xStock",
+      "chainId": 42161,
+      "address": "0x8563a53804f4a195fd2c960a8d5e16c997c394ab",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "CFx",
+      "name": "CF Industries xStock",
+      "chainId": 1,
+      "address": "0xff0b421a304fac14f9cc1d8837e4c7f5d0792710",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "ARESx",
+      "name": "Ares Management xStock",
+      "chainId": 57073,
+      "address": "0x96180d4b7c607816eeee8d58228d05b009366852",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "ELx",
+      "name": "The Estee Lauder Companies xStock",
+      "chainId": 57073,
+      "address": "0x966a68d8093cfccc6d6e43acbfd19658a91ec133",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "ONTOx",
+      "name": "Onto Innovation xStock",
+      "chainId": 57073,
+      "address": "0x2641f4565926c1692b057cc2d6ef7ee5ee7049dd",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "CPNGx",
+      "name": "Coupang xStock",
+      "chainId": 57073,
+      "address": "0x60cb8c81bdb4ae6e2bc66de8713b52c68148e5ac",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "GPNx",
+      "name": "Global Payments xStock",
+      "chainId": 56,
+      "address": "0xa6c7e611dbf501c949bc80fef3c55c6900463b83",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "DASHx",
+      "name": "DoorDash xStock",
+      "chainId": 57073,
+      "address": "0xf38665a4a42a1e7eeb36a5f26d1757b788e64a4f",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "NDSNx",
+      "name": "Nordson xStock",
+      "chainId": 57073,
+      "address": "0x12e714e27ab36fc439971d2d66f641342eb33f4e",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "TWLOx",
+      "name": "Twilio xStock",
+      "chainId": 1,
+      "address": "0xcde92f3b3ebab6c58cbbe18628033375ce0785f2",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "FCNCAx",
+      "name": "First Citizens BancShares xStock",
+      "chainId": 10,
+      "address": "0xaa05eff17edb2a99cf03e465fc3788ba273fad98",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "STZx",
+      "name": "Constellation Brands xStock",
+      "chainId": 57073,
+      "address": "0xedeacbee9c1f9c66d769c3e38a5f2b7a7d4b0420",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "UPSx",
+      "name": "United Parcel Service xStock",
+      "chainId": 57073,
+      "address": "0xf19423dea91ace37fba0edd46a521be6330b791a",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "MDBx",
+      "name": "MongoDB xStock",
+      "chainId": 1,
+      "address": "0x94a984253ecd65c1fabd35dba3cc6bcbc86b8795",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "CTSHx",
+      "name": "Cognizant Technology Solutions xStock",
+      "chainId": 1,
+      "address": "0x853c65ef470689195a52ffcb85874b901a181b58",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "ZTSx",
+      "name": "Zoetis xStock",
+      "chainId": 42161,
+      "address": "0xe15f68fa7199200677e652eb7799b0521401a3e9",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "ABNBx",
+      "name": "Airbnb xStock",
+      "chainId": 10,
+      "address": "0xc1566b43ee3d9f507c75435c5eea81de7e7515f3",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "INCYx",
+      "name": "Incyte xStock",
+      "chainId": 1,
+      "address": "0xe0124233d9e93e85a687b6849711cf063cce7e65",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "BAMx",
+      "name": "Brookfield Asset Management xStock",
+      "chainId": 1,
+      "address": "0xd629f4cf39b225edcd94c075dd17bcf37fa2c068",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "LENx",
+      "name": "Lennar xStock",
+      "chainId": 56,
+      "address": "0xfbb16f9b1d1de8a26220688dbca936c05f5a67c2",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "VEEVx",
+      "name": "Veeva Systems xStock",
+      "chainId": 42161,
+      "address": "0x5f07e31067e20d6f192128bd3c4aae64a8ab01dd",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "TXTx",
+      "name": "Textron xStock",
+      "chainId": 57073,
+      "address": "0xaff0e5f513cd797561ec8709e302de4e4da568e7",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "WDAYx",
+      "name": "Workday xStock",
+      "chainId": 1,
+      "address": "0x8537107b02089e42e6761774cef2264da2018768",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "SBACx",
+      "name": "SBA Communications xStock",
+      "chainId": 1,
+      "address": "0xc26bc7f2fcc708d6678527672b65815ae83d8b05",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "NKEx",
+      "name": "Nike xStock",
+      "chainId": 1,
+      "address": "0x7c5e9e93ea0f8fe94ea94eb6283f200ba0b72be0",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "MARx",
+      "name": "Marriott International xStock",
+      "chainId": 1,
+      "address": "0xb0c14176d72b47e962286da1ce49d49996c5f0ac",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "TSCOx",
+      "name": "Tractor Supply xStock",
+      "chainId": 57073,
+      "address": "0x3216a28c44d87aa5006db1c4b13b422c7826df88",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "MDLZx",
+      "name": "Mondelez International xStock",
+      "chainId": 1,
+      "address": "0xc567ec4e62c80cc60454d24456e45de0abc36243",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "CMEx",
+      "name": "CME xStock",
+      "chainId": 1,
+      "address": "0x388bd41aaf969d13e3538d62c051d08302a7fa6e",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "DDOGx",
+      "name": "Datadog xStock",
+      "chainId": 1,
+      "address": "0x84bb81e42fabbdfc7a760a19f73983da1bd90080",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "APHx",
+      "name": "Amphenol xStock",
+      "chainId": 56,
+      "address": "0x7848475161802da675c321b250e0b25658fdf96c",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "FISVx",
+      "name": "Fiserv xStock",
+      "chainId": 1,
+      "address": "0xc930c017431cbb6dc3672389fc5779843804c71f",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "KEYx",
+      "name": "KeyCorp xStock",
+      "chainId": 1,
+      "address": "0xcbbdab0ea8b230ddf66dae0ea8b04a14d467fed7",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "SYFx",
+      "name": "Synchrony Financial xStock",
+      "chainId": 1,
+      "address": "0xa5f97df7e8eceb65c4b0db66077d95035754a3e7",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "AVBx",
+      "name": "AvalonBay Communities xStock",
+      "chainId": 1,
+      "address": "0xc0f50d66bcd50ea78747c8ebe77f4ac57f55f401",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "PFGx",
+      "name": "Principal Financial xStock",
+      "chainId": 1,
+      "address": "0x8941fcc07e74d6a29b083f066275a9404cd8378b",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "CHDx",
+      "name": "Church & Dwight xStock",
+      "chainId": 1,
+      "address": "0x8a0d5deccd1193105b2ed895b4ed7542d54e7519",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "FISx",
+      "name": "Fidelity National Information Services xStock",
+      "chainId": 1,
+      "address": "0x41dbd486e11dc88ac498d740ed3d7a4985ce07f5",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "FTVx",
+      "name": "Fortive xStock",
+      "chainId": 1,
+      "address": "0xb3a4f4325b9952804f5f0f74d1c65f4cb84c42eb",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "ALBx",
+      "name": "Albemarle xStock",
+      "chainId": 1,
+      "address": "0x94164391de9fa0204aefd36a863743544dfa4f31",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "WWDx",
+      "name": "Woodward xStock",
+      "chainId": 56,
+      "address": "0xe61c8b12dac2fb289822fc4c1baaa36d285bc148",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "DRIx",
+      "name": "Darden Restaurants xStock",
+      "chainId": 196,
+      "address": "0xd80840f51367e5f22d29c2de161d86fe992ebf77",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "DGXx",
+      "name": "Quest Diagnostics xStock",
+      "chainId": 196,
+      "address": "0x14c7a3738fd283e04d1082db86f3410de2354e2d",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "WSTx",
+      "name": "West Pharmaceutical Services xStock",
+      "chainId": 5000,
+      "address": "0xaca636eba69011582eb6d2077436dd9bac27dcd8",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Backed (xStocks)",
+      "symbol": "UTHRx",
+      "name": "United Therapeutics xStock",
+      "chainId": 196,
+      "address": "0x3526cb34011b9bbc0ff5e60ee1dc9d04ea0cc09f",
+      "source": "https://api.backed.fi/api/v2/public/assets (Backed official public API)"
+    },
+    {
+      "issuer": "Ondo",
+      "symbol": "OUSG",
+      "name": "Ondo Short-Term US Gov Treasuries",
+      "chainId": 1,
+      "address": "0x1b19c19393e2d034d8ff31ff34c81252fcbbee92",
+      "source": "https://docs.ondo.finance/addresses (Ondo official) — on-chain verified"
+    },
+    {
+      "issuer": "Ondo",
+      "symbol": "OUSG",
+      "name": "Ondo Short-Term US Gov Treasuries",
+      "chainId": 137,
+      "address": "0xba11c5effa33c4d6f8f593cfa394241cfe925811",
+      "source": "https://docs.ondo.finance/addresses (Ondo official) — on-chain verified"
+    },
+    {
+      "issuer": "Ondo",
+      "symbol": "USDY",
+      "name": "Ondo US Dollar Yield",
+      "chainId": 1,
+      "address": "0x96f6ef951840721adbf46ac996b59e0235cb985c",
+      "source": "https://docs.ondo.finance/addresses (Ondo official) — on-chain verified"
+    },
+    {
+      "issuer": "Ondo",
+      "symbol": "rUSDY",
+      "name": "Ondo Rebasing USDY",
+      "chainId": 1,
+      "address": "0xaf37c1167910ebc994e266949387d2c7c326b879",
+      "source": "https://docs.ondo.finance/addresses (Ondo official) — on-chain verified"
+    },
+    {
+      "issuer": "Ondo",
+      "symbol": "USDY",
+      "name": "Ondo US Dollar Yield",
+      "chainId": 56,
+      "address": "0x608593d17a2decbbc4399e4185be4922f97ed32e",
+      "source": "https://docs.ondo.finance/addresses (Ondo official) — on-chain verified"
+    },
+    {
+      "issuer": "Ondo",
+      "symbol": "USDY",
+      "name": "Ondo US Dollar Yield",
+      "chainId": 5000,
+      "address": "0x5be26527e817998a7206475496fde1e68957c5a6",
+      "source": "https://docs.ondo.finance/addresses (Ondo official) — on-chain verified"
+    },
+    {
+      "issuer": "Ondo",
+      "symbol": "USDY",
+      "name": "Ondo US Dollar Yield",
+      "chainId": 42161,
+      "address": "0x35e050d3c0ec2d29d269a8ecea763a183bdf9a9d",
+      "source": "https://docs.ondo.finance/addresses (Ondo official) — on-chain verified"
     }
   ]
 }
