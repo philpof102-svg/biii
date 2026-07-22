@@ -9,6 +9,7 @@ let pass = 0, fail = 0;
 const t = (n, fn) => Promise.resolve().then(fn).then(() => { pass++; console.log('  ✓ ' + n); }, (e) => { fail++; console.log('  ✗ ' + n + '\n      ' + (e && e.message)); });
 
 const M = '0x' + 'ab'.repeat(20);
+const USDC = T.USDC_BASE;                 // real eth_getLogs always carries the emitting contract in log.address
 const pad = (a) => '0x' + '0'.repeat(24) + a.slice(2).toLowerCase();
 const fakeRpc = (logs, head = '0x100') => async (url, init) => {
   const q = JSON.parse(init.body);
@@ -23,8 +24,8 @@ const fakeRpc = (logs, head = '0x100') => async (url, init) => {
 
   await t('findPayment: newest big-enough Transfer wins; confirmations = head - block + 1', async () => {
     const logs = [
-      { transactionHash: '0x' + '11'.repeat(32), blockNumber: '0xf0', data: '0x' + (4_500_000).toString(16), topics: [TRANSFER_TOPIC, pad('0x' + 'ee'.repeat(20)), pad(M)] },
-      { transactionHash: '0x' + '22'.repeat(32), blockNumber: '0xfa', data: '0x' + (9_000_000).toString(16), topics: [TRANSFER_TOPIC, pad('0x' + 'ff'.repeat(20)), pad(M)] },
+      { address: USDC, transactionHash: '0x' + '11'.repeat(32), blockNumber: '0xf0', data: '0x' + (4_500_000).toString(16), topics: [TRANSFER_TOPIC, pad('0x' + 'ee'.repeat(20)), pad(M)] },
+      { address: USDC, transactionHash: '0x' + '22'.repeat(32), blockNumber: '0xfa', data: '0x' + (9_000_000).toString(16), topics: [TRANSFER_TOPIC, pad('0x' + 'ff'.repeat(20)), pad(M)] },
     ];
     const f = await findPayment({ to: M, minMicro: '4500000', fetchImpl: fakeRpc(logs) });
     assert.equal(f.txHash, '0x' + '22'.repeat(32), 'newest wins');
@@ -34,9 +35,19 @@ const fakeRpc = (logs, head = '0x100') => async (url, init) => {
   });
 
   await t('too-small transfers are ignored; empty chain ⇒ null (never invented)', async () => {
-    const small = [{ transactionHash: '0x' + '33'.repeat(32), blockNumber: '0xf0', data: '0x' + (100).toString(16), topics: [TRANSFER_TOPIC, pad(M), pad(M)] }];
+    const small = [{ address: USDC, transactionHash: '0x' + '33'.repeat(32), blockNumber: '0xf0', data: '0x' + (100).toString(16), topics: [TRANSFER_TOPIC, pad(M), pad(M)] }];
     assert.equal(await findPayment({ to: M, minMicro: '4500000', fetchImpl: fakeRpc(small) }), null);
     assert.equal(await findPayment({ to: M, minMicro: '1', fetchImpl: fakeRpc([]) }), null);
+  });
+
+  await t('a hostile/misfiltering RPC is fail-closed: a non-USDC contract log + a consumed tx are both skipped', async () => {
+    // #2: a Transfer from a SCAM token (not USDC) to the merchant must NOT be read as a USDC payment
+    const scam = [{ address: '0x' + '5ca3'.repeat(10), transactionHash: '0x' + '44'.repeat(32), blockNumber: '0xf0', data: '0x' + (5_000_000).toString(16), topics: [TRANSFER_TOPIC, pad('0x' + 'ee'.repeat(20)), pad(M)] }];
+    assert.equal(await findPayment({ to: M, minMicro: '1', fetchImpl: fakeRpc(scam) }), null, 'non-USDC contract → rejected');
+    // #1 guard: a tx already applied to another charge is excluded
+    const real = [{ address: USDC, transactionHash: '0x' + '55'.repeat(32), blockNumber: '0xf0', data: '0x' + (5_000_000).toString(16), topics: [TRANSFER_TOPIC, pad('0x' + 'ee'.repeat(20)), pad(M)] }];
+    assert.equal(await findPayment({ to: M, minMicro: '1', fetchImpl: fakeRpc(real), excludeTxHashes: new Set(['0x' + '55'.repeat(32)]) }), null, 'consumed tx → excluded');
+    assert.ok(await findPayment({ to: M, minMicro: '1', fetchImpl: fakeRpc(real) }), 'the same tx, not excluded → found');
   });
 
   console.log('\nthe MCP bridge (phase 3: agents pay real-world humans):');

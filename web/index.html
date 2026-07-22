@@ -120,6 +120,7 @@
   // ── STATE ──
   let rawCents = 0;          // ex: 450 = $4.50
   let charge = null;          // charge object from POST /charge
+  let chargeId = null;        // the server-owned handle that binds this charge (poll /status with it)
   let pollTimer = null;
   let lastVerdict = null;     // the verified payment, for the receipt
   let charging = false;       // re-entrancy guard for Encaisser (no double-charge)
@@ -196,9 +197,10 @@
       const data = await res.json().catch(function(){ return {}; });
       if (!res.ok || data.error) throw new Error(data.error || ("serveur " + res.status));
       charge = data.charge;
-      // the server returns paymentURI as a SIBLING of charge ({charge, paymentURI}), not charge.paymentURI
+      chargeId = data.chargeId;   // the server-owned handle we poll /status with (binds this specific charge)
+      // the server returns paymentURI as a SIBLING of charge ({charge, chargeId, paymentURI}), not charge.paymentURI
       const paymentURI = data.paymentURI || (charge && charge.paymentURI);
-      if (!charge || !paymentURI) throw new Error("réponse de charge invalide");
+      if (!charge || !chargeId || !paymentURI) throw new Error("réponse de charge invalide");
       const myToken = ++chargeToken;                         // this sale's identity for the poll/cancel race
 
       $qrAmount.textContent = amountUsd + " USDC";
@@ -224,10 +226,11 @@
 
   // ── POLL STATUS ── (bound to a sale token so a cancelled/superseded sale can't flip a new one)
   async function checkPayment(myToken) {
-    if (!charge || myToken !== chargeToken) return;
+    if (!charge || !chargeId || myToken !== chargeToken) return;
     try {
-      const url = API + "/status?amountMicro=" + encodeURIComponent(charge.amountMicro) +
-        "&createdAtMs=" + encodeURIComponent(charge.createdAtMs || 0);   // bound the window → no prior-payment false PAID
+      // poll by the server-owned chargeId: the server binds the freshness window + one-transfer-one-charge,
+      // so a prior/unrelated transfer can never flip this to PAID (no client-supplied window to spoof).
+      const url = API + "/status?chargeId=" + encodeURIComponent(chargeId);
       const res = await fetch(url);
       const data = await res.json().catch(function(){ return {}; });
       if (myToken !== chargeToken) return;                  // cancelled while awaiting → ignore
@@ -255,14 +258,14 @@
   // ── CANCEL ──
   $btnCancel.addEventListener("click", function() {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-    charge = null; chargeToken++;   // invalidate any in-flight poll so it can't flip this cancelled sale to PAID
+    charge = null; chargeId = null; chargeToken++;   // invalidate any in-flight poll so it can't flip this cancelled sale to PAID
     show($keypad);
   });
 
   // ── NEW SALE ──
   $btnNew.addEventListener("click", function() {
     rawCents = 0;
-    charge = null; chargeToken++;
+    charge = null; chargeId = null; chargeToken++;
     updateDisplay();
     show($keypad);
   });
