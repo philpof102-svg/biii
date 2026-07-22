@@ -93,6 +93,15 @@ const mkCharge = async (s, amountUsd) => (await req(s, 'POST', '/charge', { amou
     assert.equal(r.body.charge.to, M.toLowerCase(), 'caller-supplied `to` is ignored when a merchant is configured');
   });
 
+  await t('GET /verify?txHash — accounting proof: 400 on a bad hash, chain facts on a real one', async () => {
+    const s = await mkServer({ verifyTxHash: async ({ txHash }) => ({ found: true, paid: true, txHash, from: '0x' + 'ee'.repeat(20), to: M.toLowerCase(), valueMicro: '4500000', valueUsd: '4.50', confirmations: 3, explorer: 'https://basescan.org/tx/' + txHash }) });
+    assert.equal((await req(s, 'GET', '/verify?txHash=0xdead')).status, 400, 'a malformed hash gets no verdict');
+    const r = await req(s, 'GET', '/verify?txHash=0x' + 'ab'.repeat(32));
+    assert.equal(r.body.proof.paid, true); assert.equal(r.body.proof.valueUsd, '4.50');
+    assert.match(r.body.note, /Confirmed on Base|basescan/);
+    s.close();
+  });
+
   // ── the CRITICAL false-PAID fixes ──
   await t('NO chargeId → never paid: an unbound /status can\'t be satisfied by a prior/unrelated transfer', async () => {
     const s = await mkServer();

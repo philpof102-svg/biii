@@ -1,7 +1,7 @@
 'use strict';
 // chain watcher + MCP bridge — offline (fake RPC / fake fetch). Run: node test/chain.test.js
 const assert = require('node:assert');
-const { findPayment, TRANSFER_TOPIC } = require('../lib/chain');
+const { findPayment, verifyTxHash, TRANSFER_TOPIC } = require('../lib/chain');
 const { callTool, TOOLS } = require('../bin/biii-mcp');
 const T = require('../lib/till');
 
@@ -48,6 +48,28 @@ const fakeRpc = (logs, head = '0x100') => async (url, init) => {
     const real = [{ address: USDC, transactionHash: '0x' + '55'.repeat(32), blockNumber: '0xf0', data: '0x' + (5_000_000).toString(16), topics: [TRANSFER_TOPIC, pad('0x' + 'ee'.repeat(20)), pad(M)] }];
     assert.equal(await findPayment({ to: M, minMicro: '1', fetchImpl: fakeRpc(real), excludeTxHashes: new Set(['0x' + '55'.repeat(32)]) }), null, 'consumed tx → excluded');
     assert.ok(await findPayment({ to: M, minMicro: '1', fetchImpl: fakeRpc(real) }), 'the same tx, not excluded → found');
+  });
+
+  await t('verifyTxHash: retrieve a tx by hash → real USDC payment facts (the accounting proof), fail-closed', async () => {
+    const TX = '0x' + '99'.repeat(32);
+    // a fake RPC: eth_getTransactionReceipt returns a receipt with a USDC Transfer log; eth_blockNumber = head
+    const receiptRpc = (receipt, head = '0x100') => async (url, init) => {
+      const q = JSON.parse(init.body);
+      const result = q.method === 'eth_blockNumber' ? head : q.method === 'eth_getTransactionReceipt' ? receipt : null;
+      return { ok: true, json: async () => ({ jsonrpc: '2.0', id: 1, result }) };
+    };
+    const good = { status: '0x1', blockNumber: '0xfa', logs: [{ address: USDC, topics: [TRANSFER_TOPIC, pad('0x' + 'ee'.repeat(20)), pad(M)], data: '0x' + (2_500_000).toString(16) }] };
+    const p = await verifyTxHash({ txHash: TX, fetchImpl: receiptRpc(good) });
+    assert.equal(p.paid, true); assert.equal(p.to, M.toLowerCase()); assert.equal(p.valueMicro, '2500000');
+    assert.equal(p.confirmations, 0x100 - 0xfa + 1); assert.ok(p.explorer.includes(TX));
+    // reverted tx → not paid
+    assert.equal((await verifyTxHash({ txHash: TX, fetchImpl: receiptRpc({ status: '0x0', blockNumber: '0xfa', logs: [] }) })).paid, false);
+    // a receipt whose only log is a NON-USDC contract → not a USDC payment
+    const scamLog = { status: '0x1', blockNumber: '0xfa', logs: [{ address: '0x' + 'ba'.repeat(20), topics: [TRANSFER_TOPIC, pad(M), pad(M)], data: '0x' + (9).toString(16) }] };
+    assert.equal((await verifyTxHash({ txHash: TX, fetchImpl: receiptRpc(scamLog) })).paid, false, 'a non-USDC transfer is not a USDC payment');
+    // not found / malformed
+    assert.equal((await verifyTxHash({ txHash: TX, fetchImpl: receiptRpc(null) })).found, false);
+    assert.equal((await verifyTxHash({ txHash: '0xdead' })).reason, 'not a 32-byte txHash');
   });
 
   console.log('\nthe MCP bridge (phase 3: agents pay real-world humans):');
