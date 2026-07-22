@@ -56,7 +56,7 @@ wallet signs, and the chain — not us — is the only thing allowed to say "pai
 ## Run it
 
 ```bash
-npm test                               # 74 assertions across 12 files + a 17-case eval harness, all offline
+npm test                               # 123 assertions across 20 files + a 17-case eval harness, all offline
 BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface, :4700
 ```
 
@@ -81,10 +81,14 @@ BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface,
   symbol · wanted chain) or it's dropped — a schema drift yields an EMPTY registry, never a wrong "genuine"
   address. **In progress:** issuer-official / on-chain sourcing (Dinari factory + Backed tokenlist) to make
   a `genuine` verdict authoritative rather than aggregator-sourced.
-- `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (9 tools: `till_vet_merchant`,
+- `lib/export.js` — **the accounting export finance teams need**: `till_export` turns the same verified
+  receipts into an accountant-ready CSV (QuickBooks / Xero / Excel import it) where every row carries its
+  txHash + Basescan link — a pointer to the chain, not a book to trust. Non-custodial, re-verifiable.
+- `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (10 tools: `till_vet_merchant`,
   `till_create_charge`, `till_check_payment`, `till_trust`, `till_create_invoice`,
-  `till_check_invoice`, `till_vet_asset`, `till_receipt`, `till_roll`) — an agent can vet a merchant or a
-  tokenized asset, get the whole trust triangle in one call, issue or pay an invoice, keep a receipt, and
+  `till_check_invoice`, `till_vet_asset`, `till_receipt`, `till_roll`, `till_export`) — an agent can vet a
+  merchant or a tokenized asset, get the whole trust triangle in one call, issue or pay an invoice, keep a
+  receipt, export the books, and
   render provable books (`till_roll`)
 - `pitch/trust-triangle.html` — the sellable white-label one-pager (self-contained, theme-aware)
 - `COMPETITION.md` — the researched landscape (dated): ride the rails (x402/Stripe), interop with the

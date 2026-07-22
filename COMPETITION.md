@@ -39,8 +39,10 @@ rail lacks**.
 → **BIII stance:** **don't rebuild the invoice UI / accounting suite** — Request is years ahead and Stripe
 has infinite resources. But their books are *their* centralized record you must trust. BIII's registry is
 **non-custodial and re-checkable on-chain by anyone** (a fixed-width receipt + a re-verifiable day-roll).
-A QuickBooks/Xero export is **not built yet** — it's on the roadmap (see below), and without it finance
-teams won't fully adopt. Sit *under* their invoice or *beside* it as the provable trust layer.
+A QuickBooks/Xero export **now ships** (`till_export` — an accountant-ready CSV where every row carries its
+own txHash + Basescan link, so finance re-verifies each amount on Base; QuickBooks / Xero / Excel import it).
+The books stay *ours-are-a-pointer-to-the-chain*, never a record you must trust. Sit *under* their invoice or
+*beside* it as the provable trust layer.
 
 ### 3. Agent identity + reputation (the new standards — INTEROPERATE, never rival)
 - **ERC-8004 "Trustless Agents"** — ratified Jan 2026, live on Ethereum mainnet Feb 2026. Three registries:
@@ -81,8 +83,9 @@ Coinbase / Experian behind them. **Read them as signal sources** into BIII's rep
    never the pipe.
 2. **Don't go custodial.** It is the incumbents' model *and* their regulatory anchor (money-transmitter /
    PSP licensing). Non-custodial is both the product wedge and the licensing shortcut.
-3. **Don't skip accounting export.** Request/Stripe win partly because they push journal entries to
-   QuickBooks/Xero. The bon-de-caisse must export too, or finance teams won't adopt it.
+3. **Accounting export — SHIPPED (2026-07-21).** Request/Stripe win partly because they push entries to
+   QuickBooks/Xero; the bon-de-caisse now exports too (`till_export`, re-verifiable CSV). A native
+   QBO/Xero *journal-API push* (vs a CSV they import) stays on the roadmap.
 4. **Don't serve a single surface.** The winners span invoice + checkout + payroll. BIII's registry must
    span **in-person + Web2 invoice + agent-to-agent** — one registry, one trust triangle. *(Phil's insight,
    2026-07-21.)*

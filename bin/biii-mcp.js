@@ -24,6 +24,7 @@ const { assessTriangle } = require('../lib/trust');
 const I = require('../lib/invoice');
 const { assessAsset, assetVertex } = require('../lib/asset');
 const L = require('../lib/ledger');
+const X = require('../lib/export');
 const { DISCLAIMER } = require('../lib/disclaimer');
 const { loadScreen, screenAddress, screenMeta } = require('../lib/screen');
 const fs = require('node:fs'), path = require('node:path');
@@ -140,6 +141,12 @@ const TOOLS = [
       receipts: { type: 'array', description: 'the verified receipt objects (from till_receipt), each carrying a txHash', items: { type: 'object' } },
       merchantName: { type: 'string' }, lang: { type: 'string', description: '"en" (default) or "fr"' },
       brand: { description: 'WHITE-LABEL: a partner brand for the footer ("via <name>", optionally "· powered by BIII"). String or {name, poweredBy}. The non-custodial disclosure is a fact and stays regardless.' } }, required: ['receipts'] } },
+  { name: 'till_export', description: 'ACCOUNTING EXPORT: turn the verified receipts into an accountant-ready CSV that QuickBooks / Xero / Excel import (the export finance teams need to adopt). Every row carries its own txHash + Basescan link, so the accountant re-verifies each amount on Base themselves — the export is a POINTER to the chain, never a book to trust. Non-custodial (BIII moved no funds). Columns: date, receipt_no, reference, description, payer, gross_usdc, tip_usdc, charged_usdc, token, chain, tx_hash, basescan_url, status. Dedup by txHash; optional block-time window; brand slugs the filename.',
+    inputSchema: { type: 'object', properties: {
+      receipts: { type: 'array', description: 'the verified receipt objects (from till_receipt), each carrying a txHash', items: { type: 'object' } },
+      fromBlockTime: { type: 'number', description: 'optional — only export receipts settled at/after this unix block time' },
+      toBlockTime: { type: 'number', description: 'optional — only export receipts settled at/before this unix block time' },
+      brand: { description: 'WHITE-LABEL: a partner brand (string or {name}) — slugs the download filename; the non-custodial disclosure stays regardless.' } }, required: ['receipts'] } },
 ];
 
 async function callTool(name, a = {}) {
@@ -277,6 +284,17 @@ async function callTool(name, a = {}) {
       lines: rows.map((e) => ({ no: e.no, amountUsd: e.receipt.amountUsd, txHash: e.receipt.txHash, explorer: e.receipt.explorer || ('https://basescan.org/tx/' + e.receipt.txHash) })),
       note: 'Re-verify EVERY txHash on BaseScan yourself — this statement is only as true as the chain it points to. ' + DISCLAIMER,
     };
+  }
+  if (name === 'till_export') {
+    // ACCOUNTING EXPORT, stateless: the same receipts the till roll uses → an accountant-ready CSV
+    // (QuickBooks/Xero/Excel import it). Same non-custodial discipline: every row carries its txHash +
+    // Basescan link so the accountant re-verifies on Base — a pointer to the chain, never a book to trust.
+    const receipts = (Array.isArray(a.receipts) ? a.receipts : []).filter((r) => r && r.txHash);
+    const window = {};
+    if (Number.isFinite(a.fromBlockTime)) window.fromBlockTime = Number(a.fromBlockTime);
+    if (Number.isFinite(a.toBlockTime)) window.toBlockTime = Number(a.toBlockTime);
+    const ex = X.buildExport(receipts, { window, brand: a.brand });
+    return { ...ex, note: 'Import into QuickBooks / Xero / Excel; re-verify every tx_hash on BaseScan yourself. ' + DISCLAIMER };
   }
   throw new Error('unknown tool ' + name);
 }
