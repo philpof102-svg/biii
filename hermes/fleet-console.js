@@ -25,7 +25,7 @@ const jobNames = () => { try { const j = JSON.parse(fs.readFileSync(JOBS_JSON, '
 function summarize(md) {
   const body = md.split(/\n-{3,}\n/).slice(1).join('\n---\n') || md;   // drop the header block
   const lines = body.split('\n').map((s) => s.trim()).filter(Boolean);
-  const flags = (body.match(/🚩/g) || []).length;
+  const flags = (body.match(/🚩|🆕/g) || []).length;
   const head = (lines.find((l) => !l.startsWith('#')) || '(sortie vide)').replace(/\s+/g, ' ');
   const ok = !/error|traceback|failed|exception/i.test(body);
   return { head: head.slice(0, 200), flags, ok, lines: lines.slice(0, 10) };

@@ -50,18 +50,49 @@ function scanWatchlist(watchlist, { floor, registry } = {}) {
   return { checked, flags, brief };
 }
 
+const briefKey = (f) => f.verdict + ':' + f.q;
+const hhmm = (iso) => { try { return new Date(iso).toISOString().slice(11, 16) + 'Z'; } catch { return '?'; } };
+
 function main() {
   const wlPath = process.argv[2] || path.join(__dirname, 'watchlist.json');
   let watchlist = { addresses: [], tokens: [] };
   try { watchlist = JSON.parse(fs.readFileSync(wlPath, 'utf8')); } catch { console.error('no watchlist at ' + wlPath + ' — using empty'); }
   const floor = loadFloor();
   const registry = loadAssetRegistry().entries || [];
+  const cacheFile = path.join(__dirname, 'cache', 'brief.json');
+
+  // A monitor reports CHANGE, not the same standing list every 30 min. Diff this run against the last
+  // one (still in the cache until we overwrite it) so the journal reads as events, not repeated noise.
+  let prev = null;
+  try { prev = JSON.parse(fs.readFileSync(cacheFile, 'utf8')); } catch { /* first run — no prior brief */ }
+
   const out = scanWatchlist(watchlist, { floor, registry });
+  out.generatedAt = new Date().toISOString();
+  const prevFlags = (prev && Array.isArray(prev.flags)) ? prev.flags : [];
+  const prevKeys = prevFlags.map(briefKey);
+  const nowKeys = out.flags.map(briefKey);
+  const fresh = out.flags.filter((f) => !prevKeys.includes(briefKey(f)));
+  const cleared = prevFlags.filter((f) => !nowKeys.includes(briefKey(f)));
+  out.delta = { new: fresh.map(briefKey), cleared: cleared.map(briefKey), since: (prev && prev.generatedAt) || null };
 
   // write the brief to the cron cache (HOODRADAR pattern) for the Hermes agent / the /radar to ingest.
-  try { const cache = path.join(__dirname, 'cache'); fs.mkdirSync(cache, { recursive: true }); fs.writeFileSync(path.join(cache, 'brief.json'), JSON.stringify(out, null, 2) + '\n'); } catch {}
-  console.log(out.brief);
-  for (const f of out.flags) console.log(`  🚩 ${f.kind} ${f.verdict} — ${f.q}  (delegate: ${f.delegate})`);
+  try { fs.mkdirSync(path.dirname(cacheFile), { recursive: true }); fs.writeFileSync(cacheFile, JSON.stringify(out, null, 2) + '\n'); } catch {}
+
+  // Headline is change-first: first run → the raw brief; then only shout when something is new/cleared,
+  // otherwise say plainly that nothing changed (with the count still standing).
+  let head;
+  if (!prev) head = out.brief;
+  else if (fresh.length || cleared.length)
+    head = `${out.brief}  ·  🆕 ${fresh.length} new, ${cleared.length} cleared since ${hhmm(prev.generatedAt)}`;
+  else head = out.flags.length
+    ? `✓ no change since ${hhmm(prev.generatedAt)} — ${out.flags.length} standing flag(s), nothing new on the watchlist.`
+    : out.brief;
+
+  console.log(head);
+  for (const f of out.flags) {
+    const isNew = fresh.some((g) => briefKey(g) === briefKey(f));
+    console.log(`  ${isNew ? '🆕' : '🚩'} ${f.kind} ${f.verdict} — ${f.q}  (delegate: ${f.delegate})`);
+  }
   process.exit(0);
 }
 
