@@ -1,7 +1,7 @@
 {
   "generatedFrom": "issuer-official (verified: Dinari factory on-chain + Backed API + Ondo docs) + workflow-confirmed Base issuers (on-chain re-verified)",
   "generatedAt": "2026-07-22",
-  "count": 177,
+  "count": 183,
   "entries": [
     {
       "issuer": "Dinari",
@@ -1621,6 +1621,72 @@
       "source": "https://www.coinbase.com/cbbtc",
       "verifiedAt": "2026-07-22",
       "onchainSymbol": "cbBTC",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Circle",
+      "symbol": "USDC",
+      "name": "USD Coin",
+      "chainId": 8453,
+      "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      "source": "https://www.circle.com/usdc",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "USDC",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Coinbase",
+      "symbol": "cbETH",
+      "name": "Coinbase Wrapped Staked ETH",
+      "chainId": 8453,
+      "address": "0x2ae3f1ec7f1f5012cfeab0185bfc7aa3cf0dec22",
+      "source": "https://www.coinbase.com/cbeth",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "cbETH",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Circle",
+      "symbol": "EURC",
+      "name": "EURC",
+      "chainId": 8453,
+      "address": "0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42",
+      "source": "https://www.circle.com/eurc",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "EURC",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Lido",
+      "symbol": "wstETH",
+      "name": "Wrapped liquid staked Ether 2.0",
+      "chainId": 8453,
+      "address": "0xc1cba3fcea344f92d9239c08c0568f6f2f0ee452",
+      "source": "https://lido.fi",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "wstETH",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Circle",
+      "symbol": "USDbC",
+      "name": "USD Base Coin",
+      "chainId": 8453,
+      "address": "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca",
+      "source": "https://www.circle.com/usdc",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "USDbC",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Aerodrome Finance",
+      "symbol": "AERO",
+      "name": "Aerodrome",
+      "chainId": 8453,
+      "address": "0x940181a94a35a4569e4529a3cdfb74e38fd98631",
+      "source": "https://aerodrome.finance",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "AERO",
       "crossCheck": "new"
     }
   ]
