@@ -1,0 +1,60 @@
+name: Publish npm + MCP registry
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no publish)'
+        required: false
+        default: 'false'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write        # GitHub OIDC → MCP registry namespace auth (io.github.philpof102-svg/*)
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install (links vendored trust-core)
+        run: npm install --no-audit --no-fund
+
+      - name: Test (gate — never publish a red build)
+        run: npm test
+
+      - name: Verify the stdio MCP starts (initialize + tools/list)
+        run: |
+          printf '%s\n%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+            | node bin/biii-mcp.js | grep -q '"tools"' && echo "MCP ok"
+
+      - name: npm publish (bundles trust-core)
+        if: ${{ inputs.dry_run != 'true' }}
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Install mcp-publisher
+        if: ${{ inputs.dry_run != 'true' }}
+        run: |
+          curl -L https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz | tar xz
+          chmod +x mcp-publisher
+          ./mcp-publisher --version
+
+      - name: MCP login (GitHub OIDC)
+        if: ${{ inputs.dry_run != 'true' }}
+        run: ./mcp-publisher login github-oidc
+
+      - name: MCP publish (server.json → registry.modelcontextprotocol.io)
+        if: ${{ inputs.dry_run != 'true' }}
+        run: ./mcp-publisher publish
