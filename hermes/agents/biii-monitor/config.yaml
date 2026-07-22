@@ -1,33 +1,45 @@
-# biii-monitor — a Hermes Agent profile you (Claude) control: a Base trust-surveillance bot.
-# Copy this to ~/.hermes/config.yaml (or point $HERMES_HOME here), then `hermes run`. Activation needs a
-# model key (your gesture) — everything else is wired.
+# biii-monitor — a Hermes Agent you (Claude) control: a Base trust-surveillance bot.
+#
+# Hermes' model is ONE HERMES_HOME = ONE agent. This file is the *partial* config.yaml for that home
+# (Hermes deep-merges it over its DEFAULT_CONFIG, so you only declare what you add). To install a home:
+#
+#   mkdir -p ~/.hermes-biii/skills
+#   cp SOUL.md                       ~/.hermes-biii/SOUL.md
+#   cp -r ../../skills/base-token-trust ~/.hermes-biii/skills/base-token-trust
+#   cp config.yaml                   ~/.hermes-biii/config.yaml   # (this file — fix the abs path below)
+#   HERMES_HOME=~/.hermes-biii hermes mcp test biii               # proves the toolset connects
+#
+# See INTEGRATION / hermes/INSTALL-hermes-agent.md for the full, runtime-verified runbook.
+# Verified against Hermes Agent v0.19.0: `hermes mcp test biii` → ✓ Connected, 15 tools discovered.
 
-# The agent runs ON Claude (model-agnostic Hermes → any OpenAI-compatible endpoint). Control-from-Claude:
-# Claude is both the model and the operator (you drive it via the `hermes` CLI).
-model:
-  provider: anthropic            # or an OpenAI-compatible proxy exposing Claude
-  name: claude-opus-4-8
-  # api_key: set via env ANTHROPIC_API_KEY (never commit a key)
+# --- model: left UNSET on purpose. Activation is the operator's one gesture ---
+# Run `hermes model` (pick Anthropic → a Claude model) or put ANTHROPIC_API_KEY in ~/.hermes-biii/.env.
+# provider/model are FLAT top-level keys when you set them, e.g.:
+#   provider: anthropic
+#   model: claude-opus-4-8
 
-# BIII toolset — the verdict layer the agent reasons with. Local stdio, no key.
+# --- BIII toolset: the verdict layer the agent reasons with. Local stdio, no key, non-custodial. ---
 mcp_servers:
   biii:
     command: node
-    args: ["../../../bin/biii-mcp.js"]     # relative to this profile; use an absolute path in production
+    args:
+      - /ABS/PATH/TO/biii/bin/biii-mcp.js   # absolute path to THIS repo's bin/biii-mcp.js
     enabled: true
-    tools:
-      include: [till_vet_asset, till_vet_merchant, till_trust, till_create_charge, till_check_payment, till_receipt]
+    env:
+      # optional advisory oracle; the local floor + issuer-verified registry give the fail-closed
+      # verdicts with zero network, so this is not required.
+      MAINSTREET_URL: https://avisradar-production.up.railway.app
 
-# discover the base-token-trust skill (and this monitor's own skill) from the repo.
+# --- discover the base-token-trust skill (also auto-discovered if placed in ~/.hermes-biii/skills/) ---
 skills:
   external_dirs:
-    - "../../skills"                       # hermes/skills/base-token-trust
+    - /ABS/PATH/TO/.hermes-biii/skills
 
-# Hermes' full potential: a scheduled monitor that scans + DELEGATES per flag (see cron-monitor.md).
-crons:
-  - file: "cron-monitor.md"
-    schedule: "*/30 * * * *"               # every 30 min; tighten for a hot watchlist
-    enabled: true
-
-# The agent's own self-improvement loop (GEPA) is on by default in Hermes — it distills reusable checks
-# from successful runs, so the monitor sharpens over time without re-coding.
+# --- Scheduled surveillance is registered through the CLI, not a config key ---
+# Two tiers (see cron-monitor.md):
+#   A) keyless watchdog  — runs the deterministic scan, delivers flags, NO model key:
+#        hermes cron create '30m' --script biii-scan.sh --no-agent --name biii-watch --deliver local
+#   B) agent + delegation (Hermes at full potential) — needs the model key, adds reasoning + follow-ups:
+#        hermes cron create '30m' 'Scan the biii watchlist via the base-token-trust skill; for each FLAG,
+#        delegate a focused follow-up. Flags first, then what you delegated. Never say "safe".' \
+#        --skill base-token-trust --name biii-monitor --deliver local
