@@ -27,6 +27,7 @@ const T = require('../lib/till');
 const { bindingLens } = require('../lib/identity');
 const { kyaLens } = require('../lib/skyfire');
 const { loadScreen, screenAddress } = require('../lib/screen');
+const { combineAgentTrust } = require('../lib/gitlawb-trust');
 const { verdict } = require('trust-core');
 const fs = require('node:fs'), path = require('node:path');
 
@@ -73,6 +74,18 @@ function main() {
   assess(knownBadAddr, 'a sanctioned claimant');                    // BLOCK — escrow is NOT released
   const clean = assess(claimant, 'this claimant');                 // honest cold-start verdict
   if (!clean.allowed) return console.log('    → not safe — escrow stays locked, holder is warned. This is the point.');
+
+  // ── 3.5 REPUTATION: compose the BIII verdict with gitlawb's OWN per-DID score (`gl node trust <did>`) ──
+  // BIII being clear is necessary, not sufficient: a large payout also wants NETWORK STANDING. Offline we
+  // inject the score gl would return — this is where gitlawb reputation and BIII safe-to-pay become one call.
+  console.log('\n[3.5] REPUTATION (gitlawb `gl node trust ' + did.slice(0, 14) + '…` × BIII, for $' + bounty.amountUsd + '):');
+  for (const [score, who] of [[0.05, 'FRESH agent (just registered)'], [0.7, 'REPUTABLE agent (earned standing)']]) {
+    const c = combineAgentTrust({ biiiAllowed: clean.allowed, biiiDecision: clean.decision, gitlawbTrust: score, amountUsd: bounty.amountUsd });
+    console.log('    trust=' + score + ' ' + who.padEnd(34) + ' → release=' + c.release + '  [' + c.tier + ']');
+  }
+  const rep = combineAgentTrust({ biiiAllowed: clean.allowed, biiiDecision: clean.decision, gitlawbTrust: 0.7, amountUsd: bounty.amountUsd });
+  console.log('    → ' + rep.reason);
+  if (!rep.release) return console.log('    escrow holds: BIII-clear but under-reputed for this size. Split the bounty or build standing.');
 
   // ── 4. RELEASE: an EIP-681 charge the escrow's OWN wallet executes (BIII signs nothing) ──
   const charge = T.createCharge({ to: claimant, amountUsd: bounty.amountUsd, label: 'bounty ' + bounty.id, nowMs: Date.now() });
