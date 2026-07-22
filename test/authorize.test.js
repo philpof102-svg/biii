@@ -57,6 +57,18 @@ t('recipient ALLOW-LIST is enforced: a charge to an un-allowed address is refuse
   assert.match(authorizeCharge(a, charge('5', OTHER), {}).reason, /allow-list/i);
 });
 
+t('FAIL-OPEN CLOSED: a PRESENT-but-empty allow-list ([]) permits NO recipient, not "anyone" (audit)', () => {
+  // an issuer who signs allowedRecipients:[] means "nobody" — treating it as "no restriction" was the fail-open
+  const empty = authorizeCharge(auth({ allowedRecipients: [] }), charge('5', MERCHANT), {});
+  assert.equal(empty.authorized, false);
+  assert.match(empty.reason, /empty allow-list|permits NO recipient/i);
+  // a present-but-non-array allow-list is a malformed restriction → also refused (not silently ignored)
+  assert.equal(authorizeCharge(auth({ allowedRecipients: MERCHANT }), charge('5', MERCHANT), {}).authorized, false);
+  assert.match(authorizeCharge(auth({ allowedRecipients: {} }), charge('5', MERCHANT), {}).reason, /not an array|malformed/i);
+  // ABSENT allow-list is still fine — the caps bound spend (no recipient restriction intended)
+  assert.equal(authorizeCharge(auth(), charge('5', OTHER), {}).authorized, true);
+});
+
 t('wrong token/chain is refused on either side (BIII is USDC-on-Base)', () => {
   const wrongCharge = { ...charge('5'), token: '0xdead', chainId: 8453 };
   assert.equal(authorizeCharge(auth(), wrongCharge, {}).authorized, false);

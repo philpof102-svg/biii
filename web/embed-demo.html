@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BIII badge — embed demo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; background: #0A0A0F; color: #F5F7FF; min-height: 100vh; padding: 32px 16px; }
+  .wrap { max-width: 560px; margin: 0 auto; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .sub { color: #8A8FA0; font-size: 13px; margin-bottom: 24px; line-height: 1.5; }
+  .card { background: #14141F; border: 1px solid #1E1E2E; border-radius: 14px; padding: 16px; margin-bottom: 14px; display: flex; gap: 14px; align-items: center; }
+  .thumb { width: 56px; height: 56px; border-radius: 10px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 26px; background: #1E1E2E; }
+  .meta { flex: 1; min-width: 0; }
+  .title { font-weight: 700; font-size: 15px; margin-bottom: 2px; }
+  .addr { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: #8A8FA0; word-break: break-all; margin-bottom: 6px; }
+  .price { font-weight: 700; color: #0052FF; font-size: 14px; }
+  .how { background: #14141F; border: 1px dashed #1E1E2E; border-radius: 14px; padding: 16px; margin-top: 24px; }
+  .how h2 { font-size: 13px; margin-bottom: 8px; color: #8A8FA0; letter-spacing: 1px; text-transform: uppercase; }
+  pre { background: #0A0A0F; border: 1px solid #1E1E2E; border-radius: 8px; padding: 12px; font-size: 11px; overflow-x: auto; color: #eab308; }
+  .note { font-size: 11px; color: #8A8FA0; margin-top: 10px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Any listing, one line of trust</h1>
+  <p class="sub">A fake marketplace page. Each seller card carries the BIII badge — one script tag,
+  the fail-closed local verdict. Click a badge: it opens the raw <code>/trust</code> JSON (re-checkable, not a logo to trust).</p>
+
+  <!-- listing 1: a sanctioned seller — the badge must show ✗ BLOCKED -->
+  <div class="card">
+    <div class="thumb">🎛️</div>
+    <div class="meta">
+      <div class="title">Modular synth, barely used</div>
+      <div class="addr">0x098B716B8Aaf21512996dC57EB0615e2383E2f96</div>
+      <span data-biii-address="0x098B716B8Aaf21512996dC57EB0615e2383E2f96"></span>
+    </div>
+    <div class="price">420 USDC</div>
+  </div>
+
+  <!-- listing 2: a clean seller — the badge must show ~ not on known-bad floor (NEVER green) -->
+  <div class="card">
+    <div class="thumb">📷</div>
+    <div class="meta">
+      <div class="title">Film camera + 3 rolls</div>
+      <div class="addr">0xc1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1</div>
+      <span data-biii-address="0xc1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"></span>
+    </div>
+    <div class="price">85 USDC</div>
+  </div>
+
+  <!-- listing 3: a malformed address — the badge must stay ? unverified (garbage gets no verdict) -->
+  <div class="card">
+    <div class="thumb">🧸</div>
+    <div class="meta">
+      <div class="title">Mystery box (seller pasted a broken address)</div>
+      <div class="addr">0x1234-not-an-address</div>
+      <span data-biii-address="0x1234-not-an-address"></span>
+    </div>
+    <div class="price">5 USDC</div>
+  </div>
+
+  <div class="how">
+    <h2>How this page does it</h2>
+    <pre>&lt;span data-biii-address="0x…"&gt;&lt;/span&gt;
+&lt;script src="/embed.js" async&gt;&lt;/script&gt;</pre>
+    <p class="note">Three honest states only: <b style="color:#f87171">✗ BLOCKED</b> (known-bad floor, decisive) ·
+    <b style="color:#eab308">~ not on known-bad floor</b> (NOT a clean bill — no behavioral score locally) ·
+    <b>? unverified</b> (no verdict ≠ safety). There is <b>no green "safe"</b> by design — a local read cannot
+    honestly promise it. Non-custodial, advisory: the badge informs a human, it authorizes nothing.</p>
+  </div>
+</div>
+<script src="/embed.js" async></script>
+</body>
+</html>

@@ -38,6 +38,13 @@ function req(server, method, path, body) {
     assert.match(String(r.raw || ''), /BIII|Caisse|screen-keypad/, 'the / route serves web/index.html');
   });
 
+  await t('GET /embed.js + /embed-demo.html are served (the drop-in trust badge, not just referenced)', async () => {
+    const js = await req(server, 'GET', '/embed.js');
+    assert.match(String(js.raw || ''), /BIII trust badge|data-biii-address/, 'the embeddable badge script is served');
+    const demo = await req(server, 'GET', '/embed-demo.html');
+    assert.match(String(demo.raw || ''), /embed\.js|data-biii-address/, 'the badge demo page is served');
+  });
+
   await t('POST /charge → charge + EIP-681 URI (uses configured merchant)', async () => {
     const r = await req(server, 'POST', '/charge', { amountUsd: '4.50', label: 'flat white' });
     assert.equal(r.body.charge.amountMicro, '4500000');
