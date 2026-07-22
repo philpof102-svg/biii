@@ -96,18 +96,34 @@
       var p=res.parsed;
       if(!p||!p.valid){ $("scan-err").textContent="✗ QR refusé : "+esc((p&&p.reason)||"non valide"); $("pay-card").style.display="none"; return; }
       $("scan-err").textContent="";
-      // build the pay URI (with the amount if present; else prompt for one)
+      // build the amount (from the QR if present; else prompt)
       var amtMicro=p.amountMicro;
       if(!amtMicro){ var v=prompt("Montant à envoyer en USDC :"); if(!v){ $("scan-status").textContent="Annulé."; return; }
         var n=Math.round(parseFloat(v.replace(",","."))*1e6); if(!(n>0)){ $("scan-err").textContent="Montant invalide."; return; } amtMicro=String(n); }
-      var uri="ethereum:0x833589fcd6edb6e08f4c7c32d4f71b54bda02913@8453/transfer?address="+p.to+"&uint256="+amtMicro;
       var usd=(Number(amtMicro)/1e6).toFixed(2);
-      $("pay-card").style.display="block";
-      $("pay-card").innerHTML="<div class='ok'><b>✓ Prêt à payer</b></div><div style='margin:8px 0'>À <span class='a'>"+esc(p.to)+"</span></div>"
-        +"<div style='font-size:22px;font-weight:800;margin-bottom:12px'>"+usd+" USDC</div>"
-        +"<a class='act' style='display:block;text-align:center;text-decoration:none' href='"+esc(uri)+"'>Ouvrir mon wallet pour payer ▶</a>";
-      $("scan-status").textContent="Validé.";
+      // SAFE-TO-PAY PRE-FLIGHT — vet the recipient with BIII BEFORE offering the pay button (this is the point).
+      $("scan-status").textContent="Vérification du destinataire…";
+      fetch("/trust?address="+encodeURIComponent(p.to)).then(function(r){return r.json();})
+        .then(function(tr){ renderPay(p, amtMicro, usd, tr&&tr.vet); })
+        .catch(function(){ renderPay(p, amtMicro, usd, null); });   // verdict indisponible → rendu prudent
     }).catch(function(){ $("scan-err").textContent="Validation indisponible."; });
+  }
+  function renderPay(p, amtMicro, usd, vet){
+    var uri="ethereum:0x833589fcd6edb6e08f4c7c32d4f71b54bda02913@8453/transfer?address="+p.to+"&uint256="+amtMicro;
+    var cls=(vet&&vet.classifier)||{}, box=$("pay-card"); box.style.display="block";
+    if(cls.allowed===false){   // BIII BLOCK — known-bad recipient: no pay button, decisive
+      box.innerHTML="<div class='err' style='font-size:16px'><b>🚫 NE PAYEZ PAS</b></div>"
+        +"<div style='margin:8px 0'>À <span class='a'>"+esc(p.to)+"</span></div>"
+        +"<div style='margin-bottom:8px'>"+esc(cls.explainer||"Adresse sur la liste known-bad (denylist).")+"</div>"
+        +"<div class='mono-small'>Verdict BIII — floor local known-bad, décisif. Aucun bouton de paiement affiché.</div>";
+      $("scan-status").textContent="Bloqué par BIII."; return;
+    }
+    var badge = vet ? "<div class='mono-small' style='color:var(--green)'>✓ pas known-bad — "+esc((vet.disclosure||"").slice(0,80))+"</div>"
+                    : "<div class='mono-small'>Vérif de confiance indisponible — payez avec prudence.</div>";
+    box.innerHTML="<div class='ok'><b>✓ Prêt à payer</b></div><div style='margin:8px 0'>À <span class='a'>"+esc(p.to)+"</span></div>"
+      +"<div style='font-size:22px;font-weight:800;margin-bottom:6px'>"+usd+" USDC</div>"+badge
+      +"<a class='act' style='display:block;text-align:center;text-decoration:none;margin-top:12px' href='"+esc(uri)+"'>Ouvrir mon wallet pour payer ▶</a>";
+    $("scan-status").textContent="Validé — destinataire vérifié.";
   }
   $("btn-cam").onclick=function(){
     if(!("BarcodeDetector" in window)){ $("scan-status").textContent="La caméra-scan n'est pas supportée ici (iOS) — collez le texte du QR ci-dessous."; return; }
