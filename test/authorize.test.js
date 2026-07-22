@@ -1,0 +1,81 @@
+'use strict';
+// BIII spend authorization (Skyfire Programmable Payment) — a charge executes only inside what the agent's
+// OWNER signed off: token, recipient, per-charge max, AND the cumulative cap. Fail-closed. Pure + offline.
+// Run: node test/authorize.test.js
+const assert = require('node:assert');
+const { authorizeCharge } = require('../lib/skyfire');
+const T = require('../lib/till');
+
+let pass = 0, fail = 0;
+const t = (n, fn) => { try { fn(); pass++; console.log('  ✓ ' + n); } catch (e) { fail++; console.log('  ✗ ' + n + '\n      ' + (e && e.message)); } };
+
+const MERCHANT = '0x' + 'ca'.repeat(20), OTHER = '0x' + 'bb'.repeat(20);
+const charge = (usd, to = MERCHANT) => T.createCharge({ to, amountUsd: usd, nowMs: Date.now() });
+const auth = (over = {}) => ({ iss: 'skyfire', sub: 'agent:bot', token: 'USDC', chainId: 8453,
+  maxPerChargeMicro: '50000000' /* $50 */, cumulativeCapMicro: '200000000' /* $200 */, verified: true, ...over });
+
+console.log('BIII spend authorization (a charge only executes inside what the owner signed):');
+
+t('a charge within the per-charge max and the cap → authorized, with the remaining computed', () => {
+  const r = authorizeCharge(auth(), charge('12.50'), { spentMicro: '0' });
+  assert.equal(r.authorized, true);
+  assert.equal(r.spentAfterMicro, '12500000');
+  assert.equal(r.remainingMicro, '187500000', '$200 cap − $12.50 = $187.50');
+});
+
+t('over the PER-CHARGE max → refused ($60 > $50 authorized)', () => {
+  const r = authorizeCharge(auth(), charge('60'), { spentMicro: '0' });
+  assert.equal(r.authorized, false);
+  assert.match(r.reason, /per-charge max/);
+});
+
+t('THE DRAIN GUARD: small charges cannot beat the cap by accumulation', () => {
+  // $190 already spent, a $12.50 charge would bring it to $202.50 > $200 cap → refused
+  const r = authorizeCharge(auth(), charge('12.50'), { spentMicro: '190000000' });
+  assert.equal(r.authorized, false);
+  assert.match(r.reason, /cumulative|cap/i);
+  assert.equal(r.spentAfterMicro, '202500000', 'shows what it WOULD have become');
+  // but a $10 charge fits exactly under the remaining $10
+  assert.equal(authorizeCharge(auth(), charge('10'), { spentMicro: '190000000' }).authorized, true);
+});
+
+t('unverified authorization → refused (a signed authorization is required, a claim is not one)', () => {
+  assert.equal(authorizeCharge(auth({ verified: false }), charge('5'), {}).authorized, false);
+  assert.match(authorizeCharge(auth({ verified: false }), charge('5'), {}).reason, /not verified/i);
+});
+
+t('an EXPIRED authorization → refused', () => {
+  const r = authorizeCharge(auth({ exp: Math.floor(Date.now() / 1000) - 10 }), charge('5'), {});
+  assert.equal(r.authorized, false);
+  assert.match(r.reason, /expired/i);
+});
+
+t('recipient ALLOW-LIST is enforced: a charge to an un-allowed address is refused', () => {
+  const a = auth({ allowedRecipients: [MERCHANT] });
+  assert.equal(authorizeCharge(a, charge('5', MERCHANT), {}).authorized, true);
+  assert.equal(authorizeCharge(a, charge('5', OTHER), {}).authorized, false);
+  assert.match(authorizeCharge(a, charge('5', OTHER), {}).reason, /allow-list/i);
+});
+
+t('wrong token/chain is refused on either side (BIII is USDC-on-Base)', () => {
+  const wrongCharge = { ...charge('5'), token: '0xdead', chainId: 8453 };
+  assert.equal(authorizeCharge(auth(), wrongCharge, {}).authorized, false);
+  assert.equal(authorizeCharge(auth({ token: 'DAI' }), charge('5'), {}).authorized, false);
+});
+
+t('a JWT-form authorization is honored only when the caller attests the signature (opts.verified)', () => {
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const jwt = b64({ alg: 'ES256' }) + '.' + b64({ iss: 'skyfire', sub: 'agent:bot', token: 'USDC', chainId: 8453, maxPerChargeMicro: '50000000', cumulativeCapMicro: '200000000' }) + '.sig';
+  assert.equal(authorizeCharge(jwt, charge('12.50'), { verified: true }).authorized, true, 'verified JWT → authorized');
+  assert.equal(authorizeCharge(jwt, charge('12.50'), {}).authorized, false, 'unverified JWT → refused (claim, not authorization)');
+  assert.equal(authorizeCharge('not.a.jwt.x', charge('5'), { verified: true }).authorized, false, 'unparseable → refused');
+});
+
+t('no cumulative cap set → per-charge limit still applies, remaining is null (unbounded total)', () => {
+  const r = authorizeCharge(auth({ cumulativeCapMicro: null }), charge('40'), { spentMicro: '999999999' });
+  assert.equal(r.authorized, true);
+  assert.equal(r.remainingMicro, null);
+});
+
+console.log('\n' + pass + ' passed, ' + fail + ' failed');
+process.exit(fail ? 1 : 0);

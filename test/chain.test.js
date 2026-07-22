@@ -41,14 +41,15 @@ const fakeRpc = (logs, head = '0x100') => async (url, init) => {
 
   console.log('\nthe MCP bridge (phase 3: agents pay real-world humans):');
 
-  await t('14 tools exposed, descriptor-only posture in the descriptions', () => {
-    assert.deepEqual(TOOLS.map((x) => x.name), ['till_vet_merchant', 'till_create_charge', 'till_check_payment', 'till_trust', 'till_create_invoice', 'till_check_invoice', 'till_vet_asset', 'till_receipt', 'till_roll', 'till_export', 'till_meter', 'till_floor', 'till_resolve', 'till_kya']);
+  await t('15 tools exposed, descriptor-only posture in the descriptions', () => {
+    assert.deepEqual(TOOLS.map((x) => x.name), ['till_vet_merchant', 'till_create_charge', 'till_check_payment', 'till_trust', 'till_create_invoice', 'till_check_invoice', 'till_vet_asset', 'till_receipt', 'till_roll', 'till_export', 'till_meter', 'till_floor', 'till_resolve', 'till_kya', 'till_authorize']);
     assert.match(TOOLS[1].description, /holds no key|moves no funds/i);
     assert.match(TOOLS[9].description, /non-custodial|re-verif/i);    // till_export keeps the discipline
     assert.match(TOOLS[10].description, /self-reported|provable/i);   // till_meter splits usage by trust
     assert.match(TOOLS[11].description, /fingerprint|same floor|decentrali/i);   // till_floor = decentralization proof
     assert.match(TOOLS[12].description, /identity|npub|trustless/i);  // till_resolve = the buzz identity bridge
     assert.match(TOOLS[13].description, /kya|know your agent|identity/i);   // till_kya = the identity standard
+    assert.match(TOOLS[14].description, /spend|cumulative|drain-safe/i);   // till_authorize = programmable payment
   });
 
   await t('till_create_charge returns the charge + the EIP-681 intent the agent wallet executes', async () => {

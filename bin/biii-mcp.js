@@ -28,7 +28,7 @@ const X = require('../lib/export');
 const { meterUsage } = require('../lib/meter');
 const { erc8004Lens } = require('../lib/erc8004');
 const { bindingLens } = require('../lib/identity');
-const { kyaLens } = require('../lib/skyfire');
+const { kyaLens, authorizeCharge } = require('../lib/skyfire');
 const { DISCLAIMER } = require('../lib/disclaimer');
 const { loadScreen, screenAddress, screenMeta, floorProvenance } = require('../lib/screen');
 const fs = require('node:fs'), path = require('node:path');
@@ -178,6 +178,14 @@ const TOOLS = [
       token: { type: 'string', description: 'the compact KYA JWT (header.payload.signature)' },
       expectedAudience: { type: 'string', description: 'the recipient this token must be addressed to (its aud) — anti-replay; recommended' },
       verified: { type: 'boolean', description: 'attest the JWT signature verified against the issuer\'s JWKS (BIII does not check it itself)' } }, required: ['token'] } },
+  { name: 'till_authorize', description: 'SPEND AUTHORIZATION (Skyfire Programmable Payment): create a charge AND check it against what the agent\'s OWNER signed off — token, recipient allow-list, per-charge max, AND the cumulative cap. Fail-closed and drain-safe: an EIP-681 payment intent is issued ONLY if the charge is authorized (ten small charges cannot beat a low cap). BIII does not verify the authorization JWT signature itself — pass verified:true after checking it, or supply a spendAuth object. The caller tracks spentMicro (BIII is stateless).',
+    inputSchema: { type: 'object', properties: {
+      to: { type: 'string', description: 'merchant 0x address (their own wallet)' },
+      amountUsd: { type: 'string', description: 'e.g. "12.50" (or use amountMicro)' },
+      amountMicro: { type: 'string' }, label: { type: 'string' },
+      spendAuth: { description: 'the owner\'s signed spend authorization: a Programmable-Payment JWT (string) OR an object {token, chainId, maxPerChargeMicro, cumulativeCapMicro, allowedRecipients, exp}' },
+      spentMicro: { type: 'string', description: 'how much has ALREADY been spent under this authorization (the caller\'s running total — the cumulative guard)' },
+      verified: { type: 'boolean', description: 'attest the authorization JWT signature verified (BIII does not check it itself)' } }, required: ['to', 'spendAuth'] } },
 ];
 
 async function callTool(name, a = {}) {
@@ -371,6 +379,21 @@ async function callTool(name, a = {}) {
       note: kya.attested
         ? 'KYA-attested identity. This is WHO backs the agent, not that its address is safe to pay — run till_trust on the address. ' + DISCLAIMER
         : 'NOT attested (' + kya.reason + '). Treat as an unverified claim. ' + DISCLAIMER };
+  }
+  if (name === 'till_authorize') {
+    // SPEND AUTHORIZATION: a charge only becomes an executable EIP-681 intent if it is within what the
+    // agent's owner signed off (token/recipient/per-charge/cumulative). Fail-closed + drain-safe: no
+    // payment intent is issued for an unauthorized charge. BIII does not verify the JWT signature itself.
+    let charge;
+    try { charge = T.createCharge({ to: a.to, amountUsd: a.amountUsd, amountMicro: a.amountMicro, label: a.label, nowMs: Date.now() }); }
+    catch (e) { return { authorized: false, error: e.message }; }
+    const authorization = authorizeCharge(a.spendAuth, charge, { spentMicro: a.spentMicro, verified: !!a.verified });
+    return { charge: { to: charge.to, amountUsd: charge.amountUsd, amountMicro: charge.amountMicro, token: charge.token, chainId: charge.chainId },
+      authorization,
+      paymentURI: authorization.authorized ? T.paymentURI(charge) : null,   // NO intent for an unauthorized charge
+      note: authorization.authorized
+        ? 'Authorized — execute this EIP-681 with the agent wallet (BIII holds no key). ' + DISCLAIMER
+        : 'REFUSED (' + authorization.reason + '). No payment intent issued. ' + DISCLAIMER };
   }
   throw new Error('unknown tool ' + name);
 }

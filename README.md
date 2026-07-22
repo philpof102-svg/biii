@@ -56,7 +56,7 @@ wallet signs, and the chain — not us — is the only thing allowed to say "pai
 ## Run it
 
 ```bash
-npm test                               # 169 assertions across 25 files + a 17-case eval harness, all offline
+npm test                               # 178 assertions across 26 files + a 17-case eval harness, all offline
 BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface, :4700
 ```
 
@@ -101,17 +101,18 @@ BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface,
   (secp256k1 pubkey) to a payable, trust-assessable Base address via a **bidirectional attestation** (both
   keys sign the same canonical message; anyone re-verifies). Fail-closed: unverified / one-sided / expired
   ⇒ a claim, not a binding. Resolving is not trusting — you still run the triangle on the address.
-- `lib/skyfire.js` — **interop with the agent-IDENTITY standard** (Skyfire KYA, Experian's identity layer):
-  reads a KYA JWT (who backs an agent) as a SEPARATE, advisory lens. Parses + validates fail-closed (iss/sub,
-  expiry, **aud anti-replay**), attested only when the signature is confirmed (delegated, no dep). The
-  identity counterpart to the ERC-8004 reputation lens. Attesting who backs an agent is not "safe to pay".
+- `lib/skyfire.js` — **interop with Skyfire** (Experian's agent-identity layer): (1) a KYA JWT lens — who
+  backs an agent (advisory, aud anti-replay); (2) `authorizeCharge` — the **Programmable Payment**: a charge
+  only becomes an executable EIP-681 intent if it's inside what the agent's OWNER signed off — token,
+  recipient allow-list, per-charge max, AND the **cumulative cap** (drain-safe: ten small charges can't beat
+  a low cap). Both fail-closed; BIII does not verify JWT signatures itself (delegated, no dep).
 - `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (14 tools: `till_vet_merchant`,
   `till_create_charge`, `till_check_payment`, `till_trust`, `till_create_invoice`,
   `till_check_invoice`, `till_vet_asset`, `till_receipt`, `till_roll`, `till_export`, `till_meter`,
-  `till_floor`, `till_resolve`, `till_kya`) — an agent can vet a merchant or a tokenized asset, get the
-  whole trust triangle in one call, issue or pay an invoice, keep a receipt, export the books, meter usage,
-  prove its floor, resolve a buzz agent's npub to a Base address, read a KYA identity, and render provable
-  books (`till_roll`)
+  `till_floor`, `till_resolve`, `till_kya`, `till_authorize`) — an agent can vet a merchant or a tokenized
+  asset, get the whole trust triangle in one call, issue or pay an invoice, keep a receipt, export the books,
+  meter usage, prove its floor, resolve a buzz agent's npub to a Base address, read a KYA identity, spend
+  only within a signed authorization, and render provable books (`till_roll`)
 - `pitch/trust-triangle.html` — the sellable white-label one-pager (self-contained, theme-aware)
 - `COMPETITION.md` — the researched landscape (dated): ride the rails (x402/Stripe), interop with the
   standards (ERC-8004/Skyfire KYA), never custodial — the open layer is the non-custodial trust registry
