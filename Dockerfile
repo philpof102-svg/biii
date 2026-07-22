@@ -17,12 +17,12 @@ COPY . .
 ENV PORT=4700
 EXPOSE 4700
 
-# x402 anti-replay store: persist the consumed-payment set on a mounted volume so "one payment = one
-# verdict" survives redeploys. Without a volume it lives in the container and resets on each deploy —
-# freshness still caps replay to ~30 min, but a volume makes single-use durable. Mount a Railway volume at /data.
+# x402 anti-replay store: persist the consumed-payment set so "one payment = one verdict" survives
+# redeploys. Attach a **Railway Volume** mounted at /data (dashboard/CLI) — Railway rejects the Docker
+# VOLUME instruction, so we only prepare the dir + point the store at it. Without a mounted volume the
+# store lives in the container and resets on deploy; freshness still caps replay to ~30 min.
 RUN mkdir -p /data
 ENV BIII_X402_CONSUMED=/data/x402-consumed.json
-VOLUME ["/data"]
 
 # BIII_MERCHANT (the merchant's own Base address) MUST be set at runtime — non-custodial, one merchant per deploy.
 # To SELL verdicts via x402, BIII_MERCHANT is the payTo; set BIII_VET_PRICE_USD to price a call (default 0.002).
