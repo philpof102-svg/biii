@@ -34,6 +34,10 @@ curl -s "https://<your-app>/trust?address=0x098B716B8Aaf21512996dC57EB0615e2383E
 Then open `https://<your-app>/` — the caisse. Type an amount → a customer scans the EIP-681 QR and pays
 USDC on Base → the server verifies the transfer field-for-field and shows **PAID ✓** with a txHash receipt.
 
+Want proof the chain path works before deploying? `npm run test:e2e` verifies a **real** recent USDC
+transfer on Base end-to-end (real RPC → verifyPayment → receipt). It's network-gated: it skips cleanly
+offline, so it never blocks CI, but it's a live proof when you have a connection.
+
 ## Notes
 
 - **Screening ships live**: `data/known-bad.json` (811 public OFAC/label addresses) is committed, so a
