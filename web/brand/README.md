@@ -19,10 +19,11 @@ Served by the app at `/brand/<file>` and wired into `manifest.json` + `index.htm
 
 | Hex | Role |
 | --- | --- |
-| `#2f6bff` | trust · Base (primary) |
-| `#16b364` | verified · safe |
-| `#f5921b` | signal |
-| `#0b1220` | ground (ink) |
+| `#0052ff` | Base blue (primary) |
+| `#16c784` | bullish green |
+| `#f7931a` | Bitcoin orange |
+| `#06080d` | deep black (ink/ground) |
 | `#ffffff` | surface |
 
-Bar order is always blue → green → orange. The ground is `#0b1220`; never pure black.
+Bar order is always blue → green → orange (Base · bullish · Bitcoin). The ground is
+`#06080d` — a deep near-black, never a flat `#000`.

@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 72" role="img" aria-label="BIII">
   <title>BIII</title>
   <text x="0" y="57" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-weight="700" font-size="72" fill="#ffffff" letter-spacing="1">B</text>
-  <rect x="56" y="16" width="13" height="56" rx="6.5" fill="#2f6bff"/>
-  <rect x="79" y="16" width="13" height="56" rx="6.5" fill="#16b364"/>
-  <rect x="102" y="16" width="13" height="56" rx="6.5" fill="#f5921b"/>
+  <rect x="56" y="16" width="13" height="56" rx="6.5" fill="#0052ff"/>
+  <rect x="79" y="16" width="13" height="56" rx="6.5" fill="#16c784"/>
+  <rect x="102" y="16" width="13" height="56" rx="6.5" fill="#f7931a"/>
 </svg>
