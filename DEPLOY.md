@@ -12,6 +12,8 @@ wallet directly, and the chain is the only thing that says "paid". Self-containe
 | `BIII_MERCHANT` | **yes** | the merchant's own Base wallet (`0x…`). One merchant per deploy — the server pins it, so a caller can never redirect a charge to another address. |
 | `BASE_RPC_URL` | no | Base RPC for reading the chain. Defaults to public `https://mainnet.base.org` (fine for a low-volume till). Set a dedicated RPC to avoid public rate limits under load. Read-only. |
 | `PORT` | no | Railway/most PaaS inject it. Local default `4700`. |
+| `BIII_VET_PRICE_USD` | no | price per PAID x402 verdict (see "Sell verdicts" below). Default `0.002`. |
+| `BIII_X402_CONSUMED` | no | path to the anti-replay store. Default `/data/x402-consumed.json` (mount a volume at `/data` to make single-use durable across redeploys). |
 
 ## Railway (or any Docker host)
 
@@ -23,6 +25,30 @@ The repo ships a pinned `Dockerfile`, so the platform builds a reproducible imag
 
 No Dockerfile host? `npm start` (Node ≥18) runs the same server; `data/known-bad.json` (the screening floor)
 and `vendor/trust-core` ship in the repo, so screening + the local classifier are live out of the box.
+
+## Sell verdicts via x402 (get paid)
+
+The same server exposes **paid** verdicts an agent can discover and pay per call — the "safe to pay"
+ingredient, priced in USDC on Base, received by the merchant wallet (non-custodial; we receive, we
+never spend).
+
+- **Discovery:** `GET /openapi.json` — the x402/AgentCash contract (agents find + price the service).
+- **Paid:** `POST /x402/vet-asset` `{address, claimedIssuer?, claimedSymbol?}` (genuine/impersonation) and
+  `POST /x402/vet-address` `{address}` (safe-to-pay / known-bad). Unpaid → a `402` challenge
+  (`accepts[]`: pay `BIII_VET_PRICE_USD` USDC on Base **to `BIII_MERCHANT`**); pay, then re-call with the
+  txHash in the `X-Payment` header → the verdict.
+- **One payment = one verdict.** A confirmed, fresh USDC payment to the merchant redeems exactly one
+  verdict — a reused/old/underpaid tx gets `402`/`409`, never a free verdict (`lib/x402-settle.js`,
+  tested). **Mount a Railway volume at `/data`** so this single-use survives redeploys (`BIII_X402_CONSUMED`
+  defaults to `/data/x402-consumed.json`); without a volume, freshness still caps replay to ~30 min.
+
+**Turn it on:** on the deployed service, set `BIII_MERCHANT=0x<MainStreet wallet>` (the payTo), optionally
+`BIII_VET_PRICE_USD`, add a **Volume mounted at `/data`**, and redeploy. Confirm the paywall fires:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" -X POST https://<your-app>/x402/vet-asset \
+  -H 'content-type: application/json' -d '{"address":"0x1234"}'   # → 402 (paywall live)
+```
 
 ## Verify it's live (30 seconds)
 
