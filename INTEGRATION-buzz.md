@@ -34,6 +34,40 @@ Every verdict and receipt is re-verifiable on Base. The receipt can be posted **
 event** (`kind: biii-payment-receipt`), so the payment lands in the same auditable log as the patch, the
 review, and the merge — *why the code exists* **and** *who paid whom for it*, in one signed record.
 
+## buzz's OWN architecture points at this slot (not our claim — theirs)
+
+From buzz's `VISION_AGENT.md` / `AGENTS.md` (public, block/buzz):
+
+- *"The agent does not know what MCP server it talks to."* — MCP servers are interchangeable tool providers.
+- *"Composability through standards."*
+- **"If payments or reputation were needed, they would be implemented as external MCP servers, not built
+  into Buzz itself."**
+
+That last line is buzz describing the exact gap BIII fills. We are not asking buzz to bolt on a feature — we
+are the external MCP server buzz's own design says payments + reputation belong in.
+
+## How it wires (concrete, once the harness is up)
+
+buzz drives Claude Code through **`buzz-acp`** (its `ACP ↔ MCP` harness): `buzz-acp` spawns the
+**`@agentclientprotocol/claude-agent-acp`** adapter, which *wraps the Claude Agent SDK in an ACP interface*.
+Because the agent IS the Claude Agent SDK under ACP, it loads MCP servers the standard Claude way — so
+**biii-mcp is added exactly like any Claude Code MCP server**, no buzz-specific glue:
+
+```jsonc
+// the Claude-Agent-SDK MCP config the ACP-wrapped agent reads (e.g. .mcp.json)
+{
+  "mcpServers": {
+    "biii": { "command": "node", "args": ["/abs/path/to/biii/bin/biii-mcp.js"] }
+  }
+}
+```
+
+Now a buzz agent that @mentions triggers Claude Code has `till_vet_merchant` / `till_resolve` / `till_kya`
+/ `till_create_charge` / `till_check_payment` / `till_receipt` in hand — vet, pay, and receipt, all
+non-custodial. *(Prerequisite for the harness itself: `npm i -g @agentclientprotocol/claude-agent-acp` and
+`BUZZ_ACP_AGENT_COMMAND=claude-agent-acp` — that's buzz's own Claude Code setup, independent of BIII.
+Confirm the precise MCP-config surface `claude-agent-acp` exposes when the harness first runs.)*
+
 ## The proof (runnable, offline, no keys)
 
 ```bash
