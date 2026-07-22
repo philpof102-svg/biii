@@ -67,6 +67,35 @@ t('a token missing iss or sub is refused (an unidentified vouch is not an identi
   assert.equal(kyaLens(jwt(claims({ sub: undefined })), { verified: true, now: NOW }).attested, false);
 });
 
+t('POSTURE: an attested token surfaces expires + audienceBound (the reader is never blind to a weak token)', () => {
+  const strong = kyaLens(jwt(claims()), { verified: true, expectedAudience: 'seller:cafe-central', now: NOW });
+  assert.deepEqual(strong.posture, { expires: true, audienceBound: true });
+  assert.doesNotMatch(strong.disclosure, /NO EXPIRY|NOT REPLAY-BOUND/, 'a strong token carries no warning');
+});
+
+t('POSTURE: a NO-EXPIRY token still attests (advisory) but is SURFACED as never-expiring, not silently eternal', () => {
+  const l = kyaLens(jwt(claims({ exp: undefined })), { verified: true, expectedAudience: 'seller:cafe-central', now: NOW });
+  assert.equal(l.attested, true, 'advisory identity: a long-lived vouch is a legit issuer choice, not a hard refuse');
+  assert.equal(l.posture.expires, false);
+  assert.equal(l.expiresAt, null);
+  assert.match(l.disclosure, /NO EXPIRY/);
+});
+
+t('POSTURE (strict): requireExpiry REFUSES a no-exp token fail-closed (a leaked eternal vouch is a footgun)', () => {
+  const l = kyaLens(jwt(claims({ exp: undefined })), { verified: true, expectedAudience: 'seller:cafe-central', requireExpiry: true, now: NOW });
+  assert.equal(l.attested, false);
+  assert.match(l.reason, /no exp|never-expiring|unbounded/i);
+  // a token WITH an expiry is unaffected by requireExpiry
+  assert.equal(kyaLens(jwt(claims()), { verified: true, expectedAudience: 'seller:cafe-central', requireExpiry: true, now: NOW }).attested, true);
+});
+
+t('POSTURE: an attested token with NO audience check is surfaced as NOT replay-bound (anti-replay was skipped)', () => {
+  const l = kyaLens(jwt(claims()), { verified: true, now: NOW });   // no expectedAudience
+  assert.equal(l.attested, true);
+  assert.equal(l.posture.audienceBound, false);
+  assert.match(l.disclosure, /NOT REPLAY-BOUND/);
+});
+
 t('an unparseable token → available:false, and never throws', () => {
   const l = kyaLens('garbage', { verified: true });
   assert.equal(l.available, false);

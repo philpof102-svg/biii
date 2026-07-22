@@ -178,6 +178,7 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: {
       token: { type: 'string', description: 'the compact KYA JWT (header.payload.signature)' },
       expectedAudience: { type: 'string', description: 'the recipient this token must be addressed to (its aud) — anti-replay; recommended' },
+      requireExpiry: { type: 'boolean', description: 'strict mode: REFUSE a KYA JWT with no exp (a never-expiring vouch). Default false — a no-exp token still attests but is flagged posture.expires:false' },
       verified: { type: 'boolean', description: 'attest the JWT signature verified against the issuer\'s JWKS (BIII does not check it itself)' } }, required: ['token'] } },
   { name: 'till_authorize', description: 'SPEND AUTHORIZATION (Skyfire Programmable Payment): create a charge AND check it against what the agent\'s OWNER signed off — token, recipient allow-list, per-charge max, AND the cumulative cap. Fail-closed and drain-safe: an EIP-681 payment intent is issued ONLY if the charge is authorized (ten small charges cannot beat a low cap). BIII does not verify the authorization JWT signature itself — pass verified:true after checking it, or supply a spendAuth object. The caller tracks spentMicro (BIII is stateless).',
     inputSchema: { type: 'object', properties: {
@@ -376,10 +377,11 @@ async function callTool(name, a = {}) {
     // IDENTITY STANDARD (interop, never rival): read a Skyfire KYA JWT as a SEPARATE, advisory identity
     // lens — attested only when the caller confirms the signature + the aud matches (anti-replay). BIII
     // does not verify JWT signatures itself. Attesting who backs an agent is NOT safe-to-pay (run the triangle).
-    const kya = kyaLens(a.token, { verified: !!a.verified, expectedAudience: a.expectedAudience, now: Date.now() });
+    const kya = kyaLens(a.token, { verified: !!a.verified, expectedAudience: a.expectedAudience, requireExpiry: !!a.requireExpiry, now: Date.now() });
+    const weak = kya.attested && kya.posture && (!kya.posture.expires || !kya.posture.audienceBound);
     return { kya,
       note: kya.attested
-        ? 'KYA-attested identity. This is WHO backs the agent, not that its address is safe to pay — run till_trust on the address. ' + DISCLAIMER
+        ? 'KYA-attested identity' + (weak ? ' (⚠ weak posture: ' + [kya.posture.expires ? null : 'never expires', kya.posture.audienceBound ? null : 'not replay-bound'].filter(Boolean).join(' + ') + ')' : '') + '. This is WHO backs the agent, not that its address is safe to pay — run till_trust on the address. ' + DISCLAIMER
         : 'NOT attested (' + kya.reason + '). Treat as an unverified claim. ' + DISCLAIMER };
   }
   if (name === 'till_authorize') {
