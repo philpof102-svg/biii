@@ -1,7 +1,7 @@
 {
   "generatedFrom": "issuer-official (verified: Dinari factory on-chain + Backed API + Ondo docs) + workflow-confirmed Base issuers (on-chain re-verified)",
   "generatedAt": "2026-07-22",
-  "count": 176,
+  "count": 177,
   "entries": [
     {
       "issuer": "Dinari",
@@ -1610,6 +1610,17 @@
       "source": "https://github.com/backed-fi/tokenlists",
       "verifiedAt": "2026-07-22",
       "onchainSymbol": "bMSTR",
+      "crossCheck": "new"
+    },
+    {
+      "issuer": "Coinbase",
+      "symbol": "cbBTC",
+      "name": "Coinbase Wrapped BTC",
+      "chainId": 8453,
+      "address": "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+      "source": "https://www.coinbase.com/cbbtc",
+      "verifiedAt": "2026-07-22",
+      "onchainSymbol": "cbBTC",
       "crossCheck": "new"
     }
   ]
