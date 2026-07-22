@@ -61,9 +61,47 @@
     <div class="price">5 USDC</div>
   </div>
 
+  <h1 style="margin-top:32px">…and any tokenized asset, "is it the real issuer?"</h1>
+  <p class="sub">A fake tokenized-securities marketplace. The badge answers genuine vs impersonation —
+  the FBI-flagged lookalike-token fraud — and clicks through to the re-checkable verdict.</p>
+
+  <!-- asset 1: a genuine registry contract (Ondo) → ✓ genuine (green is honest: a verified issuer match) -->
+  <div class="card">
+    <div class="thumb">🏦</div>
+    <div class="meta">
+      <div class="title">ABTON — Ondo tokenized treasury</div>
+      <div class="addr">0x3859385363f7bb4dfe42811ccf3f294fcd41dd1d</div>
+      <span data-biii-asset="0x3859385363f7bb4dfe42811ccf3f294fcd41dd1d" data-issuer="Ondo" data-symbol="ABTON"></span>
+    </div>
+    <div class="price">$100.12</div>
+  </div>
+
+  <!-- asset 2: the SAME real contract, but LISTED as BlackRock → ✗ IMPERSONATION (the dangerous case) -->
+  <div class="card">
+    <div class="thumb">⚠️</div>
+    <div class="meta">
+      <div class="title">"BlackRock BUIDL" (seller's label)</div>
+      <div class="addr">0x3859385363f7bb4dfe42811ccf3f294fcd41dd1d</div>
+      <span data-biii-asset="0x3859385363f7bb4dfe42811ccf3f294fcd41dd1d" data-issuer="BlackRock" data-symbol="BUIDL"></span>
+    </div>
+    <div class="price">$99.80</div>
+  </div>
+
+  <!-- asset 3: an unlisted contract → ~ unknown (never a false "genuine") -->
+  <div class="card">
+    <div class="thumb">❓</div>
+    <div class="meta">
+      <div class="title">"Apple Inc. tokenized" (unknown contract)</div>
+      <div class="addr">0xdddddddddddddddddddddddddddddddddddddddd</div>
+      <span data-biii-asset="0xdddddddddddddddddddddddddddddddddddddddd" data-issuer="Apple" data-symbol="AAPL"></span>
+    </div>
+    <div class="price">$210.00</div>
+  </div>
+
   <div class="how">
     <h2>How this page does it</h2>
-    <pre>&lt;span data-biii-address="0x…"&gt;&lt;/span&gt;
+    <pre>&lt;span data-biii-address="0x…"&gt;&lt;/span&gt;                          &lt;!-- pay-safety --&gt;
+&lt;span data-biii-asset="0x…" data-issuer="Ondo" data-symbol="OUSG"&gt;&lt;/span&gt;   &lt;!-- authenticity --&gt;
 &lt;script src="/embed.js" async&gt;&lt;/script&gt;</pre>
     <p class="note">Three honest states only: <b style="color:#f87171">✗ BLOCKED</b> (known-bad floor, decisive) ·
     <b style="color:#eab308">~ not on known-bad floor</b> (NOT a clean bill — no behavioral score locally) ·
