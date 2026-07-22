@@ -1,2 +1,4 @@
-# cmd.exe mis-parses LF-only batch files — keep our launchers CRLF on checkout.
+# cmd.exe mis-parses LF-only batch files — keep our Windows launchers CRLF on checkout.
 *.cmd text eol=crlf
+# shell scripts run on Linux hosts — MUST stay LF (CRLF breaks `bash script.sh` with $'\r').
+*.sh text eol=lf
