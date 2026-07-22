@@ -1,7 +1,7 @@
 {
   "generatedFrom": "issuer-official (verified: Dinari factory on-chain + Backed API + Ondo docs)",
   "generatedAt": "2026-07-22",
-  "count": 147,
+  "count": 149,
   "entries": [
     {
       "issuer": "Dinari",
@@ -1297,6 +1297,22 @@
       "name": "Ondo US Dollar Yield",
       "chainId": 42161,
       "address": "0x35e050d3c0ec2d29d269a8ecea763a183bdf9a9d",
+      "source": "https://docs.ondo.finance/addresses (Ondo official) — on-chain verified"
+    },
+    {
+      "issuer": "Ondo",
+      "symbol": "USDY",
+      "name": "Ondo US Dollar Yield",
+      "chainId": 1329,
+      "address": "0x54cd901491aef397084453f4372b93c33260e2a6",
+      "source": "https://docs.ondo.finance/addresses (Ondo official) — on-chain verified"
+    },
+    {
+      "issuer": "Ondo",
+      "symbol": "USDY",
+      "name": "Ondo US Dollar Yield",
+      "chainId": 98866,
+      "address": "0xd2b65e851be3d80d3c2ce795eb2e78f16cb088b2",
       "source": "https://docs.ondo.finance/addresses (Ondo official) — on-chain verified"
     }
   ]
