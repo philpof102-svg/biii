@@ -11,3 +11,6 @@ dist/
 
 # Hermes agent cron output (generated per-run)
 hermes/agents/*/cache/
+
+# x402 anti-replay runtime store (not source)
+data/x402-consumed.json

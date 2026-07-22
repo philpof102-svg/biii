@@ -3,11 +3,15 @@
 // Run: node test/x402-discovery.test.js
 const assert = require('node:assert');
 const http = require('node:http');
+// isolate the anti-replay consumed-store to a temp file (fresh per run) so paid tests don't pollute data/
+// or fail on re-run — and MUST be set before requiring the server (STORE is bound at module load).
+process.env.BIII_X402_CONSUMED = require('node:path').join(require('node:os').tmpdir(), 'biii-x402-disc-' + process.pid + '.json');
 const { build } = require('../lib/server');
 const T = require('../lib/till');
 
 const M = '0x' + 'ab'.repeat(20);
 const GOODTX = '0x' + 'cd'.repeat(32);
+const GOODTX2 = '0x' + 'ef'.repeat(32);   // a SECOND distinct payment — one payment = one verdict (anti-replay)
 let pass = 0, fail = 0;
 const t = (n, fn) => Promise.resolve().then(fn).then(() => { pass++; console.log('  ✓ ' + n); }, (e) => { fail++; console.log('  ✗ ' + n + '\n      ' + (e && e.message)); });
 
@@ -21,8 +25,8 @@ function req(server, method, path, body, headers) {
   });
 }
 // stub verifyTxHash: GOODTX = a confirmed USDC payment to M for 0.01 USDC (≥ the 0.002 price); else unpaid.
-const stubVerify = async ({ txHash }) => txHash === GOODTX
-  ? { paid: true, txHash, from: '0x' + 'ee'.repeat(20), to: M.toLowerCase(), valueMicro: '10000', confirmations: 3, explorer: 'https://basescan.org/tx/' + txHash }
+const stubVerify = async ({ txHash }) => (txHash === GOODTX || txHash === GOODTX2)
+  ? { paid: true, txHash, from: '0x' + 'ee'.repeat(20), to: M.toLowerCase(), valueMicro: '10000', confirmations: 3, blockNumber: 5000, explorer: 'https://basescan.org/tx/' + txHash }
   : { paid: false, txHash, reason: 'not found' };
 async function mkServer() { const s = build({ merchant: M, verifyTxHash: stubVerify }); await new Promise((r) => s.listen(0, r)); return s; }
 
@@ -63,7 +67,7 @@ async function mkServer() { const s = build({ merchant: M, verifyTxHash: stubVer
   });
 
   await t('POST /x402/vet-address PAID → the safe-to-pay verdict (fail-closed local screen)', async () => {
-    const r = await req(s, 'POST', '/x402/vet-address', { address: '0x' + 'a1'.repeat(20) }, { 'x-payment': GOODTX });
+    const r = await req(s, 'POST', '/x402/vet-address', { address: '0x' + 'a1'.repeat(20) }, { 'x-payment': GOODTX2 });
     assert.equal(r.status, 200);
     assert.ok(r.body.vet && r.body.vet.screen, 'returns the vet verdict');
   });
