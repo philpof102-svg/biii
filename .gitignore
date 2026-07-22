@@ -5,3 +5,4 @@ data/
 
 # known-bad.json is a small PUBLIC seed the decentralized screen needs at runtime — track it (the rest of data/ stays ignored: generated/large artifacts)
 !data/known-bad.json
+dist/
