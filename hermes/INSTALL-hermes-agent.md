@@ -110,6 +110,28 @@ hermes cron list          # inspect scheduled jobs
 hermes status             # components + key state
 ```
 
+## Second toolset: gitlawb (decentralized git) — "hermes comme second"
+
+`gl mcp serve` (gitlawb CLI ≥0.6.0) exposes **40 tools** — repos, PRs, issues, bounties, agent tasks, UCAN
+delegation, DID resolution. Catch: gl frames MCP messages **LSP-style (`Content-Length:` headers)**, which
+standard MCP stdio clients (Hermes, Claude Code, the SDKs) don't speak — they use newline-delimited JSON.
+Route gl through **`gl-mcp-bridge.js`** (in this dir; translates newline ↔ Content-Length both ways):
+
+```yaml
+mcp_servers:
+  gitlawb:
+    command: node
+    args: [ /abs/gl-mcp-bridge.js ]
+    enabled: true
+    env: { GITLAWB_NODE: https://node.gitlawb.com, GL_BIN: /usr/local/bin/gl }
+```
+
+Install gl in WSL (Linux-native, sidesteps the Windows `npm\gl` shim): `npm install -g @gitlawb/gl`, then
+symlink the package binaries onto PATH and `gl register` (idempotent; gl ≥0.4 auto-solves iCaptcha, no human).
+Verified: `hermes mcp test gitlawb` → ✓ Connected, **40 tools**. With biii (15) + gitlawb (40) the agent can
+vet a Base address/token AND operate the decentralized git network — the trust/pay layer beside the
+collaboration layer, both re-verifiable and keypair-native.
+
 ---
 
 **Security posture kept throughout:** installed from auditable source (no `curl | bash`); the model key is
