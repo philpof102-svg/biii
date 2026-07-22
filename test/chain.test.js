@@ -41,10 +41,11 @@ const fakeRpc = (logs, head = '0x100') => async (url, init) => {
 
   console.log('\nthe MCP bridge (phase 3: agents pay real-world humans):');
 
-  await t('10 tools exposed, descriptor-only posture in the descriptions', () => {
-    assert.deepEqual(TOOLS.map((x) => x.name), ['till_vet_merchant', 'till_create_charge', 'till_check_payment', 'till_trust', 'till_create_invoice', 'till_check_invoice', 'till_vet_asset', 'till_receipt', 'till_roll', 'till_export']);
+  await t('11 tools exposed, descriptor-only posture in the descriptions', () => {
+    assert.deepEqual(TOOLS.map((x) => x.name), ['till_vet_merchant', 'till_create_charge', 'till_check_payment', 'till_trust', 'till_create_invoice', 'till_check_invoice', 'till_vet_asset', 'till_receipt', 'till_roll', 'till_export', 'till_meter']);
     assert.match(TOOLS[1].description, /holds no key|moves no funds/i);
-    assert.match(TOOLS[9].description, /non-custodial|re-verif/i);   // till_export keeps the discipline
+    assert.match(TOOLS[9].description, /non-custodial|re-verif/i);    // till_export keeps the discipline
+    assert.match(TOOLS[10].description, /self-reported|provable/i);   // till_meter splits usage by trust
   });
 
   await t('till_create_charge returns the charge + the EIP-681 intent the agent wallet executes', async () => {

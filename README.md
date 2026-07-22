@@ -56,7 +56,7 @@ wallet signs, and the chain — not us — is the only thing allowed to say "pai
 ## Run it
 
 ```bash
-npm test                               # 123 assertions across 20 files + a 17-case eval harness, all offline
+npm test                               # 131 assertions across 21 files + a 17-case eval harness, all offline
 BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface, :4700
 ```
 
@@ -84,11 +84,14 @@ BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface,
 - `lib/export.js` — **the accounting export finance teams need**: `till_export` turns the same verified
   receipts into an accountant-ready CSV (QuickBooks / Xero / Excel import it) where every row carries its
   txHash + Basescan link — a pointer to the chain, not a book to trust. Non-custodial, re-verifiable.
-- `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (10 tools: `till_vet_merchant`,
+- `lib/meter.js` — **the usage→bill mechanic for a white-label pilot**: `till_meter` turns a month's
+  receipts into a bill against an injected plan, split by trust — settled receipts are ON-CHAIN (provable),
+  the verdict count is SELF-REPORTED (advisory) and labeled as such. Pure, stateless, non-custodial.
+- `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (11 tools: `till_vet_merchant`,
   `till_create_charge`, `till_check_payment`, `till_trust`, `till_create_invoice`,
-  `till_check_invoice`, `till_vet_asset`, `till_receipt`, `till_roll`, `till_export`) — an agent can vet a
-  merchant or a tokenized asset, get the whole trust triangle in one call, issue or pay an invoice, keep a
-  receipt, export the books, and
+  `till_check_invoice`, `till_vet_asset`, `till_receipt`, `till_roll`, `till_export`, `till_meter`) — an
+  agent can vet a merchant or a tokenized asset, get the whole trust triangle in one call, issue or pay an
+  invoice, keep a receipt, export the books, meter usage, and
   render provable books (`till_roll`)
 - `pitch/trust-triangle.html` — the sellable white-label one-pager (self-contained, theme-aware)
 - `COMPETITION.md` — the researched landscape (dated): ride the rails (x402/Stripe), interop with the

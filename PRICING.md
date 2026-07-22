@@ -22,6 +22,11 @@ never like an RPC call.** The receipt is a brand-new category (no comparable) �
 
 ## The model (three meters + a license)
 
+*The meter is **built** (`till_meter`, 2026-07-21): a month's usage → a bill against an injected plan,
+split by trust — settled receipts are on-chain (the **provable** basis for receipt charges); the verdict
+count is **self-reported** (verdicts are advisory reads, not chain artifacts) and labeled as such, so we
+only bill on it with a trusted volume report (the honesty the bps row already flags).*
+
 | Meter | Price | Why |
 | --- | --- | --- |
 | **Trust verdict** (`till_trust` / preflight) | **$0.25** each | inside the $0.20–1.00 sanctions corridor, deliberately **under AMLBot's $0.45** to undercut, 250× above the RPC floor because it's judgment |

@@ -25,6 +25,7 @@ const I = require('../lib/invoice');
 const { assessAsset, assetVertex } = require('../lib/asset');
 const L = require('../lib/ledger');
 const X = require('../lib/export');
+const { meterUsage } = require('../lib/meter');
 const { DISCLAIMER } = require('../lib/disclaimer');
 const { loadScreen, screenAddress, screenMeta } = require('../lib/screen');
 const fs = require('node:fs'), path = require('node:path');
@@ -147,6 +148,12 @@ const TOOLS = [
       fromBlockTime: { type: 'number', description: 'optional — only export receipts settled at/after this unix block time' },
       toBlockTime: { type: 'number', description: 'optional — only export receipts settled at/before this unix block time' },
       brand: { description: 'WHITE-LABEL: a partner brand (string or {name}) — slugs the download filename; the non-custodial disclosure stays regardless.' } }, required: ['receipts'] } },
+  { name: 'till_meter', description: 'USAGE → BILL for a white-label pilot, split by trust. The settled receipts are ON-CHAIN (each txHash re-verifiable on Base — the PROVABLE basis for receipt charges); the verdict count is SELF-REPORTED (verdicts are advisory reads, not chain artifacts) and labeled as such. The pricing plan is INJECTED (the partner brings their tiers). Pure, stateless, non-custodial (BIII holds no ledger). Returns the provable/self-reported split + itemized charges + total.',
+    inputSchema: { type: 'object', properties: {
+      receipts: { type: 'array', description: 'the verified receipt objects (from till_receipt) — the provable on-chain usage', items: { type: 'object' } },
+      verdictCount: { type: 'number', description: 'optional — operator-reported number of trust verdicts served this period (advisory, NOT chain-provable)' },
+      plan: { type: 'object', description: 'optional pricing plan: {name, monthlyBaseUsd, includedVerdicts, verdictOverageUsd, includedReceipts, receiptOverageUsd}. Defaults to the pilot template ($750/mo, 5000 verdicts, $0.25/verdict, $0.03/receipt).' },
+      fromBlockTime: { type: 'number' }, toBlockTime: { type: 'number' } }, required: ['receipts'] } },
 ];
 
 async function callTool(name, a = {}) {
@@ -295,6 +302,16 @@ async function callTool(name, a = {}) {
     if (Number.isFinite(a.toBlockTime)) window.toBlockTime = Number(a.toBlockTime);
     const ex = X.buildExport(receipts, { window, brand: a.brand });
     return { ...ex, note: 'Import into QuickBooks / Xero / Excel; re-verify every tx_hash on BaseScan yourself. ' + DISCLAIMER };
+  }
+  if (name === 'till_meter') {
+    // USAGE → BILL, stateless, split by trust: settled receipts are provable (on-chain), the verdict
+    // count is self-reported (advisory reads aren't chain artifacts). The plan is injected by the partner.
+    const receipts = (Array.isArray(a.receipts) ? a.receipts : []).filter((r) => r && r.txHash);
+    const window = {};
+    if (Number.isFinite(a.fromBlockTime)) window.fromBlockTime = Number(a.fromBlockTime);
+    if (Number.isFinite(a.toBlockTime)) window.toBlockTime = Number(a.toBlockTime);
+    const bill = meterUsage(receipts, { plan: a.plan, verdictCount: a.verdictCount, window });
+    return { ...bill, note: 'Re-verify the settled receipts on Base yourself; bill on the self-reported verdict count only with a trusted volume report. ' + DISCLAIMER };
   }
   throw new Error('unknown tool ' + name);
 }
