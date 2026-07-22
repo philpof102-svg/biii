@@ -56,7 +56,7 @@ wallet signs, and the chain — not us — is the only thing allowed to say "pai
 ## Run it
 
 ```bash
-npm test                               # 142 assertions across 22 files + a 17-case eval harness, all offline
+npm test                               # 148 assertions across 23 files + a 17-case eval harness, all offline
 BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface, :4700
 ```
 
@@ -91,11 +91,17 @@ BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface,
   `ReputationRegistry.getSummary` result into a SEPARATE, advisory, re-verifiable lens on `till_trust`.
   Feedback is client-submitted (sybil-farmable), so it never enters the payable decision — it informs, keeps
   the sybil caveat unless filtered to trusted clients, and always points to re-verify getSummary on Base.
-- `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (11 tools: `till_vet_merchant`,
+- **Decentralization is checkable, not claimed** — the known-bad floor carries a content **fingerprint**
+  (`floorFingerprint` / `till_floor`): two nodes with the same fingerprint judge on the *same* objective
+  floor, re-derivable from named public MIT lists, so convergence is on **public data + a deterministic
+  hash, never on a central operator**. The classifier is replicated (pure `trust-core`), the floor
+  converges on public data, and relative reputation stays deliberately local — divergence, where it exists,
+  is always fail-closed (a node with less data is *more* cautious, never more permissive).
+- `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (12 tools: `till_vet_merchant`,
   `till_create_charge`, `till_check_payment`, `till_trust`, `till_create_invoice`,
-  `till_check_invoice`, `till_vet_asset`, `till_receipt`, `till_roll`, `till_export`, `till_meter`) — an
-  agent can vet a merchant or a tokenized asset, get the whole trust triangle in one call, issue or pay an
-  invoice, keep a receipt, export the books, meter usage, and
+  `till_check_invoice`, `till_vet_asset`, `till_receipt`, `till_roll`, `till_export`, `till_meter`,
+  `till_floor`) — an agent can vet a merchant or a tokenized asset, get the whole trust triangle in one
+  call, issue or pay an invoice, keep a receipt, export the books, meter usage, prove its floor, and
   render provable books (`till_roll`)
 - `pitch/trust-triangle.html` — the sellable white-label one-pager (self-contained, theme-aware)
 - `COMPETITION.md` — the researched landscape (dated): ride the rails (x402/Stripe), interop with the

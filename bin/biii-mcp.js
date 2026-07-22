@@ -28,7 +28,7 @@ const X = require('../lib/export');
 const { meterUsage } = require('../lib/meter');
 const { erc8004Lens } = require('../lib/erc8004');
 const { DISCLAIMER } = require('../lib/disclaimer');
-const { loadScreen, screenAddress, screenMeta } = require('../lib/screen');
+const { loadScreen, screenAddress, screenMeta, floorProvenance } = require('../lib/screen');
 const fs = require('node:fs'), path = require('node:path');
 
 // trust-core — MainStreet's JUDGMENT extracted PURE (same classifier, zero DB/network). BIII runs it
@@ -158,6 +158,8 @@ const TOOLS = [
       verdictCount: { type: 'number', description: 'optional — operator-reported number of trust verdicts served this period (advisory, NOT chain-provable)' },
       plan: { type: 'object', description: 'optional pricing plan: {name, monthlyBaseUsd, includedVerdicts, verdictOverageUsd, includedReceipts, receiptOverageUsd}. Defaults to the pilot template ($750/mo, 5000 verdicts, $0.25/verdict, $0.03/receipt).' },
       fromBlockTime: { type: 'number' }, toBlockTime: { type: 'number' } }, required: ['receipts'] } },
+  { name: 'till_floor', description: 'DECENTRALIZATION PROOF: the provenance + content-FINGERPRINT of this node\'s known-bad floor. Two nodes with the SAME fingerprint judge on the SAME floor — sameness is a checkable fact, not an operator\'s word. The floor is re-derivable from named public open-licensed lists (run scripts/biii-known-bad-ingest.js and confirm the hash), so convergence is on PUBLIC DATA + a deterministic hash, never on a central node. Compare fingerprints across nodes to prove they share the same objective floor.',
+    inputSchema: { type: 'object', properties: {} } },
 ];
 
 async function callTool(name, a = {}) {
@@ -209,7 +211,8 @@ async function callTool(name, a = {}) {
       : ((oracle.decision != null || oracle.score != null) ? { decision: oracle.decision, score: oracle.score } : null);
     const reputationLenses = {
       local: { blocked: localScreen.blocked, available: meta.available, asOf: meta.asOf, ageDays: meta.ageDays, stale: meta.stale, reason: localScreen.reason,
-        disclosure: 'LOCAL — screened by THIS node against public known-bad lists (no network). A BLOCK here is decisive and overrides any oracle answer.' },
+        floorFingerprint: floorProvenance(KNOWN_BAD).fingerprint,   // which floor this verdict judged on — compare across nodes to prove same basis
+        disclosure: 'LOCAL — screened by THIS node against public known-bad lists (no network). A BLOCK here is decisive and overrides any oracle answer. The floorFingerprint identifies WHICH floor this is: another node with the same fingerprint shares the same objective judgment basis (till_floor), proven without trusting either node.' },
       oracle,
       note: 'Two lenses, SEPARATE and never merged into one score: LOCAL (verified here, decisive on a BLOCK) vs ORACLE (MainStreet, ORACLE-REPORTED, advisory). Averaging them would launder the oracle\'s word into local proof.',
     };
@@ -323,6 +326,13 @@ async function callTool(name, a = {}) {
     if (Number.isFinite(a.toBlockTime)) window.toBlockTime = Number(a.toBlockTime);
     const bill = meterUsage(receipts, { plan: a.plan, verdictCount: a.verdictCount, window });
     return { ...bill, note: 'Re-verify the settled receipts on Base yourself; bill on the self-reported verdict count only with a trusted volume report. ' + DISCLAIMER };
+  }
+  if (name === 'till_floor') {
+    // DECENTRALIZATION PROOF: expose this node's known-bad floor provenance + fingerprint so any other
+    // node can prove they share the SAME objective floor (same fingerprint) — convergence on public data,
+    // never on a central operator. Answers "is the judgment the same everywhere?" — for the floor, checkably yes.
+    return { floor: floorProvenance(KNOWN_BAD),
+      note: 'Compare this fingerprint with another node\'s till_floor: same fingerprint = same floor = same objective judgment basis, proven without trusting either node. ' + DISCLAIMER };
   }
   throw new Error('unknown tool ' + name);
 }
