@@ -12,7 +12,7 @@ wallet directly, and the chain is the only thing that says "paid". Self-containe
 | `BIII_MERCHANT` | **yes** | the merchant's own Base wallet (`0x…`). One merchant per deploy — the server pins it, so a caller can never redirect a charge to another address. |
 | `BASE_RPC_URL` | no | Base RPC for reading the chain. Defaults to public `https://mainnet.base.org` (fine for a low-volume till). Set a dedicated RPC to avoid public rate limits under load. Read-only. |
 | `PORT` | no | Railway/most PaaS inject it. Local default `4700`. |
-| `BIII_VET_PRICE_USD` | no | price per PAID x402 verdict (see "Sell verdicts" below). Default `0.03`. |
+| `BIII_VET_PRICE_USD` | no | price per PAID x402 verdict (see "Sell verdicts" below). Default `0.25`. |
 | `BIII_X402_CONSUMED` | no | path to the anti-replay store. Default `/data/x402-consumed.json` (mount a volume at `/data` to make single-use durable across redeploys). |
 
 ## Railway (or any Docker host)
