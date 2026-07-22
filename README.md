@@ -56,7 +56,7 @@ wallet signs, and the chain — not us — is the only thing allowed to say "pai
 ## Run it
 
 ```bash
-npm test                               # 201 assertions across 29 files + a 17-case eval harness, all offline
+npm test                               # 206 assertions across 30 files + a 17-case eval harness, all offline
 BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface, :4700
 ```
 
@@ -65,7 +65,9 @@ BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface,
 - `lib/server.js` — thin HTTP: `/charge`, `/status`, `/receipt`, **`/trust`** (the LOCAL safe-to-pay
   verdict as ONE `fetch()` — known-bad screen + this node's trust-core classifier + floor provenance,
   fail-closed, CORS-open: any web app embeds a pre-payment check with no MCP; shares `lib/vet.js` with the
-  MCP tool so the two surfaces cannot drift)
+  MCP tool so the two surfaces cannot drift), **`/asset`** (tokenized-asset authenticity as one fetch —
+  `genuine`/`impersonation`/`unsafe`/`unknown`, fail-closed: a non-registry token is never a false
+  `genuine`; a pre-trade check any page embeds and re-verifies on-chain)
 - `lib/trust.js` — **the trust triangle**: composes reputation (MainStreet) + standing (LAWBOR) +
   settlement (chain) into one fail-closed verdict (`unsafe`/`unknown`/`trusted`/`settled`)
 - `lib/invoice.js` — **the same registry for Web2-style invoices**: number, line items (exact micro
