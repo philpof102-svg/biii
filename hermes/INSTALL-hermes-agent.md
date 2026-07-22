@@ -132,6 +132,25 @@ Verified: `hermes mcp test gitlawb` → ✓ Connected, **40 tools**. With biii (
 vet a Base address/token AND operate the decentralized git network — the trust/pay layer beside the
 collaboration layer, both re-verifiable and keypair-native.
 
+## Safety: read-only enforcement (survives `/yolo`)
+
+An unattended agent must never autonomously write or move value. Hermes' approval modes (`smart` default /
+`manual` / `off` = YOLO) gate *prompts*, but a **`pre_tool_call` shell hook** is a hard block that YOLO does
+**not** bypass. `readonly-guard.js` (in `agents/biii-monitor/hooks/`) blocks every write/spend tool in both
+toolsets — `till_create_charge/invoice/authorize`, all gitlawb writes (`repo_create`, `pr_merge`, `bounty_*`,
+`task_*`, `ucan_delegate`, `identity_sign`) and the base-mcp `send/swap/sign` set — and allows only
+reads/verdicts. Wire it:
+
+```yaml
+hooks:
+  pre_tool_call:
+    - command: "node /root/.hermes-biii/hooks/readonly-guard.js"
+```
+
+Pre-allowlist it for non-TTY runs: add `{event, command}` to `~/.hermes-biii/shell-hooks-allowlist.json`.
+Verified: `hermes hooks test pre_tool_call --for-tool till_create_charge` → **block**; `--for-tool
+till_vet_asset` → **allow**. So even in `approvals.mode off`, the monitor is provably read-only.
+
 ---
 
 **Security posture kept throughout:** installed from auditable source (no `curl | bash`); the model key is
