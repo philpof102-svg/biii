@@ -42,7 +42,9 @@ node examples/buzz-agent-pays.js
 
 Runs the whole wedge with the real BIII libs: resolve the agent's npub → its Base address, read its KYA,
 refuse a known-bad counterparty, pay a clean merchant via EIP-681, verify + receipt, shape it as a buzz
-event. 169 assertions across the suite; `npm test`.
+event. Smoke-tested in CI (`test/examples.test.js`); 192 assertions across the suite; `npm test`.
+
+*(gitlawb runs the same substrate — see `INTEGRATION-gitlawb.md` for the escrow-release wedge.)*
 
 ## The ask
 
