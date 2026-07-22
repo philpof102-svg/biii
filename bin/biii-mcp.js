@@ -30,16 +30,9 @@ const { erc8004Lens } = require('../lib/erc8004');
 const { bindingLens } = require('../lib/identity');
 const { kyaLens, authorizeCharge } = require('../lib/skyfire');
 const { DISCLAIMER } = require('../lib/disclaimer');
-const { loadScreen, screenAddress, screenMeta, floorProvenance } = require('../lib/screen');
+const { screenAddress, screenMeta, floorProvenance } = require('../lib/screen');
+const V = require('../lib/vet');   // the LOCAL verdict, shared with GET /trust — one judgment, many mouths
 const fs = require('node:fs'), path = require('node:path');
-
-// trust-core — MainStreet's JUDGMENT extracted PURE (same classifier, zero DB/network). BIII runs it
-// LOCALLY so the "safe to pay" verdict is computed on THIS node, not fetched from the hosted oracle.
-// Resilient resolve: the published package name, else the local sibling repo; if neither is present TC
-// stays null and localClassify() returns null — the existing screen-based BLOCK path is independent and
-// still fires, so safety NEVER depends on trust-core being installed.
-let TC = null;
-try { TC = require('trust-core'); } catch { try { TC = require('../../trust-core'); } catch { TC = null; } }
 
 // Authoritative verified-issuer registry, if it's been ingested (scripts/biii-rwa-registry.js → RWA.xyz).
 // Absent → assessAsset falls back to its small SEED. A stale/missing file can only UNDER-verify (safe).
@@ -49,9 +42,8 @@ try { const p = path.join(__dirname, '..', 'data', 'rwa-registry.json'); if (fs.
 // DECENTRALIZED known-bad floor: a LOCAL, public, open-licensed list (data/known-bad.json). The node
 // screens against it with zero network, so a known-bad address BLOCKs even when the MainStreet oracle is
 // down — removing the single point of failure. Absent file ⇒ available:false ⇒ screening is UNAVAILABLE
-// (never a silent "clean"), which the verdict discloses.
-let KNOWN_BAD = loadScreen(null);
-try { const p = path.join(__dirname, '..', 'data', 'known-bad.json'); if (fs.existsSync(p)) KNOWN_BAD = loadScreen(JSON.parse(fs.readFileSync(p, 'utf8'))); } catch {}
+// (never a silent "clean"), which the verdict discloses. (Loader shared with GET /trust via lib/vet.)
+const KNOWN_BAD = V.loadFloor();
 
 const MAINSTREET = (process.env.MAINSTREET_URL || 'https://avisradar-production.up.railway.app').replace(/\/$/, '');
 
@@ -79,26 +71,11 @@ async function fetchReputation(address) {
   return null;   // not-locally-known-bad + oracle down ⇒ no live signal. Honest 'unknown', never 'clean'.
 }
 
-// localClassify — MainStreet's judgment run on THIS node via trust-core (pure, no oracle). The known-bad
-// screen supplies the fail-closed DENY lens; the endpoint URL (if known) supplies the phishing/http/admin
-// URL lens — a genuinely NEW local capability (BIII can flag a hostile endpoint even for an address on no
-// list). No behavioral score is available locally (that needs the indexer), so a clean read is capped at
-// PROCEED_LOW_VALUE, never a confident PROCEED. This is the decentralization payoff: the verdict is computed
-// here and holds when the oracle is down. It is surfaced as its OWN lens — never folded into the triangle's
-// reputation input, because a green-unverified PROCEED_LOW_VALUE there would read as false 'trusted'.
-function localClassify(address, { resourceUrl } = {}) {
-  if (!TC) return null;
-  const scr = screenAddress(address, KNOWN_BAD);
-  const meta = screenMeta(KNOWN_BAD);
-  const deny = { available: meta.available, asOf: meta.asOf, entry: scr.blocked ? { reason: scr.reason, severity: 'high' } : null };
-  const signals = { deny };
-  if (resourceUrl) signals.bazaar = { resourcePath: String(resourceUrl) };
-  // BIII's own screen + its own knowledge of the endpoint = a locally-trusted signal bag (trustedSignals).
-  const v = TC.verdict(signals, null, { trustedSignals: true });
-  return { decision: v.decision, allowed: v.allowed, color: v.shield.color, reasonShort: v.shield.reasonShort,
-    flags: v.shield.flags, explainer: v.shield.explainer,
-    disclosure: 'LOCAL CLASSIFIER — MainStreet\'s judgment reproduced on THIS node via trust-core (pure, zero-oracle). Known-bad screen + endpoint-URL lens only; no behavioral score locally ⇒ a clean read is PROCEED_LOW_VALUE (low-value only), never a confident PROCEED. Holds even when the oracle is down.' };
-}
+// localClassify — MainStreet's judgment run on THIS node via trust-core (pure, no oracle). Extracted to
+// lib/vet.js (shared with GET /trust — one judgment, many mouths); this wrapper binds the node's floor.
+// Surfaced as its OWN lens — never folded into the triangle's reputation input, because a green-unverified
+// PROCEED_LOW_VALUE there would read as false 'trusted'.
+const localClassify = (address, opts = {}) => V.localClassify(address, { ...opts, knownBad: KNOWN_BAD });
 
 const TOOLS = [
   { name: 'till_vet_merchant', description: 'MainStreet safe-to-pay preflight on a merchant address. Returns the hosted oracle read (advisory) AND a LOCAL CLASSIFIER verdict computed on this node via trust-core (pure, zero-oracle) — so a verdict holds even if the oracle is down. Vet the RECIPIENT before paying.',
