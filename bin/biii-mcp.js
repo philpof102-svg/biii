@@ -27,6 +27,7 @@ const L = require('../lib/ledger');
 const X = require('../lib/export');
 const { meterUsage } = require('../lib/meter');
 const { erc8004Lens } = require('../lib/erc8004');
+const { bindingLens } = require('../lib/identity');
 const { DISCLAIMER } = require('../lib/disclaimer');
 const { loadScreen, screenAddress, screenMeta, floorProvenance } = require('../lib/screen');
 const fs = require('node:fs'), path = require('node:path');
@@ -160,6 +161,17 @@ const TOOLS = [
       fromBlockTime: { type: 'number' }, toBlockTime: { type: 'number' } }, required: ['receipts'] } },
   { name: 'till_floor', description: 'DECENTRALIZATION PROOF: the provenance + content-FINGERPRINT of this node\'s known-bad floor. Two nodes with the SAME fingerprint judge on the SAME floor — sameness is a checkable fact, not an operator\'s word. The floor is re-derivable from named public open-licensed lists (run scripts/biii-known-bad-ingest.js and confirm the hash), so convergence is on PUBLIC DATA + a deterministic hash, never on a central node. Compare fingerprints across nodes to prove they share the same objective floor.',
     inputSchema: { type: 'object', properties: {} } },
+  { name: 'till_resolve', description: 'IDENTITY BRIDGE: resolve a buzz/Nostr agent identity (npub, 64-hex secp256k1 pubkey) to a payable, trust-assessable BASE address — trustlessly. The binding is a BIDIRECTIONAL attestation: both keys sign the same canonical message, so anyone re-verifies the two signatures (BIII never takes your word). Fail-closed: unverified / one-sided / expired / un-nonced / malformed ⇒ a CLAIM, not a binding (bound:false). BIII does not verify secp256k1 itself (no dep) — supply verified:true after checking both sigs, or re-verify with the returned pointer. When bound, feed the address to till_trust / till_vet_merchant (resolving is NOT trusting).',
+    inputSchema: { type: 'object', properties: {
+      npub: { type: 'string', description: 'the agent\'s 64-hex secp256k1 pubkey (Nostr/buzz identity)' },
+      address: { type: 'string', description: 'the claimed Base address (0x…)' },
+      did: { type: 'string', description: 'optional — a gitlawb did:key to bind alongside' },
+      nonce: { type: 'string', description: 'a per-binding nonce (anti-replay) — required' },
+      chainId: { type: 'number', description: 'default 8453 (Base)' },
+      expiry: { type: 'number', description: 'optional unix seconds; 0 = no expiry' },
+      sigNostr: { type: 'string', description: 'the Nostr key\'s signature over the canonical message' },
+      sigBase: { type: 'string', description: 'the Base key\'s signature over the canonical message' },
+      verified: { type: 'boolean', description: 'attest that BOTH signatures verified (BIII does not check secp256k1 itself)' } }, required: ['npub', 'address'] } },
 ];
 
 async function callTool(name, a = {}) {
@@ -333,6 +345,16 @@ async function callTool(name, a = {}) {
     // never on a central operator. Answers "is the judgment the same everywhere?" — for the floor, checkably yes.
     return { floor: floorProvenance(KNOWN_BAD),
       note: 'Compare this fingerprint with another node\'s till_floor: same fingerprint = same floor = same objective judgment basis, proven without trusting either node. ' + DISCLAIMER };
+  }
+  if (name === 'till_resolve') {
+    // IDENTITY BRIDGE (buzz glue): npub ↔ Base, trustless + fail-closed. Resolve a buzz agent's Nostr
+    // identity to a payable Base address ONLY on a proven bidirectional attestation — then the caller runs
+    // till_trust on the address (resolving is not trusting). BIII does not verify secp256k1 itself.
+    const binding = bindingLens(a, { now: Date.now() });
+    return { binding,
+      note: binding.bound
+        ? 'Bound. Now assess this address with till_trust / till_vet_merchant — a resolved address is not a safe one. ' + DISCLAIMER
+        : 'NOT bound (' + binding.reason + '). Do not resolve payment to it. ' + DISCLAIMER };
   }
   throw new Error('unknown tool ' + name);
 }

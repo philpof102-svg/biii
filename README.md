@@ -56,7 +56,7 @@ wallet signs, and the chain — not us — is the only thing allowed to say "pai
 ## Run it
 
 ```bash
-npm test                               # 148 assertions across 23 files + a 17-case eval harness, all offline
+npm test                               # 161 assertions across 24 files + a 17-case eval harness, all offline
 BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface, :4700
 ```
 
@@ -97,12 +97,16 @@ BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface,
   hash, never on a central operator**. The classifier is replicated (pure `trust-core`), the floor
   converges on public data, and relative reputation stays deliberately local — divergence, where it exists,
   is always fail-closed (a node with less data is *more* cautious, never more permissive).
-- `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (12 tools: `till_vet_merchant`,
+- `lib/identity.js` — **the buzz glue: npub ↔ Base**, trustless. Resolves a Nostr/buzz agent identity
+  (secp256k1 pubkey) to a payable, trust-assessable Base address via a **bidirectional attestation** (both
+  keys sign the same canonical message; anyone re-verifies). Fail-closed: unverified / one-sided / expired
+  ⇒ a claim, not a binding. Resolving is not trusting — you still run the triangle on the address.
+- `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (13 tools: `till_vet_merchant`,
   `till_create_charge`, `till_check_payment`, `till_trust`, `till_create_invoice`,
   `till_check_invoice`, `till_vet_asset`, `till_receipt`, `till_roll`, `till_export`, `till_meter`,
-  `till_floor`) — an agent can vet a merchant or a tokenized asset, get the whole trust triangle in one
-  call, issue or pay an invoice, keep a receipt, export the books, meter usage, prove its floor, and
-  render provable books (`till_roll`)
+  `till_floor`, `till_resolve`) — an agent can vet a merchant or a tokenized asset, get the whole trust
+  triangle in one call, issue or pay an invoice, keep a receipt, export the books, meter usage, prove its
+  floor, resolve a buzz agent's npub to a Base address, and render provable books (`till_roll`)
 - `pitch/trust-triangle.html` — the sellable white-label one-pager (self-contained, theme-aware)
 - `COMPETITION.md` — the researched landscape (dated): ride the rails (x402/Stripe), interop with the
   standards (ERC-8004/Skyfire KYA), never custodial — the open layer is the non-custodial trust registry
