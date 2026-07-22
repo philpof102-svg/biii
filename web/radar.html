@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BIII — Trust Radar</title>
+<meta name="theme-color" content="#0A0A0F">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --bg:#0A0A0F; --surface:#14141F; --border:#1E1E2E; --text:#F5F7FF; --dim:#8A8FA0; --accent:#0052FF; --green:#16C784; --red:#f87171; --yellow:#eab308; --teal:#38bdf8; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 24px 16px; }
+  .wrap { max-width: 820px; margin: 0 auto; }
+  h1 { font-size: 22px; letter-spacing: -.5px; display: flex; align-items: center; gap: 10px; }
+  h1 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .sub { color: var(--dim); font-size: 13px; margin: 4px 0 20px; line-height: 1.5; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 12px; margin-bottom: 22px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+  .card .n { font-size: 30px; font-weight: 800; letter-spacing: -1px; }
+  .card .l { color: var(--dim); font-size: 12px; margin-top: 2px; }
+  .card .sm { font-size: 11px; color: var(--dim); margin-top: 8px; line-height: 1.5; word-break: break-word; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin: 20px 0 10px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; background: var(--surface); font-size: 13px; }
+  .row .tag { font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .row .q { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--dim); flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .imp { background: #2a1416; color: var(--red); }
+  .blk { background: #2a1416; color: var(--red); }
+  .ok  { background: #0f2318; color: var(--green); }
+  .list { background: #0e2024; color: var(--teal); }
+  .unk { background: #221d0f; color: var(--yellow); }
+  .empty { color: var(--dim); font-size: 13px; padding: 12px; }
+  .foot { color: var(--dim); font-size: 11px; margin-top: 24px; line-height: 1.6; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><span class="dot"></span> BIII — Trust Radar</h1>
+  <p class="sub">The verdict layer for Base: what this node can authenticate, and the flags it has raised.
+  Fail-closed, non-custodial, re-verifiable on-chain. The history lives here — no external delivery.</p>
+
+  <div class="grid" id="coverage"></div>
+
+  <h2>🚩 Recent flags</h2>
+  <div id="flags"><div class="empty">loading…</div></div>
+
+  <h2>Recent checks</h2>
+  <div id="checks"><div class="empty">loading…</div></div>
+
+  <p class="foot" id="foot"></p>
+</div>
+<script>
+(function(){
+  "use strict";
+  var esc = function(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); };
+  var short = function(a){ a=String(a||""); return a.length>16 ? a.slice(0,10)+"…"+a.slice(-4) : a; };
+  var tagFor = function(v){
+    if(v==="impersonation") return ['🚨 IMPERSONATION','imp'];
+    if(v==="blocked") return ['✗ BLOCKED','blk'];
+    if(v==="unsafe") return ['✗ unsafe','imp'];
+    if(v==="genuine") return ['✓ genuine','ok'];
+    if(v==="not-known-bad") return ['~ not known-bad','list'];
+    return ['? '+v,'unk'];
+  };
+  function card(n,l,sm){ return '<div class="card"><div class="n">'+n+'</div><div class="l">'+esc(l)+'</div>'+(sm?'<div class="sm">'+sm+'</div>':'')+'</div>'; }
+  function rowHtml(r){ var t=tagFor(r.verdict); return '<div class="row"><span class="tag '+t[1]+'">'+t[0]+'</span>'
+    + '<span class="q" title="'+esc(r.q)+'">'+esc(r.kind)+' · '+short(r.q)+(r.issuer?' · '+esc(r.issuer):'')+'</span></div>'; }
+  function render(d){
+    var c=d.coverage||{};
+    var byIssuer=Object.entries(c.byIssuer||{}).map(function(e){return esc(e[0])+' '+e[1];}).join(' · ');
+    document.getElementById('coverage').innerHTML =
+      card(c.issuerVerified||0,'issuer-verified contracts',esc(byIssuer))
+      + card(c.chains||0,'chains covered')
+      + card((c.floor&&c.floor.addresses)||0,'known-bad floor',(c.floor&&c.floor.asOf?'as of '+esc(c.floor.asOf)+(c.floor.stale?' · ⚠ stale':''):''))
+      + card(d.served||0,'checks served');
+    var flags=d.recentFlags||[];
+    document.getElementById('flags').innerHTML = flags.length ? flags.map(rowHtml).join('') : '<div class="empty">no flags yet — no impersonation or known-bad seen this session.</div>';
+    var checks=d.recentChecks||[];
+    document.getElementById('checks').innerHTML = checks.length ? checks.slice(0,20).map(rowHtml).join('') : '<div class="empty">no checks yet — hit /asset or /trust to populate the radar.</div>';
+  }
+  function load(){ fetch('/radar').then(function(r){return r.json();}).then(function(j){ if(j&&j.radar){ render(j.radar); document.getElementById('foot').textContent = j.note||''; } })
+    .catch(function(){ document.getElementById('flags').innerHTML='<div class="empty">radar unavailable.</div>'; }); }
+  load(); setInterval(load, 8000);
+})();
+</script>
+</body>
+</html>

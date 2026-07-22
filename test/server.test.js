@@ -54,6 +54,8 @@ const mkCharge = async (s, amountUsd) => (await req(s, 'POST', '/charge', { amou
     assert.match(String(js.raw || ''), /BIII trust badge|data-biii-address/, 'the embeddable badge script is served');
     const demo = await req(server, 'GET', '/embed-demo.html');
     assert.match(String(demo.raw || ''), /embed\.js|data-biii-address/, 'the badge demo page is served');
+    const radar = await req(server, 'GET', '/radar.html');
+    assert.match(String(radar.raw || ''), /Trust Radar/, 'the radar dashboard page is served');
   });
 
   await t('POST /charge → charge + chargeId + EIP-681 URI (uses configured merchant)', async () => {
