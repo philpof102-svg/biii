@@ -2,7 +2,7 @@
 
 BIII is a **live production x402 service** on Base — discovery at
 [`/openapi.json`](https://biii-production.up.railway.app/openapi.json), paid verdicts at
-`POST /x402/vet-asset` and `/x402/vet-address` ($0.002 USDC, payTo the merchant wallet, non-custodial).
+`POST /x402/vet-asset` and `/x402/vet-address` ($0.03 USDC, payTo the merchant wallet, non-custodial).
 Getting it in front of paying agents = the "structure must meet the market" move.
 
 ## Where it's listed / can be listed
@@ -20,12 +20,12 @@ Getting it in front of paying agents = the "structure must meet the market" move
 
 Onyx Bazaar, the CDP Bazaar, gold-402's full catalog, and Agent.market all index off the **Coinbase CDP
 x402 discovery**, which surfaces services that have **real on-chain x402 settlements**. So **one real
-$0.002 USDC settlement through `/x402/vet-asset`** (a) proves the full paid path end-to-end in prod, and
+$0.03 USDC settlement through `/x402/vet-asset`** (a) proves the full paid path end-to-end in prod, and
 (b) makes BIII start appearing in those directories automatically.
 
 - **Cheapest path:** an external agent pays once (the honest "meets a buyer" signal). A self-pay dogfood
   also triggers indexing mechanically, but it is a wash — prefer a real external caller when possible.
-- Phil's gesture: it moves funds ($0.002), so BIII (and this AI) never executes it — a wallet pays the
+- Phil's gesture: it moves funds ($0.03), so BIII (and this AI) never executes it — a wallet pays the
   challenge's `payTo` and re-calls with the txHash in the `X-Payment` header.
 
 ## Anti-hype / posture
