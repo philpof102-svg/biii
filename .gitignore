@@ -8,3 +8,6 @@ data/*
 # issuer-verified.json is the small, curated, ISSUER-OFFICIAL registry (on-chain-verified addresses) — ships so /asset can show the green "issuer-verified" without the non-commercial Coingecko file.
 !data/issuer-verified.json
 dist/
+
+# Hermes agent cron output (generated per-run)
+hermes/agents/*/cache/

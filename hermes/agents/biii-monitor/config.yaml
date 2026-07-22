@@ -1,0 +1,33 @@
+# biii-monitor — a Hermes Agent profile you (Claude) control: a Base trust-surveillance bot.
+# Copy this to ~/.hermes/config.yaml (or point $HERMES_HOME here), then `hermes run`. Activation needs a
+# model key (your gesture) — everything else is wired.
+
+# The agent runs ON Claude (model-agnostic Hermes → any OpenAI-compatible endpoint). Control-from-Claude:
+# Claude is both the model and the operator (you drive it via the `hermes` CLI).
+model:
+  provider: anthropic            # or an OpenAI-compatible proxy exposing Claude
+  name: claude-opus-4-8
+  # api_key: set via env ANTHROPIC_API_KEY (never commit a key)
+
+# BIII toolset — the verdict layer the agent reasons with. Local stdio, no key.
+mcp_servers:
+  biii:
+    command: node
+    args: ["../../../bin/biii-mcp.js"]     # relative to this profile; use an absolute path in production
+    enabled: true
+    tools:
+      include: [till_vet_asset, till_vet_merchant, till_trust, till_create_charge, till_check_payment, till_receipt]
+
+# discover the base-token-trust skill (and this monitor's own skill) from the repo.
+skills:
+  external_dirs:
+    - "../../skills"                       # hermes/skills/base-token-trust
+
+# Hermes' full potential: a scheduled monitor that scans + DELEGATES per flag (see cron-monitor.md).
+crons:
+  - file: "cron-monitor.md"
+    schedule: "*/30 * * * *"               # every 30 min; tighten for a hot watchlist
+    enabled: true
+
+# The agent's own self-improvement loop (GEPA) is on by default in Hermes — it distills reusable checks
+# from successful runs, so the monitor sharpens over time without re-coding.

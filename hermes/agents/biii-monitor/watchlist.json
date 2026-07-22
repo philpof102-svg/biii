@@ -1,0 +1,11 @@
+{
+  "addresses": [
+    "0x098B716B8Aaf21512996dC57EB0615e2383E2f96",
+    "0xc1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+  ],
+  "tokens": [
+    { "address": "0x41f7a63713e76c0ab800be03bae9f17b8a356348", "claimedSymbol": "AAPL" },
+    { "address": "0x41f7a63713e76c0ab800be03bae9f17b8a356348", "claimedIssuer": "BlackRock" },
+    { "address": "0xabababababababababababababababababababab", "claimedSymbol": "AAPL" }
+  ]
+}
