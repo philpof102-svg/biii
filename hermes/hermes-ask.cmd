@@ -7,16 +7,19 @@ REM  (monid is OAuth/remote and not -t-selectable; omit -t in a custom run to ad
 REM
 REM  Usage:   hermes-ask "your prompt here"  [model]
 REM  Models:  tencent/hy3        (default — cheap, routine RC)
-REM           moonshotai/kimi-k3 (hard RC — 1M ctx, pricier; the Kimi 3 model)
+REM           moonshotai/kimi-k3 (hard RC — 1M ctx; the Kimi 3 model)
+REM           x-ai/grok-4.5      (Grok — strong reasoning/coding; ~$2/Mtok, tools OK)
+REM           x-ai/grok-build-0.1(Grok coding-tuned, cheaper ~$1/Mtok)
 REM
 REM  Examples:
 REM    hermes-ask "use memory_search to recall what we decided about buzz"
 REM    hermes-ask "vet Base address 0x... with till_trust" moonshotai/kimi-k3
+REM    hermes-ask "read the lawbor bazaar, list open jobs" x-ai/grok-4.5
 REM ============================================================================
 setlocal
 if "%~1"=="" (
   echo Usage: hermes-ask "prompt" [model]
-  echo   default model: tencent/hy3   ^|   hard RC: moonshotai/kimi-k3
+  echo   models: tencent/hy3 ^(default^) ^| moonshotai/kimi-k3 ^| x-ai/grok-4.5 ^| x-ai/grok-build-0.1
   exit /b 1
 )
 set "HERMES_PROMPT=%~1"

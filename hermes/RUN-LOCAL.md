@@ -23,6 +23,11 @@ hermes-ask "your prompt here"  [model]
 - Hard tasks: **`moonshotai/kimi-k3`** — Kimi 3 (1M-token context, ~5× cheaper than frontier, strong
   backend coding; pricier than hy3, use when the task is hard). A parallel variant, **K3 Swarm Max**,
   is built for many-agents-at-once — a fit for our fleet/swarm work if/when OpenRouter exposes it.
+- Grok: **`x-ai/grok-4.5`** (the model powering xAI's *Grok Build* CLINEW at x.ai/cli; strong
+  reasoning/coding, ~$2/Mtok, tools OK — **proven** doing `memory_search` here) or the cheaper
+  coding-tuned **`x-ai/grok-build-0.1`** (~$1/Mtok). Use for a second opinion or Grok-specific tasks.
+  *(Grok Build the CLI is itself MCP-capable — it can load our `biii-mcp` the same way buzz's Claude
+  agent does; a future fit, not needed for the model option above.)*
 
 Examples:
 ```
