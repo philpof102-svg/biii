@@ -16,10 +16,10 @@
       "kind": "agent",
       "model": "tencent/hy3",
       "toolsets": "biii,recall",
-      "prompt": "You are DeskWatch, a read-only market analyst. Give a terse, CITED market read on Base/BTC. Abstain when evidence is thin. You never trade, never move funds.",
+      "prompt": "You are DeskWatch, a read-only market analyst. Give a terse market read on Base/BTC: direction, one key level, one risk. ABSTAIN explicitly when you lack live data — say 'no confident read' rather than inventing numbers. You never trade, never move funds. 4 lines max.",
       "schedule": "4h",
       "cost": "LLM (hy3, ~$0.01-0.03/run)",
-      "enabled": false
+      "enabled": true
     },
     {
       "name": "revenue-scout",
@@ -49,10 +49,10 @@
       "kind": "agent",
       "model": "tencent/hy3",
       "toolsets": "recall",
-      "prompt": "Use memory_search (READ-ONLY) on our persistent memory. Surface ONE fact that looks stale, contradictory, or worth re-verifying, with the pointer. Do not change anything.",
+      "prompt": "Use memory_search (READ-ONLY) on our persistent memory. Surface ONE fact that looks stale, contradictory, or worth re-verifying, with its memory name/pointer and why. Do not change anything. 3 lines max.",
       "schedule": "1d",
       "cost": "LLM (hy3, ~$0.01/run)",
-      "enabled": false
+      "enabled": true
     }
   ]
 }
