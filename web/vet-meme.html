@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>BIII — Meme Vet</title>
+<meta name="theme-color" content="#06080d">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="brand/biii-icon.svg">
+<meta property="og:title" content="BIII — Which memecoin is the REAL one?">
+<meta property="og:description" content="Fail-closed verdict: find the real memecoin contract among 10+ look-alikes. Pay per call in USDC on Base.">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root { --bg: #0A0A0F; --accent: #0052FF; --green: #16C784; --red: #EF4444; --text: #F5F7FF; --text-dim: #8A8FA0; --surface: #14141F; --border: #1E1E2E; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 16px; }
+  h1 { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: var(--text-dim); margin-bottom: 24px; }
+  label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 6px; font-weight: 600; }
+  input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; font-size: 16px; color: var(--text); outline: none; font-family: inherit; }
+  input:focus { border-color: var(--accent); }
+  .form-group { margin-bottom: 16px; }
+  .btn { width: 100%; padding: 16px; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; border: none; font-family: inherit; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:disabled { opacity: 0.4; }
+  .btn-secondary { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-top: 20px; }
+  .verdict { padding: 16px; border-radius: 12px; margin-top: 16px; }
+  .verdict.genuine { background: rgba(22,199,132,0.12); border: 1px solid rgba(22,199,132,0.3); }
+  .verdict.impersonation { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); }
+  .verdict.ambiguous { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); }
+  .verdict.thin { background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.3); }
+  .verdict.unknown { background: rgba(107,114,128,0.12); border: 1px solid rgba(107,114,128,0.3); }
+  .verdict-title { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+  .verdict.genuine .verdict-title { color: var(--green); }
+  .verdict.impersonation .verdict-title { color: var(--red); }
+  .verdict.ambiguous .verdict-title { color: #F59E0B; }
+  .verdict-detail { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+  .candidate { background: rgba(255,255,255,0.04); border-radius: 10px; padding: 12px; margin-top: 8px; font-size: 13px; }
+  .candidate-address { font-family: ui-monospace, monospace; font-size: 11px; color: var(--text-dim); word-break: break-all; }
+  .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #toast { display:none; position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#2a1416; border:1px solid #f87171; color:#fca5a5; padding:12px 18px; border-radius:12px; font-size:13px; max-width:90%; text-align:center; z-index:60; }
+  .qr-box { width: 200px; height: 200px; background: #fff; border-radius: 12px; margin: 16px auto; display: flex; align-items: center; justify-content: center; padding: 10px; }
+  .qr-box img { width: 100%; height: 100%; }
+  .disclaimer { font-size: 11px; color: var(--text-dim); text-align: center; margin-top: 24px; line-height: 1.5; opacity: 0.7; }
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<h1>🪙 Meme Vet</h1>
+<p class="subtitle">Which contract is the REAL memecoin? Fail-closed verdict from live market data.</p>
+
+<!-- STEP 1: INPUT -->
+<div id="step-input">
+  <div class="form-group">
+    <label for="symbol">Symbol *</label>
+    <input id="symbol" type="text" placeholder="TOSHI" maxlength="20" style="text-transform: uppercase">
+  </div>
+  <div class="form-group">
+    <label for="chainId">Chain ID (optional)</label>
+    <input id="chainId" type="number" placeholder="8453 = Base">
+  </div>
+  <div class="form-group">
+    <label for="address">Specific address to judge (optional)</label>
+    <input id="address" type="text" placeholder="0x...">
+  </div>
+  <button class="btn btn-primary" id="btn-vet">Vet Meme — $0.25 USDC</button>
+</div>
+
+<!-- STEP 2: PAY -->
+<div id="step-pay" style="display:none">
+  <div class="card">
+    <h2 style="font-size:16px;font-weight:700;margin-bottom:12px">Payment Required</h2>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px">Scan with your Base wallet to pay $0.25 USDC, then paste the txHash below.</p>
+    <div class="qr-box" id="qr-box"></div>
+    <div style="text-align:center;margin-bottom:16px">
+      <span class="spinner"></span>
+      <span style="font-size:13px;color:var(--text-dim);margin-left:8px">Waiting for payment…</span>
+    </div>
+    <div class="form-group">
+      <label for="txHash">txHash (after payment)</label>
+      <input id="txHash" type="text" placeholder="0x...">
+    </div>
+    <button class="btn btn-primary" id="btn-submit-tx">Submit & Get Verdict</button>
+    <button class="btn btn-secondary" style="margin-top:8px" id="btn-back">Back</button>
+  </div>
+</div>
+
+<!-- STEP 3: VERDICT -->
+<div id="step-verdict" style="display:none">
+  <div id="verdict-card"></div>
+  <button class="btn btn-secondary" style="margin-top:16px" id="btn-new">New Check</button>
+</div>
+
+<script src="qrcode.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  const API = "";
+  let currentSymbol = "", currentChainId = undefined, currentAddress = "";
+  let paymentURI = "";
+
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+
+  function showError(msg){ var t=document.getElementById("toast"); t.textContent=msg; t.style.display="block"; setTimeout(function(){t.style.display="none";},5000); }
+
+  function show(id){ ["step-input","step-pay","step-verdict"].forEach(function(s){ document.getElementById(s).style.display="none"; }); document.getElementById(id).style.display="block"; }
+
+  // ── VET (get 402 challenge) ──
+  document.getElementById("btn-vet").addEventListener("click", async function(){
+    var symbol = document.getElementById("symbol").value.trim();
+    if(!symbol) { showError("Enter a symbol"); return; }
+    currentSymbol = symbol;
+    currentChainId = document.getElementById("chainId").value ? Number(document.getElementById("chainId").value) : undefined;
+    currentAddress = document.getElementById("address").value.trim();
+
+    try {
+      var res = await fetch(API + "/x402/vet-meme", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ symbol: currentSymbol, chainId: currentChainId, address: currentAddress || undefined })
+      });
+      if(res.status === 402) {
+        var body = await res.json();
+        var accept = (body.accepts||[])[0];
+        if(!accept) throw new Error("invalid 402 challenge");
+        // Build EIP-681 URI: ethereum:<payTo>@<chainId>?value=<amountWei>&token=<USDC>
+        var amountWei = String(Number(accept.amount) * 1000000); // priceMicro = USDC atomic (6dp), but EIP-681 expects wei? Actually USDC 6dp, so amount is already microUSDC
+        // Simpler: use the payment URI from the server if available, else build from accepts
+        paymentURI = "ethereum:" + accept.payTo + "@" + (accept.network === "base" ? "8453" : accept.network) + "?value=" + accept.amount + "&token=" + accept.asset;
+        document.getElementById("qr-box").innerHTML = "";
+        var qr = qrcode(0, "M"); qr.addData(paymentURI); qr.make();
+        document.getElementById("qr-box").innerHTML = qr.createImgTag(5);
+        show("step-pay");
+        return;
+      }
+      // If already paid (unlikely without txHash, but handle)
+      var data = await res.json().catch(function(){ return {}; });
+      if(data.status) { renderVerdict(data); show("step-verdict"); return; }
+      throw new Error(data.error || "server " + res.status);
+    } catch(e) { showError("Failed: " + (e.message||"network error")); }
+  });
+
+  // ── SUBMIT txHash ──
+  document.getElementById("btn-submit-tx").addEventListener("click", async function(){
+    var txHash = document.getElementById("txHash").value.trim();
+    if(!txHash) { showError("Paste the txHash"); return; }
+    try {
+      var res = await fetch(API + "/x402/vet-meme", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ symbol: currentSymbol, chainId: currentChainId, address: currentAddress || undefined, proof: { txHash: txHash } })
+      });
+      var data = await res.json().catch(function(){ return {}; });
+      if(!res.ok) throw new Error(data.error || "server " + res.status);
+      renderVerdict(data);
+      show("step-verdict");
+    } catch(e) { showError("Failed: " + (e.message||"network error")); }
+  });
+
+  // ── RENDER VERDICT ──
+  function renderVerdict(data) {
+    var v = data.status ? data : (data.verdict || {});
+    var status = v.status || "unknown";
+    var cls = status; // genuine, impersonation, ambiguous, thin, unknown
+    var title = status.toUpperCase();
+    var reason = v.reason || "";
+    var html = '<div class="card"><div class="verdict ' + cls + '"><div class="verdict-title">' + esc(title) + '</div><div class="verdict-detail">' + esc(reason) + '</div>';
+
+    if(v.canonical) {
+      html += '<div style="margin-top:12px;font-size:13px"><b>Canonical:</b> ' + esc(v.canonical.chain||"") + ' — <span class="candidate-address">' + esc(v.canonical.address||"") + '</span>';
+      if(v.canonical.dexscreener) html += '<br><a href="' + esc(v.canonical.dexscreener) + '" target="_blank" rel="noopener" style="color:var(--accent)">DexScreener ↗</a>';
+      html += '</div>';
+    }
+
+    var cands = v.candidates || [];
+    if(cands.length) {
+      html += '<div style="margin-top:12px;font-size:12px;color:var(--text-dim)">Top candidates:</div>';
+      cands.slice(0,5).forEach(function(c){
+        html += '<div class="candidate"><div style="font-weight:600">' + esc(c.chain||"") + ' — $' + (c.liquidityUsd||0).toLocaleString() + ' liq</div><div class="candidate-address">' + esc(c.address||"") + '</div></div>';
+      });
+    }
+
+    if(v.disclosure) html += '<div style="margin-top:12px;font-size:11px;color:var(--text-dim);line-height:1.5">' + esc(v.disclosure) + '</div>';
+    if(data.paid && data.paid.txHash) html += '<div style="margin-top:8px;font-size:11px;color:var(--text-dim)">Paid: ' + esc(data.paid.txHash.slice(0,10)) + '…</div>';
+    html += '</div></div>';
+    document.getElementById("verdict-card").innerHTML = html;
+  }
+
+  document.getElementById("btn-back").addEventListener("click", function(){ show("step-input"); });
+  document.getElementById("btn-new").addEventListener("click", function(){ show("step-input"); });
+})();
+</script>
+
+<p class="disclaimer">Non-custodial — BIII holds no keys and moves no funds. Advisory verdict, re-verifiable on-chain. Each call costs $0.25 USDC on Base.</p>
+</body>
+</html>

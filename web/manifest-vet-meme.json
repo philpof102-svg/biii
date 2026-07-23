@@ -1,0 +1,19 @@
+{
+  "name": "BIII - Meme Vet",
+  "short_name": "Meme Vet",
+  "description": "Which memecoin is the REAL one? Fail-closed verdict from live market data.",
+  "start_url": "/vet-meme.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A0A0F",
+  "theme_color": "#0A0A0F",
+  "icons": [
+    {
+      "src": "brand/biii-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
