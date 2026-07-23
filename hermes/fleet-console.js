@@ -77,6 +77,24 @@ async function gather() {
   return data;
 }
 
+// ── Sessions: the REAL agent-session store, read via the Hermes CLI (no dashboard auth needed — the
+// :4711 /api/sessions is 401 to a tokenless fetch, so we go through the CLI against the right HERMES_HOME). ──
+async function readSessions(limit = 12) {
+  const out = await sh(HERMES, ['sessions', 'list', '--limit', String(limit)]);
+  const rows = [];
+  for (const line of String(out).split('\n')) {
+    const s = line.trim();
+    if (!s || /^Preview\b/.test(s) || /^[─-]{3,}/.test(s)) continue;   // skip header + separator
+    const cols = s.split(/\s{2,}/);                                     // fixed-width cols are 2+ spaces apart
+    const id = cols[cols.length - 1];
+    if (cols.length >= 5 && /^\d{8}_\d{6}_/.test(id)) {
+      rows.push({ id, src: cols[cols.length - 2], lastActive: cols[cols.length - 3],
+        workspace: cols[cols.length - 4], preview: cols.slice(0, cols.length - 4).join(' ') });
+    }
+  }
+  return rows;
+}
+
 // ── Observability: REAL LLM spend from OpenRouter. Key is read server-side and NEVER sent to the browser. ──
 function openrouterKey() {
   if (process.env.OPENROUTER_API_KEY) return process.env.OPENROUTER_API_KEY;
@@ -150,6 +168,8 @@ h1{margin:6px 0 0;font-size:25px;font-weight:650;letter-spacing:-.01em}h1 .thin{
 <div class="legend"><span><i style="background:var(--up)"></i>working</span><span><i style="background:var(--sched)"></i>scheduled</span><span><i style="background:var(--pend)"></i>pending</span><span><i style="background:var(--down)"></i>down</span><span><i style="background:var(--off)"></i>idle</span></div>
 <div class="jhead"><div class="eyebrow">Observabilité · dépense LLM (OpenRouter, live)</div><h2>Combien les robots dépensent</h2></div>
 <div id="obs" class="obs"><div class="foot">chargement de la dépense…</div></div>
+<div class="jhead"><div class="eyebrow">Sessions · agents (live via le CLI, le vrai store)</div><h2>Ce que les agents ont fait <span class="thin">— vraies sessions Hermes</span></h2></div>
+<div id="sessions" class="journal"><div class="foot">chargement des sessions…</div></div>
 <div class="jhead"><div class="eyebrow">Journal · historique réel des runs</div><h2>Ce que les bots ont fait <span class="thin">— dernières exécutions cron</span></h2></div>
 <div id="journal" class="journal"><div class="foot">chargement du journal…</div></div>
 <div class="foot" id="foot">chargement…</div></div>
@@ -190,9 +210,15 @@ async function stick(){let d;try{d=await (await fetch('/api/spend')).json()}catc
   ['sentinelle biii-watch','$0.00','no_agent · zéro appel LLM','zero'],
  ];
  el.innerHTML=rows.map(s=>\`<div class="stat \${s[3]}"><div class="l">\${s[0]}</div><div class="n">\${s[1]}</div><div class="s">\${s[2]}</div></div>\`).join('')}
+function sesrow(r){return \`<div class="jitem"><span class="jtime">\${esc(r.lastActive)}</span><span class="jjob">\${esc(r.workspace)}</span><span class="jhd">\${esc(r.preview)}</span><span class="jflag c">\${esc(r.src)}</span></div>\`}
+async function sestick(){let d;try{d=await (await fetch('/api/sessions')).json()}catch(e){return}
+ const el=document.getElementById('sessions');
+ if(!d.sessions||!d.sessions.length){el.innerHTML='<div class="foot" style="padding:14px 16px;margin:0">aucune session — lance un agent (hermes -z ...) pour en cr\\u00e9er une</div>';return}
+ el.innerHTML=d.sessions.map(sesrow).join('')}
 tick();setInterval(tick,12000);
 jtick();setInterval(jtick,30000);
 stick();setInterval(stick,60000);
+sestick();setInterval(sestick,30000);
 </script></body></html>`;
 
 http.createServer(async (req, res) => {
@@ -207,6 +233,10 @@ http.createServer(async (req, res) => {
   if (req.url.startsWith('/api/spend')) {
     try { const d = await fetchSpend(); res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify(d)); }
     catch (e) { res.writeHead(500, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: false, reason: String(e.message || e) })); }
+  }
+  if (req.url.startsWith('/api/sessions')) {
+    try { const s = await readSessions(12); res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ts: new Date().toISOString(), sessions: s })); }
+    catch (e) { res.writeHead(500, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: String(e.message || e) })); }
   }
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(HTML);
 }).listen(PORT, () => console.log('fleet-console → http://localhost:' + PORT));
