@@ -11,6 +11,7 @@
   "files": [
     "bin/",
     "lib/",
+    "web/",
     "vendor/",
     "data/known-bad.json",
     "README.md",
