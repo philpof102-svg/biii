@@ -18,6 +18,14 @@ case "$1" in
     echo "starting fleet console on :4799..."
     exec node /mnt/d/Users/VolKov/veilleIA/biii/hermes/fleet-console.js
     ;;
+  dashboard)
+    # The Hermes native dashboard (sessions / config / keys). MUST run with HERMES_HOME=/root/.hermes-biii
+    # (already exported above) or it reads the empty default home and shows "no sessions". First launch
+    # runs npm ci + a frontend build (slow, a few minutes); after that it's fast.
+    pgrep -f 'hermes dashboard' >/dev/null && { echo "dashboard already up"; sleep 2; exit 0; }
+    echo "starting hermes dashboard on :4711 (first run builds the frontend, be patient)..."
+    exec "$HERMES_BIN" dashboard --port 4711 --host 127.0.0.1 --no-open
+    ;;
   *)
     echo "usage: fleet-run.sh gateway|console"; sleep 2; exit 2
     ;;
