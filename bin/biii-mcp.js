@@ -23,6 +23,7 @@ const { findPayment } = require('../lib/chain');
 const { assessTriangle } = require('../lib/trust');
 const I = require('../lib/invoice');
 const { assessAsset, assetVertex } = require('../lib/asset');
+const { vetMeme } = require('../lib/meme');
 const L = require('../lib/ledger');
 const X = require('../lib/export');
 const { meterUsage } = require('../lib/meter');
@@ -118,6 +119,11 @@ const TOOLS = [
       token: { type: 'string', description: '0x contract address of the token' },
       claimedIssuer: { type: 'string', description: 'what it claims to be, e.g. "BlackRock"' },
       claimedSymbol: { type: 'string', description: 'e.g. "BUIDL", "TSLAx"' } }, required: ['token'] } },
+  { name: 'till_vet_meme', description: 'Which contract is the REAL memecoin among 10+ look-alikes? Fail-closed verdict from live market data (DexScreener). Returns: genuine (one contract dominates liquidity), ambiguous (top-2 tied — never certified), impersonation (the address you passed is NOT the dominant one), thin (no credible liquidity). Advisory + re-verifiable.',
+    inputSchema: { type: 'object', properties: {
+      symbol: { type: 'string', description: 'memecoin symbol, e.g. "TOSHI", "BRETT"' },
+      chainId: { type: 'number', description: 'optional chainId filter (e.g. 8453 for Base)' },
+      address: { type: 'string', description: 'optional specific contract address to judge' } }, required: ['symbol'] } },
   { name: 'till_receipt', description: 'Produce the chain-anchored receipt for a VERIFIED payment (txHash + basescan link). Refuses without verification.',
     inputSchema: { type: 'object', properties: {
       to: { type: 'string' }, amountUsd: { type: 'string' }, label: { type: 'string' },
@@ -290,6 +296,10 @@ async function callTool(name, a = {}) {
     return { verdict, triangleReputation: assetVertex(verdict),
       registrySource: RWA_REGISTRY ? `${RWA_SOURCE} (${RWA_REGISTRY.length} contracts)` : 'seed only (run `node scripts/biii-rwa-registry.js` — free Coingecko source, no key needed)',
       note: 'ADVISORY. genuine = the contract matches a verified issuer address; impersonation/unknown fail closed.' };
+  }
+  if (name === 'till_vet_meme') {
+    const result = await vetMeme({ symbol: a.symbol, chainId: a.chainId ? Number(a.chainId) : undefined, address: a.address });
+    return { ...result, note: 'ADVISORY. genuine = one contract dominates liquidity (>3x runner-up); ambiguous = top-2 tied (never certified); re-verify on DexScreener/Basescan.' };
   }
   if (name === 'till_receipt') {
     const charge = T.createCharge({ to: a.to, amountUsd: a.amountUsd, label: a.label, nowMs: Date.now() });
