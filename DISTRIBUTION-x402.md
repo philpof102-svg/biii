@@ -16,17 +16,26 @@ Getting it in front of paying agents = the "structure must meet the market" move
 | **[x402.org/ecosystem](https://www.x402.org/ecosystem)** | Official x402 ecosystem directory | ⏳ submit |
 | **lawbor bazaar** (ours) | Our own agent bazaar (`lawbor_offer`) | ⏳ post an offer — Phil signs the envelope |
 
-## The one thing that unlocks the auto-indexed venues
+## Correction (2026-07-23): a settlement does NOT auto-index us
 
-Onyx Bazaar, the CDP Bazaar, gold-402's full catalog, and Agent.market all index off the **Coinbase CDP
-x402 discovery**, which surfaces services that have **real on-chain x402 settlements**. So **one real
-$0.25 USDC settlement through `/x402/vet-asset`** (a) proves the full paid path end-to-end in prod, and
-(b) makes BIII start appearing in those directories automatically.
+**First real settle DONE** — tx `0x4be3f98d…c80bd3`, $0.25 USDC on Base → merchant, redeemed an
+`impersonation` verdict live; replay refused (`409`). The paid path is **proven end-to-end in prod.**
 
-- **Cheapest path:** an external agent pays once (the honest "meets a buyer" signal). A self-pay dogfood
-  also triggers indexing mechanically, but it is a wash — prefer a real external caller when possible.
-- Phil's gesture: it moves funds ($0.25), so BIII (and this AI) never executes it — a wallet pays the
-  challenge's `payTo` and re-calls with the txHash in the `X-Payment` header.
+But an earlier assumption here was **wrong and is retracted**: a settlement does **not** make BIII
+appear on the CDP-indexed venues automatically. Why — BIII's x402 verifies the payment **directly
+on-chain** (`verifyTxHash` → Base RPC), by design **non-custodial, with no CDP facilitator in the loop**.
+The CDP x402 discovery only surfaces settlements it **observes through the Coinbase facilitator**; ours
+never touch it, so CDP has no record to index. (And Onyx Bazaar is a top-100-by-volume board — a
+one-call service wouldn't show there regardless.) Verified: not listed on Onyx Bazaar after the settle.
+
+**What actually gets us listed (explicit, honest):**
+- **Curated lists that invite entries** — `awesome-agentic-commerce` (PR #502, already open). This is the
+  real, no-hype channel.
+- **The hosted MCP endpoint + the MCP registry** (`DISTRIBUTION-mcp.md`) — `/mcp` is live now; the npm
+  `biii-mcp` is registry-ready (publish = one tag). The MCP registry is what agent hosts actually index.
+- **Only if we want the CDP venues**: either register BIII's `/openapi.json` with the CDP discovery
+  explicitly, or route settlements through the CDP facilitator — the latter trades away part of our
+  facilitator-less, non-custodial posture, so it's a deliberate choice, not a freebie.
 
 ## Anti-hype / posture
 Every listing describes only what BIII does (fail-closed, non-custodial, re-verifiable on-chain). No
