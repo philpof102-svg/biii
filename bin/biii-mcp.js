@@ -381,26 +381,40 @@ async function callTool(name, a = {}) {
   throw new Error('unknown tool ' + name);
 }
 
-// ── minimal stdio MCP (initialize / tools/list / tools/call) ─────────────────────────────
-const rl = readline.createInterface({ input: process.stdin });
-const send = (o) => process.stdout.write(JSON.stringify(o) + '\n');
-rl.on('line', async (line) => {
-  let m; try { m = JSON.parse(line); } catch { return; }
-  if (m === null || typeof m !== 'object' || Array.isArray(m)) return;  // JSON.parse("null") is valid → would crash the destructure OUTSIDE the try below, killing every tool
+// ── shared JSON-RPC dispatch (used by BOTH the stdio loop AND the hosted /mcp HTTP endpoint) ──
+// Returns the response object, or null for a notification / non-object (nothing to send back).
+async function handleRpc(m) {
+  if (m === null || typeof m !== 'object' || Array.isArray(m)) return null;
   const { id, method, params } = m;
+  const isNotification = id == null;
   try {
-    if (method === 'initialize') return send({ jsonrpc: '2.0', id, result: {
+    if (method === 'initialize') return { jsonrpc: '2.0', id, result: {
       protocolVersion: '2024-11-05', capabilities: { tools: {} },
-      serverInfo: { name: 'biii', version: '0.1.0' } } });
-    if (method === 'tools/list') return send({ jsonrpc: '2.0', id, result: { tools: TOOLS } });
+      serverInfo: { name: 'biii', version: '0.1.0' } } };
+    if (method === 'tools/list') return { jsonrpc: '2.0', id, result: { tools: TOOLS } };
     if (method === 'tools/call') {
       const out = await callTool(params.name, params.arguments || {});
-      return send({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(out) }] } });
+      return { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(out) }] } };
     }
-    if (id != null) send({ jsonrpc: '2.0', id, result: {} });    // notifications & misc: ack quietly
+    if (isNotification) return null;                       // notifications/initialized etc. — no reply
+    return { jsonrpc: '2.0', id, result: {} };             // unknown method with an id — ack quietly
   } catch (e) {
-    if (id != null) send({ jsonrpc: '2.0', id, error: { code: -32000, message: String(e.message || e) } });
+    try { console.error('[biii-mcp]', method, '·', (e && (e.stack || e.message)) || e); } catch { /* log must not throw */ }
+    if (isNotification) return null;
+    // stable, non-leaky error (CWE-209): the detail is in the server log, not the JSON-RPC reply.
+    const msg = method === 'tools/call' ? `tool "${params && params.name}" failed — check arguments` : 'request failed';
+    return { jsonrpc: '2.0', id, error: { code: -32000, message: msg } };
   }
-});
+}
 
-module.exports = { callTool, TOOLS, localClassify };
+// stdio transport — ONLY when run directly (require.main), so requiring this module (for /mcp) is side-effect-free.
+if (require.main === module) {
+  const rl = readline.createInterface({ input: process.stdin });
+  rl.on('line', async (line) => {
+    let m; try { m = JSON.parse(line); } catch { return; }
+    const resp = await handleRpc(m);
+    if (resp) process.stdout.write(JSON.stringify(resp) + '\n');
+  });
+}
+
+module.exports = { callTool, TOOLS, localClassify, handleRpc };
