@@ -54,6 +54,15 @@
       "schedule": "1d",
       "cost": "LLM (hy3, ~$0.01/run)",
       "enabled": true
+    },
+    {
+      "name": "strategist",
+      "role": "The THINKER — analyzes live signals (market + on-chain endpoints), poses 2 concrete ideas / next actions, and WRITES them to the Obsidian vault (IDEAS-agent.md). Self-contained script (fetches data + calls the LLM + appends the file itself).",
+      "kind": "script",
+      "script": "strategist.sh",
+      "schedule": "every 12h",
+      "cost": "LLM via its own call (~$0.02/run)",
+      "enabled": true
     }
   ]
 }
