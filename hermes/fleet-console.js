@@ -179,7 +179,7 @@ function card(o){const wk=o.st==='up'?'wk':'';return \`<div class="card" style="
 async function tick(){let d;try{d=await (await fetch('/api/fleet')).json()}catch(e){document.getElementById('foot').textContent='console injoignable';return}
  const gwUp=d.gateway==='running', hUp=d.biiiHealth==='200', xUp=d.x402==='402';
  const cards=[
-  {st:hUp?'up':'down',state:hUp?'working':'down',loc:'Railway',name:'biii · vente',role:'Verdicts safe-to-pay payants sur Base (x402) → wallet',facts:[['/health',hUp?'200':d.biiiHealth,hUp?'ok':'bad'],['POST /x402/vet-asset',xUp?'402 · $0.002':d.x402,xUp?'ok':'bad'],['payTo','0xa6cf…f5d4']]},
+  {st:hUp?'up':'down',state:hUp?'working':'down',loc:'Railway',name:'biii · vente',role:'Verdicts safe-to-pay payants sur Base (x402) → wallet',facts:[['/health',hUp?'200':d.biiiHealth,hUp?'ok':'bad'],['POST /x402/vet-asset',xUp?'402 · $0.25':d.x402,xUp?'ok':'bad'],['payTo','0xa6cf…f5d4']]},
   {st:gwUp?'up':'down',state:gwUp?'working':'stopped',loc:'WSL local',name:'hermes · gateway',role:'Le cerveau local — scheduler + agents à la demande',facts:[['gateway',gwUp?'running':'stopped',gwUp?'ok':'bad'],['toolsets',(d.toolsets||[]).join('·')||'—'],['#',String((d.toolsets||[]).length)]]},
   {st:d.watchActive?'sched':'off',state:d.watchActive?'scheduled':'off',loc:'cron',name:'biii-watch · sentinelle',role:'Scan trust de Base, sans clé, $0',facts:[['next run',d.cronNext?d.cronNext.slice(11,16):'—','wait'],['cadence','every 30m'],['clé/dépense','0 / 0','ok']]},
   {st:'up',state:'working',loc:'Railway',name:'biii-node · monitor+analyste',role:'Surveille + propose, read-only (worker, pas d\\'HTTP local)',facts:[['guard','on','ok'],['watchdog','biii-watch/30m'],['modèles','hy3·kimi·grok']]},
