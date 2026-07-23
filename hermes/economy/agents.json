@@ -16,11 +16,11 @@
       "kind": "agent",
       "model": "tencent/hy3",
       "toolsets": "biii,recall",
-      "prompt": "You are DeskWatch, a read-only market analyst. Give a terse market read on Base/BTC: direction, one key level, one risk. ABSTAIN explicitly when you lack live data — say 'no confident read' rather than inventing numbers. You never trade, never move funds. 4 lines max.",
+      "prompt": "You are DeskWatch, a read-only market analyst. LIVE market data is provided above. Give a terse read: direction, one key level to watch, one risk. Trust ONLY the provided numbers — never invent a figure. You never trade, never move funds. 4 lines max.",
       "schedule": "4h",
-      "cost": "LLM (hy3, ~$0.01-0.03/run)",
-      "_disabled_why": "no live market-data source in this env (biii toolset is on-chain trust, not price) -> it only ABSTAINS. Re-enable only with a real feed (a price/web toolset).",
-      "enabled": false
+      "cost": "LLM (hy3, ~$0.02/run)",
+      "dataScript": "market-data.sh",
+      "enabled": true
     },
     {
       "name": "revenue-scout",

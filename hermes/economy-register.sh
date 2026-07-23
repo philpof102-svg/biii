@@ -33,9 +33,17 @@ for i in $(seq 0 $((n - 1))); do
       || echo "  ! $name : FAILED to schedule (script)"
   else
     prompt=$(jq -r ".agents[$i].prompt" "$CFG")
-    "$H" cron create "$sched" "$prompt" --name "$name" >/dev/null 2>&1 \
-      && { echo "  + $name : scheduled every $sched ($cost) — LLM"; reg=$((reg+1)); } \
-      || echo "  ! $name : FAILED to schedule (agent)"
+    dscript=$(jq -r ".agents[$i].dataScript // empty" "$CFG")
+    if [ -n "$dscript" ]; then
+      # agent + a data script: the script's stdout (live data) is injected into the prompt each run.
+      "$H" cron create "$sched" "$prompt" --name "$name" --script "$dscript" >/dev/null 2>&1 \
+        && { echo "  + $name : scheduled every $sched ($cost) — LLM + live data ($dscript)"; reg=$((reg+1)); } \
+        || echo "  ! $name : FAILED to schedule (agent+data)"
+    else
+      "$H" cron create "$sched" "$prompt" --name "$name" >/dev/null 2>&1 \
+        && { echo "  + $name : scheduled every $sched ($cost) — LLM"; reg=$((reg+1)); } \
+        || echo "  ! $name : FAILED to schedule (agent)"
+    fi
   fi
 done
 
