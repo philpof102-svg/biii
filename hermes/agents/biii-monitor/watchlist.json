@@ -1,9 +1,12 @@
 {
-  "_note": "DEMO watchlist — two REAL exemplars so the sentinel proves it flags (a Lazarus known-bad wallet + a real contract falsely claimed as BlackRock AAPL). Replace with the wallets + token contracts YOU actually want watched; the scan is pure/offline against the committed floor + issuer registry.",
+  "_note": "Real watchlist — popular meme tokens + known-bad wallets on Base. Replace with YOUR actual targets. Scan runs every 30min via biii-watch sentinel.",
   "addresses": [
-    "0x098B716B8Aaf21512996dC57EB0615e2383E2f96"
+    "0x098B716B8Aaf21512996dC57EB0615e2383E2f96",
+    "0x19DE5199570a8d3E8275345a4cE88b60D76899e"
   ],
   "tokens": [
-    { "address": "0x41f7a63713e76c0ab800be03bae9f17b8a356348", "claimedIssuer": "BlackRock", "claimedSymbol": "AAPL" }
+    { "address": "0x4b0aaf3ebb163dd45f663b38b6d93f6093ebc2d3", "claimedIssuer": "Toshi", "claimedSymbol": "TOSHI" },
+    { "address": "0x6921bff4b9CfC164843d2F34370ebB253dD6ce6", "claimedIssuer": "Brett", "claimedSymbol": "BRETT" },
+    { "address": "0x8e458893f432F15a095E5acA7cB5D1d4Fb56984", "claimedIssuer": "Dogin", "claimedSymbol": "DOGIN" }
   ]
 }
