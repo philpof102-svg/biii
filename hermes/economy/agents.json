@@ -1,0 +1,58 @@
+{
+  "_note": "The declarative living-economy fleet. `economy-up` reads this and registers each enabled agent as a Hermes cron job (one command). Add an agent = add an entry here (no code). $0 agents run a no_agent SCRIPT (no LLM, free). LLM agents cost OpenRouter credits per run — keep schedules sane; a fleet of always-on LLM agents drains credits fast. Default: the free sentinel ON, LLM agents present but OFF until you opt in + fund the key.",
+  "agents": [
+    {
+      "name": "biii-watch",
+      "role": "Base trust sentinel (the SOUL) — scan the watchlist through BIII, flag known-bad/impersonation, delegate follow-ups.",
+      "kind": "script",
+      "script": "biii-scan.sh",
+      "schedule": "30m",
+      "cost": "free ($0, no_agent)",
+      "enabled": true
+    },
+    {
+      "name": "market-watch",
+      "role": "Abstaining market-intel read on Base majors: cite evidence or don't claim it; NEVER trades. (DeskWatch)",
+      "kind": "agent",
+      "model": "tencent/hy3",
+      "toolsets": "biii,recall",
+      "prompt": "You are DeskWatch, a read-only market analyst. Give a terse, CITED market read on Base/BTC. Abstain when evidence is thin. You never trade, never move funds.",
+      "schedule": "4h",
+      "cost": "LLM (hy3, ~$0.01-0.03/run)",
+      "enabled": false
+    },
+    {
+      "name": "revenue-scout",
+      "role": "Find one concrete B2B revenue lead for BIII/Loop; propose outreach. Close is Phil's gesture.",
+      "kind": "agent",
+      "model": "tencent/hy3",
+      "toolsets": "biii,lawbor,recall",
+      "prompt": "You are our revenue scout. Using recall (our memory) and the biii/lawbor tools, propose ONE concrete, real B2B lead or channel for BIII safe-to-pay verdicts. No hype; only real, actionable. You never send anything — you propose.",
+      "schedule": "1d",
+      "cost": "LLM (hy3, ~$0.02/run)",
+      "enabled": false
+    },
+    {
+      "name": "gitlawb-health",
+      "role": "Report gitlawb node health (our sovereign git layer) — read-only.",
+      "kind": "agent",
+      "model": "tencent/hy3",
+      "toolsets": "gitlawb,recall",
+      "prompt": "Check and report, in one terse line, the health of our gitlawb node and any of our repos on it. Read-only; never write.",
+      "schedule": "6h",
+      "cost": "LLM (hy3, ~$0.01/run)",
+      "enabled": false
+    },
+    {
+      "name": "memory-keeper",
+      "role": "Memory hygiene: surface one stale/contradictory memory to reconcile. Read-only recall.",
+      "kind": "agent",
+      "model": "tencent/hy3",
+      "toolsets": "recall",
+      "prompt": "Use memory_search (READ-ONLY) on our persistent memory. Surface ONE fact that looks stale, contradictory, or worth re-verifying, with the pointer. Do not change anything.",
+      "schedule": "1d",
+      "cost": "LLM (hy3, ~$0.01/run)",
+      "enabled": false
+    }
+  ]
+}
