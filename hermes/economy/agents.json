@@ -63,6 +63,15 @@
       "schedule": "every 12h",
       "cost": "LLM via its own call (~$0.02/run)",
       "enabled": true
+    },
+    {
+      "name": "meme-watch",
+      "role": "Meme-genuineness grinder (like biii-watch, for memes): scans a watchlist of meme symbols via lib/meme.js (DexScreener), flags the AMBIGUOUS/trap ones (many contracts, no clear real one) and names the canonical + look-alikes. Deterministic, no LLM.",
+      "kind": "script",
+      "script": "meme-scan.sh",
+      "schedule": "every 6h",
+      "cost": "free ($0, no_agent — DexScreener API only)",
+      "enabled": true
     }
   ]
 }
