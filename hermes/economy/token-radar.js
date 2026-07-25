@@ -64,7 +64,14 @@ async function harvestNewPools() {
     const id = ((rel.base_token || {}).data || {}).id || '';       // e.g. "base_0xabc..."
     const addr = id.split('_')[1];
     if (!addr || liq < MIN_LIQ_WATCH) continue;
-    out.push({ addr: addr.toLowerCase(), sym: String(a.name || '').split('/')[0].trim(), liq, source: 'new_pool', createdAt: a.pool_created_at || null });
+    // A pool whose base token the aggregator labels "[invalid]" is not a parsing failure on our side — it
+    // means the symbol could not be decoded at all, which happens when a name is deliberately built from
+    // control characters or invisible glyphs to slip past text filters. Carrying that through as if it were
+    // a ticker pollutes the database; naming it as the anomaly it is keeps the row useful.
+    const raw = String(a.name || '').split('/')[0].trim();
+    const undecodable = !raw || /^\[invalid\]$/i.test(raw);
+    out.push({ addr: addr.toLowerCase(), sym: undecodable ? '⟨undecodable-symbol⟩' : raw, undecodable,
+      liq, source: 'new_pool', createdAt: a.pool_created_at || null });
   }
   return out;
 }
@@ -122,6 +129,27 @@ async function currentLiquidity(addrs) {
     }
   }
 
+  // ---------- 1b. RE-JUDGE THE ABSTENTIONS ------------------------------------------------------
+  // An `unknown` was never a conclusion, it was a question asked too early. The curated index does not
+  // refuse these tokens, it simply has not reached them yet: $MB was judged 25 minutes after its pool
+  // opened, returned nothing, and was filed unknown forever — while two hours later the index held its
+  // owner address, and by then nobody was asking. It rugged with $479k in it. So abstentions get asked
+  // again while the token is still alive, and the first verdict is kept alongside so the scorecard still
+  // grades what we said WHEN IT MATTERED, not what we learned afterwards.
+  const stale = Object.keys(db).filter((k) => db[k].outcome === 'live' && db[k].firstVerdict === 'unknown'
+    && !db[k].rejudgedAt).slice(0, 8);
+  const rejudged = [];
+  if (stale.length) {
+    const again = await scanRug(CHAIN, stale);
+    for (const addr of stale) {
+      const v = again[addr];
+      if (!v || v.verdict === 'unknown') continue;
+      const t = db[addr];
+      t.rejudgedAt = now; t.rejudgedVerdict = v.verdict; t.rejudgedReason = v.reason;
+      rejudged.push({ addr, sym: t.sym, from: t.firstVerdict, to: v.verdict, reason: v.reason });
+    }
+  }
+
   // ---------- 1. HARVEST ------------------------------------------------------------------------
   const [fresh, boosted] = await Promise.all([harvestNewPools(), harvestBoosts()]);
   const seen = new Set();
@@ -145,6 +173,7 @@ async function currentLiquidity(addrs) {
     if (v.verdict === 'rug_ready') armed.push({ ...c, v });
     else if (v.verdict === 'clean') survivors.push({ ...c, v });
     else watch.push({ ...c, v });
+    if (c.undecodable) lines.push('⚠️ ' + c.addr.slice(0, 10) + '… (' + usd(c.liq) + ') has NO decodable symbol — a name built to defeat text filters, which is a choice, not an accident.');
   }
 
   // ---------- FOLLOW THE MONEY: who paid for these launches, and what else did they pay for? -----
@@ -213,6 +242,9 @@ async function currentLiquidity(addrs) {
       c.f.funder.slice(0, 10) + '… (' + c.f.fundedEth + ' ETH' + (c.f.freshDeployer ? ', its ONLY incoming tx' : '') + ')');
     lines.push('     ' + c.f.pattern + (c.f.morePages ? ' — and that is one page of many' : ''));
     lines.push('     structure, not intent: these tokens share fate. Judge them together.');
+  }
+  for (const r of rejudged) {
+    lines.push('🔁 ' + r.sym + ' ' + r.addr.slice(0, 10) + '… — the index caught up: unknown → ' + r.to.toUpperCase() + ' — ' + r.reason);
   }
   if (newlyRugged.length) {
     lines.push('📉 RUGGED since last run (' + newlyRugged.length + ') — grading our own call:');
