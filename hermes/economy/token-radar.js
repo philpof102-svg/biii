@@ -26,6 +26,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const https = require('node:https');
 const { scanRug } = require('../../lib/rugsignals');
+const { traceFeeder, SIBLING_ALERT } = require('../../lib/feeder');
 
 const DB_DIR = path.join(__dirname, '..', '..', 'data', 'token-radar');
 const TOKENS = path.join(DB_DIR, 'tokens.json');          // per-token state (the memory)
@@ -37,6 +38,7 @@ const MIN_LIQ_WATCH = 5000;      // below this a "pool" is dust, not a market wo
 const RUG_DROP = 0.80;           // >=80% off its own peak liquidity = the pool was pulled
 const RUG_FLOOR = 2000;          // ...and what is left is not a market anymore
 const MAX_NEW = 20;              // GoPlus batches 20 contracts per request
+const TRACE_MAX = 6;             // funding traces per run — 3 explorer calls each, on a free endpoint
 
 function getJSON(url) {
   return new Promise((resolve) => {
@@ -145,6 +147,20 @@ async function currentLiquidity(addrs) {
     else watch.push({ ...c, v });
   }
 
+  // ---------- FOLLOW THE MONEY: who paid for these launches, and what else did they pay for? -----
+  // Capped deliberately. Three explorer calls per token on a free public endpoint adds up, and an unbounded
+  // crawl is how we lose access to it — so we trace the biggest fresh launches and say what we skipped.
+  const toTrace = toJudge.slice().sort((a, b) => b.liq - a.liq).slice(0, TRACE_MAX);
+  const clusters = [];
+  for (const c of toTrace) {
+    let f; try { f = await traceFeeder(CHAIN, c.addr); } catch { continue; }
+    if (!f || !f.ok || !f.funder) continue;
+    db[c.addr].deployer = f.deployer; db[c.addr].funder = f.funder;
+    db[c.addr].siblingCount = f.siblingCount; db[c.addr].freshDeployer = f.freshDeployer;
+    if (f.identicalAmountSiblings >= SIBLING_ALERT || f.siblingCount >= SIBLING_ALERT) clusters.push({ ...c, f });
+  }
+  if (toJudge.length > toTrace.length) lines.push('   (funding traced for the ' + toTrace.length + ' largest of ' + toJudge.length + ' — the rest were skipped, not cleared)');
+
   // ---------- SCORECARD: what our calls were actually worth --------------------------------------
   const all = Object.values(db);
   const rugged = all.filter((t) => t.outcome === 'rugged');
@@ -180,6 +196,12 @@ async function currentLiquidity(addrs) {
   for (const w of watch) {
     lines.push((w.v.verdict === 'high_risk' ? '⚠️ ' : '·  ') + w.sym + ' ' + w.addr.slice(0, 10) + '… (' + w.source + ', ' + usd(w.liq) +
       ') [' + w.v.verdict + '] — ' + w.v.reason + (w.v.flags.length > 1 ? ' (+' + (w.v.flags.length - 1) + ' more flag(s))' : ''));
+  }
+  for (const c of clusters) {
+    lines.push('🕸️ ' + c.sym + ' shares a paymaster: deployer ' + c.f.deployer.slice(0, 10) + '… funded by ' +
+      c.f.funder.slice(0, 10) + '… (' + c.f.fundedEth + ' ETH' + (c.f.freshDeployer ? ', its ONLY incoming tx' : '') + ')');
+    lines.push('     ' + c.f.pattern + (c.f.morePages ? ' — and that is one page of many' : ''));
+    lines.push('     structure, not intent: these tokens share fate. Judge them together.');
   }
   if (newlyRugged.length) {
     lines.push('📉 RUGGED since last run (' + newlyRugged.length + ') — grading our own call:');
