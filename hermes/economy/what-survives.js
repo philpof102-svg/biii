@@ -14,6 +14,24 @@
  * the groups perfectly by chance, and any rule taken from here must still be replayed by
  * backtest-weighting.js before it goes anywhere near a verdict — that is exactly how the last confident
  * rule died.
+ *
+ * FIRST RESULT, AND IT KILLED ITS OWN BEST CANDIDATE. The medians looked decisive: $11.6k of initial
+ * liquidity among the rugs against $43.2k among the survivors, with a mechanism to match — seeded liquidity
+ * is what a rug must spend to run, so a large seed is a poor return on a disposable launch. Sweeping a
+ * threshold across both groups gave at best 5/8 rugs against 3/8 survivors, barely distinguishable from
+ * chance. The raw values show why:
+ *
+ *   rugged    8124, 9341, 10533, 11592, 11605, 56804, 58231, 479678
+ *   survived  7709, 9346, 9945, 18443, 43162, 45190, 56940, 61794
+ *
+ * They overlap almost entirely. The rugs are BIMODAL — five small launches and three large ones — and the
+ * median, whose whole virtue is resisting extreme values, hid exactly the structure that mattered. On eight
+ * points the summary statistic was the mistake; reading the list took seconds and settled it.
+ *
+ * So the honest state of this analysis: nothing in the captured features separates the two groups yet. That
+ * is a real finding, and a more useful one than a fabricated signal — it says the radar is currently a
+ * RECORDER rather than a predictor, and that its value is the accumulating evidence base, not its verdicts.
+ * Anything printed below is a candidate for the next replay, nothing more.
  */
 const path = require('node:path');
 const db = require(path.join(__dirname, '..', '..', 'data', 'token-radar', 'tokens.json'));
