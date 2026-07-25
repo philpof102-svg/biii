@@ -1,0 +1,10 @@
+{
+  "updatedAt": "2026-07-25T16:55:26.310Z",
+  "tokensTracked": 5,
+  "rugsObserved": 0,
+  "caughtBeforeTheRug": 0,
+  "missed": 0,
+  "catchRate": null,
+  "flaggedButStillAlive": 0,
+  "note": "catchRate = share of observed rugs we had already called rug_ready/high_risk at first sight. flaggedButStillAlive is our false-alarm count and is published on purpose: a scanner that only reports its wins is marketing, not evidence."
+}

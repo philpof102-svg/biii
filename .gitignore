@@ -7,6 +7,14 @@ data/*
 !data/known-bad.json
 # issuer-verified.json is the small, curated, ISSUER-OFFICIAL registry (on-chain-verified addresses) — ships so /asset can show the green "issuer-verified" without the non-commercial Coingecko file.
 !data/issuer-verified.json
+# token-radar's memory: every token it ever judged, the call it made at first sight, and how that token
+# actually ended up. This is the one asset that cannot be copied by reading the code — it only accrues by
+# watching the market over time, and the misses are recorded alongside the hits on purpose. Versioned so the
+# track record is auditable by whoever doubts it. (observations.jsonl stays local: append-only, re-derivable.)
+!data/token-radar/
+!data/token-radar/tokens.json
+!data/token-radar/scorecard.json
+data/token-radar/observations.jsonl
 dist/
 
 # Hermes agent cron output (generated per-run)

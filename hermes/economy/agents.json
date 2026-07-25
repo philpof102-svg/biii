@@ -72,6 +72,15 @@
       "schedule": "every 6h",
       "cost": "free ($0, no_agent — DexScreener API only)",
       "enabled": true
+    },
+    {
+      "name": "token-radar",
+      "role": "The market watchman that keeps its own evidence base. Harvests the freshest launches (GeckoTerminal new pools) + what is being paid to promote (DexScreener boosts), asks of each contract 'who can still fire a rug power here' (lib/rugsignals.js: GoPlus index + honeypot.is live simulation), and re-checks every token it has ever seen so a collapse against its own peak liquidity is recorded as an OUTCOME. Publishes a falsifiable scorecard — catches AND misses — into data/token-radar/ (versioned). Deterministic, no LLM.",
+      "kind": "script",
+      "script": "token-radar.sh",
+      "schedule": "every 1h",
+      "cost": "free ($0, no_agent — keyless public APIs)",
+      "enabled": true
     }
   ]
 }
