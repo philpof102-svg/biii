@@ -162,18 +162,29 @@ async function currentLiquidity(addrs) {
   if (toJudge.length > toTrace.length) lines.push('   (funding traced for the ' + toTrace.length + ' largest of ' + toJudge.length + ' — the rest were skipped, not cleared)');
 
   // ---------- SCORECARD: what our calls were actually worth --------------------------------------
+  // Grading ourselves in three buckets, not two. The first version counted only rug_ready/high_risk as a
+  // catch and only `clean` as a miss, which put every `caution` in a gap: the first four real rugs had all
+  // been called caution, and the scorecard reported a 0% catch rate while the runs had in fact warned on all
+  // four. Under-crediting is the safer direction to be wrong in, but a metric nobody can interpret is worse
+  // than no metric — so a warning now counts as a warning, at the strength it was actually given.
   const all = Object.values(db);
   const rugged = all.filter((t) => t.outcome === 'rugged');
-  const caught = rugged.filter((t) => t.firstVerdict === 'rug_ready' || t.firstVerdict === 'high_risk');
+  const strong = rugged.filter((t) => t.firstVerdict === 'rug_ready' || t.firstVerdict === 'high_risk');
+  const soft = rugged.filter((t) => t.firstVerdict === 'caution');
+  const silent = rugged.filter((t) => t.firstVerdict === 'unknown');
   const missed = rugged.filter((t) => t.firstVerdict === 'clean');
   const stillLive = all.filter((t) => t.outcome === 'live');
   const falseAlarms = stillLive.filter((t) => t.firstVerdict === 'rug_ready');
+  const warned = strong.length + soft.length;
   const card = {
     updatedAt: now, tokensTracked: all.length, rugsObserved: rugged.length,
-    caughtBeforeTheRug: caught.length, missed: missed.length,
-    catchRate: rugged.length ? +(caught.length / rugged.length).toFixed(2) : null,
+    warnedBeforeTheRug: warned,
+    ofWhichStrong: strong.length, ofWhichCautionOnly: soft.length,
+    abstained: silent.length, missedOutright: missed.length,
+    warnRate: rugged.length ? +(warned / rugged.length).toFixed(2) : null,
+    strongRate: rugged.length ? +(strong.length / rugged.length).toFixed(2) : null,
     flaggedButStillAlive: falseAlarms.length,
-    note: 'catchRate = share of observed rugs we had already called rug_ready/high_risk at first sight. flaggedButStillAlive is our false-alarm count and is published on purpose: a scanner that only reports its wins is marketing, not evidence.',
+    note: 'warnRate = share of observed rugs carrying ANY warning at first sight; strongRate = share we called rug_ready or high_risk. Both are published because they say different things: a caution that rugs means the warning was there but too quiet to act on. abstained = rugs we had called unknown, which is honest but useless to a buyer. missedOutright = rugs we had called clean, the only truly damaging error. flaggedButStillAlive is our false-alarm count, published on purpose: a scanner that only reports its wins is marketing, not evidence.',
   };
 
   writeJSON(TOKENS, db);
@@ -206,12 +217,21 @@ async function currentLiquidity(addrs) {
   if (newlyRugged.length) {
     lines.push('📉 RUGGED since last run (' + newlyRugged.length + ') — grading our own call:');
     for (const r of newlyRugged) {
-      const grade = r.firstVerdict === 'clean' ? '❌ WE MISSED IT' : '✅ we had called it ' + r.firstVerdict;
+      // Four grades, because "we said something" and "we said something useful" are not the same claim.
+      // An abstention is honest and worthless to a buyer; marking it with a tick would flatter the record.
+      const grade = r.firstVerdict === 'clean' ? '❌ WE CALLED IT CLEAN — a real miss'
+        : r.firstVerdict === 'unknown' ? '⚪ we abstained (unknown) — honest, but no use to anyone holding it'
+        : (r.firstVerdict === 'rug_ready' || r.firstVerdict === 'high_risk') ? '✅ we had called it ' + r.firstVerdict
+        : '🟡 we had called it caution — the warning was there, too quiet to act on';
       lines.push('   · ' + r.sym + ' ' + pct(r.dropPct) + ' off peak (' + usd(r.peakLiq) + ' → ' + usd(r.lastLiq) + ') — ' + grade);
     }
   }
-  lines.push('📊 scorecard: ' + card.tokensTracked + ' tracked · ' + card.rugsObserved + ' rugs observed · caught ' +
-    card.caughtBeforeTheRug + ', missed ' + card.missed + (card.catchRate != null ? ' (catch rate ' + pct(card.catchRate) + ')' : ' (no rug observed yet — no rate to claim)') +
+  lines.push('📊 scorecard: ' + card.tokensTracked + ' tracked · ' + card.rugsObserved + ' rugs observed' +
+    (card.rugsObserved
+      ? ' · warned on ' + card.warnedBeforeTheRug + '/' + card.rugsObserved + ' (' + pct(card.warnRate) + ') — but only ' +
+        card.ofWhichStrong + ' strongly (' + pct(card.strongRate) + '); ' + card.abstained + ' abstained, ' +
+        card.missedOutright + ' called clean and rugged'
+      : ' · no rug observed yet — no rate to claim') +
     ' · ' + card.flaggedButStillAlive + ' flagged still alive');
   for (const l of lines) console.log('  ' + l);
 })();
