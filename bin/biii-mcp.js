@@ -29,6 +29,7 @@ const { traceFeeder } = require('../lib/feeder');
 const { classifyB20 } = require('../lib/b20');
 const { whatMoved, readBridgeExit, followTron } = require('../lib/trace');
 const { assessRecoveryOffer } = require('../lib/recovery');
+const { vetApproach } = require('../lib/lure');
 const L = require('../lib/ledger');
 const X = require('../lib/export');
 const { meterUsage } = require('../lib/meter');
@@ -210,6 +211,14 @@ const TOOLS = [
       asksForUpfrontPayment: { type: 'boolean', description: 'were you asked to pay a fee before delivery?' },
       asksForSeedOrKey: { type: 'boolean', description: 'were you asked for a seed phrase, private key or keystore?' },
       asksToInstall: { type: 'boolean', description: 'were you asked to download or run anything?' } }, required: [] } },
+
+  { name: 'till_vet_approach', description: 'JUDGE AN INBOUND OPPORTUNITY BY ITS ASK, NOT BY HOW GOOD IT LOOKS (podcast, interview, partnership, job, AMA). Built from a lure that worked on someone who verifies counterparties professionally: a 35-question production dossier citing his real scoring model, his settlement rails, his own catchphrase, quoting his posts verbatim — and asking genuinely HARD questions, because a flatterer never includes criticism and including it is what flips an approach from marketing to journalism in the reader\'s head. The mechanism is EFFORT AS A TRUST SIGNAL: that much researched detail used to cost hours of human work, so nobody spent it on one target, and everyone\'s instinct silently priced that in. The arithmetic was right for decades and is not right now. So this deliberately does NOT score how convincing an approach is — grading convincingness would just give a forgery a good mark. It grades the two things a forger cannot hide: where a link ACTUALLY points (a brand name to the left of the registrable domain is a free label, so wechat.web09eu.com is web09eu.com), and what the sender wants you to do. Never returns "safe".',
+    inputSchema: { type: 'object', properties: {
+      links: { type: 'array', items: { type: 'string' }, description: 'every URL in the message' },
+      platform: { type: 'string', description: 'the platform they named, e.g. "WeChat", "Zoom"' },
+      asksToInstall: { type: 'boolean' }, asksForKeyOrSeed: { type: 'boolean' },
+      asksForSignature: { type: 'boolean' }, asksForUpfrontPayment: { type: 'boolean' },
+      urgency: { type: 'boolean', description: 'was time pressure applied?' } }, required: [] } },
 ];
 
 async function callTool(name, a = {}) {
@@ -367,6 +376,11 @@ async function callTool(name, a = {}) {
       return await followTron(a.address, { maxHops: a.maxHops || 3 });
     }
     return { error: 'mode must be one of: moved, bridge, tron' };
+  }
+  if (name === 'till_vet_approach') {
+    return vetApproach({ links: a.links, platform: a.platform, asksToInstall: a.asksToInstall,
+      asksForKeyOrSeed: a.asksForKeyOrSeed, asksForSignature: a.asksForSignature,
+      asksForUpfrontPayment: a.asksForUpfrontPayment, urgency: a.urgency });
   }
   if (name === 'till_recovery_offer') {
     return await assessRecoveryOffer({ address: a.address, chain: a.chain || 'base',
