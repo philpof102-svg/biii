@@ -28,6 +28,7 @@ const { scanRugOne } = require('../lib/rugsignals');
 const { traceFeeder } = require('../lib/feeder');
 const { classifyB20 } = require('../lib/b20');
 const { whatMoved, readBridgeExit, followTron } = require('../lib/trace');
+const { assessRecoveryOffer } = require('../lib/recovery');
 const L = require('../lib/ledger');
 const X = require('../lib/export');
 const { meterUsage } = require('../lib/meter');
@@ -200,6 +201,15 @@ const TOOLS = [
       address: { type: 'string', description: 'TRON address, T-form (mode: tron)' },
       chain: { type: 'string', description: 'EVM chain for moved/bridge — base (default) | ethereum | optimism | polygon | arbitrum | gnosis' },
       maxHops: { type: 'number', description: 'tron mode: how far to walk (default 3)' } }, required: ['mode'] } },
+
+  { name: 'till_recovery_offer', description: 'THE SECOND THEFT: judge an approach offering to recover already-stolen funds. Every other tool here tries to stop the first loss; this exists because the first loss is what makes a person findable, and a drained wallet is a lead with a market for it. Answerable with certainty rather than a score, because the ask itself is the tell: recovery happens through the thief returning funds, or a court, exchange, or issuer freezing and reassigning them — none of which require anything from the victim\'s wallet. So a recovery needing your signature or an upfront fee is not merely suspect, it is structurally impossible as described, no matter how credible the person sounds or how accurately they recite your loss (the theft is public — anyone can read it back to you). Also reads the chain for the harvesting shape: many unrelated senders paying one address that returns nothing. NEVER returns "safe".',
+    inputSchema: { type: 'object', properties: {
+      address: { type: 'string', description: 'the address you were asked to pay or interact with (optional — its absence is not reassurance)' },
+      chain: { type: 'string', description: 'base (default) | ethereum | polygon | arbitrum | optimism' },
+      asksForSignature: { type: 'boolean', description: 'were you asked to sign a message or transaction?' },
+      asksForUpfrontPayment: { type: 'boolean', description: 'were you asked to pay a fee before delivery?' },
+      asksForSeedOrKey: { type: 'boolean', description: 'were you asked for a seed phrase, private key or keystore?' },
+      asksToInstall: { type: 'boolean', description: 'were you asked to download or run anything?' } }, required: [] } },
 ];
 
 async function callTool(name, a = {}) {
@@ -357,6 +367,11 @@ async function callTool(name, a = {}) {
       return await followTron(a.address, { maxHops: a.maxHops || 3 });
     }
     return { error: 'mode must be one of: moved, bridge, tron' };
+  }
+  if (name === 'till_recovery_offer') {
+    return await assessRecoveryOffer({ address: a.address, chain: a.chain || 'base',
+      asksForSignature: a.asksForSignature, asksForUpfrontPayment: a.asksForUpfrontPayment,
+      asksForSeedOrKey: a.asksForSeedOrKey, asksToInstall: a.asksToInstall });
   }
   if (name === 'till_receipt') {
     const charge = T.createCharge({ to: a.to, amountUsd: a.amountUsd, label: a.label, nowMs: Date.now() });
