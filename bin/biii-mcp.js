@@ -24,6 +24,10 @@ const { assessTriangle } = require('../lib/trust');
 const I = require('../lib/invoice');
 const { assessAsset, assetVertex } = require('../lib/asset');
 const { vetMeme } = require('../lib/meme');
+const { scanRugOne } = require('../lib/rugsignals');
+const { traceFeeder } = require('../lib/feeder');
+const { classifyB20 } = require('../lib/b20');
+const { whatMoved, readBridgeExit, followTron } = require('../lib/trace');
 const L = require('../lib/ledger');
 const X = require('../lib/export');
 const { meterUsage } = require('../lib/meter');
@@ -173,6 +177,29 @@ const TOOLS = [
       spendAuth: { description: 'the owner\'s signed spend authorization: a Programmable-Payment JWT (string) OR an object {token, chainId, maxPerChargeMicro, cumulativeCapMicro, allowedRecipients, exp}' },
       spentMicro: { type: 'string', description: 'how much has ALREADY been spent under this authorization (the caller\'s running total — the cumulative guard)' },
       verified: { type: 'boolean', description: 'attest the authorization JWT signature verified (BIII does not check it itself)' } }, required: ['to', 'spendAuth'] } },
+
+  { name: 'till_rug_powers', description: 'WHO CAN STILL RUG THIS TOKEN? till_vet_meme says which contract is the real one; this says whether the real one is itself a trap. A dangerous capability only counts if someone can still FIRE it — mintable with ownership renounced is inert, the same flag with a live owner is an armed rug, and scoring flags without that distinction is why most scanners are noise. Merges two sources that fail at opposite ends: a curated index (owner powers, LP locks) that has never heard of a token minted ten minutes ago, and a live trade simulation that always works on fresh deploys but sees nothing about control. Fail-closed: NEVER returns clean on simulation alone, because "you can sell it right now" is not safety. Verdicts: rug_ready / high_risk / caution / clean / unknown.',
+    inputSchema: { type: 'object', properties: {
+      address: { type: 'string', description: 'token contract address' },
+      chain: { type: 'string', description: 'base (default) | ethereum | bsc | polygon | arbitrum | optimism | avalanche' } }, required: ['address'] } },
+
+  { name: 'till_launch_funder', description: 'WHO PAID FOR THIS LAUNCH, AND WHAT ELSE DID THEY PAY FOR? Follows the money backwards: a token names its creator, a creator minted minutes ago names the wallet that funded it, and that funder usually funded others. Three free explorer queries surface a cluster no buyer can see from a chart. Proven live: one funder had sent an identical 15.020 ETH to 26 fresh wallets. Reports STRUCTURE ONLY — a shared funder proves shared control or shared infrastructure, never fraud; a launchpad and a rug factory are indistinguishable from the graph. What it does prove is that these tokens share fate and should be judged together.',
+    inputSchema: { type: 'object', properties: {
+      address: { type: 'string', description: 'token contract address' },
+      chain: { type: 'string', description: 'base (default) — chains with a public Blockscout instance' } }, required: ['address'] } },
+
+  { name: 'till_b20_authentic', description: 'IS THIS A REAL BASE-NATIVE B20, OR AN ERC-20 WEARING ITS ADDRESS PREFIX? B20 is Base\'s native standard for compliant asset issuance (stablecoins, RWA); its tokens sit at addresses starting 0xb200 and run as a precompile, so a genuine one carries almost no EVM bytecode. As people learn to read 0xb200 as "official Base asset", a plain ERC-20 at a vanity address of the same prefix inherits that credibility for free — landing on it by chance is about 1 in 65,536. Both outcomes matter and differ: an impostor lacks the issuer controls the standard implies, while a GENUINE B20 lets its issuer freeze and burn a blocked holder\'s balance — a power no ERC-20 has and no ERC-20-shaped scanner looks for. Verdicts: native_b20 / prefix_impostor / not_b20 / unknown.',
+    inputSchema: { type: 'object', properties: {
+      address: { type: 'string', description: 'token contract address' },
+      chain: { type: 'string', description: 'base (default)' } }, required: ['address'] } },
+
+  { name: 'till_trace_theft', description: 'FOLLOW STOLEN FUNDS from the victim\'s transaction to where the trail dies. Three modes. moved: what actually left a wallet in one transaction, marking which transfers are AUTHENTIC — ERC-20 Transfer logs are attacker-controlled text, so only the transaction signer is authoritative and forged events are flagged rather than followed. bridge: read a cross-chain exit; aggregators write the destination chain and receiver into their own calldata because the far side needs them, and chain ids are checked against a table before any field is called an amount (0x2b6653dc reads as a plausible token amount and is in fact TRON mainnet). tron: walk a TRON account\'s flow, detecting relay hops — an account forwarding the amount it received, within seconds, is a pass-through and not a destination. Reports hops, never identity or intent.',
+    inputSchema: { type: 'object', properties: {
+      mode: { type: 'string', description: 'moved | bridge | tron' },
+      txHash: { type: 'string', description: 'transaction hash (modes: moved, bridge)' },
+      address: { type: 'string', description: 'TRON address, T-form (mode: tron)' },
+      chain: { type: 'string', description: 'EVM chain for moved/bridge — base (default) | ethereum | optimism | polygon | arbitrum | gnosis' },
+      maxHops: { type: 'number', description: 'tron mode: how far to walk (default 3)' } }, required: ['mode'] } },
 ];
 
 async function callTool(name, a = {}) {
@@ -300,6 +327,36 @@ async function callTool(name, a = {}) {
   if (name === 'till_vet_meme') {
     const result = await vetMeme({ symbol: a.symbol, chainId: a.chainId ? Number(a.chainId) : undefined, address: a.address });
     return { ...result, note: 'ADVISORY. genuine = one contract dominates liquidity (>3x runner-up); ambiguous = top-2 tied (never certified); re-verify on DexScreener/Basescan.' };
+  }
+  if (name === 'till_rug_powers') {
+    const v = await scanRugOne(a.chain || 'base', a.address);
+    return { ...v, note: 'ADVISORY, fail-closed. "clean" means no rug power was found that anyone can still fire — NOT a promise the price holds or the team is honest. Owner-gated dangers are scored only while an owner exists; missing data reads as unknown, never clean.' };
+  }
+  if (name === 'till_launch_funder') {
+    const f = await traceFeeder(a.chain || 'base', a.address);
+    if (!f || !f.ok) return { error: (f && f.reason) || 'could not trace the funding of this launch' };
+    return f;
+  }
+  if (name === 'till_b20_authentic') {
+    return await classifyB20(a.chain || 'base', a.address);
+  }
+  if (name === 'till_trace_theft') {
+    const chain = a.chain || 'base';
+    if (a.mode === 'moved') {
+      if (!a.txHash) return { error: 'txHash is required for mode "moved"' };
+      const m = await whatMoved(chain, a.txHash);
+      if (!m.ok) return { error: m.reason };
+      return { ...m, note: m.forgedTransfers ? m.forgedTransfers + ' transfer event(s) name a sender who did not sign this transaction — those are forged logs, do not follow them.' : 'All transfer events match the transaction signer.' };
+    }
+    if (a.mode === 'bridge') {
+      if (!a.txHash) return { error: 'txHash is required for mode "bridge"' };
+      return await readBridgeExit(chain, a.txHash);
+    }
+    if (a.mode === 'tron') {
+      if (!a.address) return { error: 'address is required for mode "tron"' };
+      return await followTron(a.address, { maxHops: a.maxHops || 3 });
+    }
+    return { error: 'mode must be one of: moved, bridge, tron' };
   }
   if (name === 'till_receipt') {
     const charge = T.createCharge({ to: a.to, amountUsd: a.amountUsd, label: a.label, nowMs: Date.now() });
