@@ -27,6 +27,7 @@ const path = require('node:path');
 const https = require('node:https');
 const { scanRug } = require('../../lib/rugsignals');
 const { traceFeeder, SIBLING_ALERT } = require('../../lib/feeder');
+const { vetMeme } = require('../../lib/meme');
 
 const DB_DIR = path.join(__dirname, '..', '..', 'data', 'token-radar');
 const TOKENS = path.join(DB_DIR, 'tokens.json');          // per-token state (the memory)
@@ -39,6 +40,7 @@ const RUG_DROP = 0.80;           // >=80% off its own peak liquidity = the pool 
 const RUG_FLOOR = 2000;          // ...and what is left is not a market anymore
 const MAX_NEW = 20;              // GoPlus batches 20 contracts per request
 const TRACE_MAX = 6;             // funding traces per run — 3 explorer calls each, on a free endpoint
+const IMPOSTOR_MAX = 10;         // symbol checks per run — one search each
 
 function getJSON(url) {
   return new Promise((resolve) => {
@@ -176,6 +178,25 @@ async function currentLiquidity(addrs) {
     if (c.undecodable) lines.push('⚠️ ' + c.addr.slice(0, 10) + '… (' + usd(c.liq) + ') has NO decodable symbol — a name built to defeat text filters, which is a choice, not an accident.');
   }
 
+  // ---------- IS THIS TOKEN EVEN CLAIMING TO BE ITSELF? -----------------------------------------
+  // Asked because of CORE, which appeared twice in this database seven minutes apart with near-identical
+  // liquidity — $56,804 and $56,940 — and one of the two went to $1. The contract analysis found nothing
+  // worse than a caution on the one that died, correctly: there was nothing malicious IN the contract. The
+  // deception was positional, a clone borrowing a name that already had a dominant holder elsewhere. That
+  // question was already answered by another module in this repository and the radar had simply never
+  // asked it. Cheap, and only for tokens whose symbol can be decoded at all.
+  const impostors = [];
+  for (const c of toJudge.filter((x) => !x.undecodable && x.sym && x.sym.length <= 12).slice(0, IMPOSTOR_MAX)) {
+    let m; try { m = await vetMeme({ symbol: c.sym, chainId: CHAIN, address: c.addr }); } catch { continue; }
+    if (!m) continue;
+    db[c.addr].symbolVerdict = m.status;
+    if (m.status === 'impersonation') {
+      impostors.push({ ...c, canonical: m.canonical });
+      db[c.addr].firstVerdict = 'rug_ready';   // wearing another token's name IS the fireable trap here
+      db[c.addr].firstReason = 'the symbol "' + c.sym + '" already has a dominant contract elsewhere — this one is not it';
+    }
+  }
+
   // ---------- FOLLOW THE MONEY: who paid for these launches, and what else did they pay for? -----
   // Capped deliberately. Three explorer calls per token on a free public endpoint adds up, and an unbounded
   // crawl is how we lose access to it — so we trace the biggest fresh launches and say what we skipped.
@@ -236,6 +257,11 @@ async function currentLiquidity(addrs) {
   for (const w of watch) {
     lines.push((w.v.verdict === 'high_risk' ? '⚠️ ' : '·  ') + w.sym + ' ' + w.addr.slice(0, 10) + '… (' + w.source + ', ' + usd(w.liq) +
       ') [' + w.v.verdict + '] — ' + w.v.reason + (w.v.flags.length > 1 ? ' (+' + (w.v.flags.length - 1) + ' more flag(s))' : ''));
+  }
+  for (const im of impostors) {
+    lines.push('🎭 ' + im.sym + ' ' + im.addr.slice(0, 10) + '… (' + usd(im.liq) + ') — NOT the dominant contract for its own symbol.' +
+      (im.canonical ? ' The one holding the name is ' + im.canonical.address.slice(0, 12) + '… with ' + usd(im.canonical.liquidityUsd) + '.' : '') +
+      ' A clone borrowing a name is a trap the contract itself will never reveal.');
   }
   for (const c of clusters) {
     lines.push('🕸️ ' + c.sym + ' shares a paymaster: deployer ' + c.f.deployer.slice(0, 10) + '… funded by ' +
