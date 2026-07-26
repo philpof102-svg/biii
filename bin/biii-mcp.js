@@ -33,6 +33,7 @@ const { vetApproach } = require('../lib/lure');
 const { checkApprovals } = require('../lib/approvals');
 const SEED = require('../lib/seedscan');
 const KEYS = require('../lib/keyscan');
+const DELIV = require('../lib/delivery');
 const { watchWallet } = require('../lib/wallet-watch');
 const { vetAgent } = require('../lib/agent-vet');
 const L = require('../lib/ledger');
@@ -249,6 +250,13 @@ const TOOLS = [
   { name: 'till_key_exposure', description: 'WHAT KEY MATERIAL IS ON THIS DISK, AND WHAT STILL HOLDS AN OLD COPY OF IT? The companion to till_seed_exposure, and it exists because a real theft happened without the phrase ever being written down: the key was exfiltrated. The trap is that a secp256k1 private key is 64 hex characters and so is every SHA-256 hash, git object id and transaction hash in a saved response, so the value SHAPE carries almost no information. Two things do: STRUCTURE (a Web3 Secret Storage keystore has version 3 and a crypto member with ciphertext, kdf and mac — nothing else looks like that, and finding one is not an exposure but an encrypted wallet whose strength is its password) and THE LABEL (cleartext keys are named by what needs them, so PRIVATE_KEY matches and PRIVATE_KEY_HASH is rejected as a digest). RETAINED COPIES are what people miss: ROTATING A SECRET DOES NOT REMOVE IT FROM THE DISK, because editor history, session caches and backup folders keep snapshots of what the file used to say — on the machine this was built for, one .env holding three named keys had eighteen previous versions still readable, and the folder had been copied into a keep-across-the-reformat backup. Also reports browser wallet vaults by PRESENCE only, nothing opened or parsed, because that is how a key leaves a machine when it was never in a text file. Never outputs key material, not even a prefix: four bytes narrow a brute force. Never decrypts, never derives an address.',
     inputSchema: { type: 'object', properties: {
       paths: { type: 'array', items: { type: 'string' }, description: 'directories to scan; defaults to Documents, Desktop and Downloads' } }, required: [] } },
+  { name: 'till_verify_delivery', description: 'I CAN PROVE I PAID. CAN I PROVE I WAS SERVED? Every other check here runs before money moves; this is the question after, and it is the one nothing in this market answers. A payment is a fact on Base that anyone can re-check forever; the deliverable was a sentence in a message. So a buyer can prove it spent and cannot prove it received — and every settlement record in existence, including the ones this server writes, records the money and takes the goods on trust. The fix is a commitment, not an opinion: the seller publishes sha256(deliverable) BEFORE being paid, the buyer hashes what arrived and compares. That settles exactly two things no prose can fake — the deliverable EXISTED before the money (you cannot hash what you have not made, which kills "pay me and I will get to it") and the bytes were NOT SWAPPED for something cheaper once the funds cleared. FOUR states, and the last two are the point. `commitment_too_late`: the bytes match but the hash was published at or after payment, so it proves only that nobody edited it afterwards — a hash published after the funds clear can simply be the hash of whatever was eventually sent, which is the exact trick this catches, and calling it `served` would bless it. `unverifiable`: no commitment was made, which is the honest verdict for almost every agent transaction today — a buyer must know it never had the MEANS to check rather than believe it passed one. It proves NOTHING about quality: a committed hash of garbage verifies perfectly. Pure, offline, no network, no keys.',
+    inputSchema: { type: 'object', properties: {
+      commitmentHash: { type: 'string', description: '0x + sha256 the seller published BEFORE payment. Omit it and the answer is unverifiable, which is the truth.' },
+      received: { type: 'string', description: 'the bytes you actually received (or pass receivedHash instead if you hashed them yourself)' },
+      receivedHash: { type: 'string', description: '0x + sha256 of what you received, if you would rather not send the artifact' },
+      paidAt: { type: 'number', description: 'block or unix ms of the payment — needed for the strong claim' },
+      committedAt: { type: 'number', description: 'block or unix ms at which the commitment was recorded somewhere the seller cannot rewrite' } }, required: [] } },
 ];
 
 async function callTool(name, a = {}) {
@@ -410,6 +418,17 @@ async function callTool(name, a = {}) {
   if (name === 'till_seed_exposure') {
     const paths = Array.isArray(a.paths) && a.paths.length ? a.paths : SEED.defaultPaths();
     return SEED.scanPaths(paths, SEED.loadWordlist());
+  }
+  if (name === 'till_verify_delivery') {
+    // Either the artifact or its digest — the digest is the better habit, and on a hosted server the only
+    // defensible one: nothing here should hold someone's deliverable in order to compare a hash.
+    return DELIV.assessDelivery({
+      commitment: a.commitmentHash ? { deliverableHash: String(a.commitmentHash).toLowerCase() } : null,
+      received: a.received,
+      receivedHash: a.receivedHash,
+      paidAt: a.paidAt == null ? null : Number(a.paidAt),
+      committedAt: a.committedAt == null ? null : Number(a.committedAt),
+    });
   }
   if (name === 'till_key_exposure') {
     const paths = Array.isArray(a.paths) && a.paths.length ? a.paths : SEED.defaultPaths();
