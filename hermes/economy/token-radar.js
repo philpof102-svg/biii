@@ -301,6 +301,32 @@ async function currentLiquidity(addrs) {
     lines.push((w.v.verdict === 'high_risk' ? '⚠️ ' : '·  ') + w.sym + ' ' + w.addr.slice(0, 10) + '… (' + w.source + ', ' + usd(w.liq) +
       ') [' + w.v.verdict + '] — ' + w.v.reason + (w.v.flags.length > 1 ? ' (+' + (w.v.flags.length - 1) + ' more flag(s))' : ''));
   }
+  // THE CLEAN BAND — the strongest thing measured so far, and reported rather than encoded.
+  //
+  // Two conditions, each with an economic mechanism rather than just a correlation, explain almost every rug
+  // in 99 settled outcomes. Seeding under $15k makes a rug cheap: the operator recovers the stake for no
+  // effort. A funder that has bankrolled 20+ wallets is an industry, amortised over volume. They are
+  // independent — one is about cost, the other about structure — which is why they compose.
+  //
+  //   under $15k OR industrial funder : 55/65 = 85% rugged  (+27pts on a 58% base)
+  //   neither                         :  2/34 =  6%         (-52pts), and 0/15 where sibling data was confirmed
+  //
+  // It also dissolved a false regime. Launches above $40k looked dangerous at 70%, until 13 of those 14 rugs
+  // turned out to share one funder with 26-27 siblings. Excluding factories, big launches rug at 17% — SAFER
+  // than average. "Big is dangerous" was one operator wearing a market-wide costume.
+  //
+  // Not wired into the verdict: this is measured on the very data that produced it, and three confidently
+  // reasoned rules died to that exact mistake this session. It gets labelled and the scorecard will grade it
+  // forward. If it holds on tokens judged AFTER today, it is the first defensible green signal here.
+  for (const c of toJudge) {
+    const sib = db[c.addr].siblingCount;
+    const clean = c.liq >= 15000 && (sib === undefined || sib < INDUSTRIAL_FUNDER);
+    db[c.addr].cleanBand = clean;
+    if (clean) lines.push('🟢 ' + c.sym + ' ' + c.addr.slice(0, 10) + '… (' + usd(c.liq) +
+      ') sits in the band where almost nothing has rugged: seeded above $15k and no industrial funder found. ' +
+      '(6% observed, 2/34 — IN-SAMPLE, being graded forward. Not a verdict.)');
+  }
+
   for (const r of relaunches) {
     lines.push('♻️ ' + r.sym + ' ' + r.addr.slice(0, 10) + '… (' + usd(r.liq) + ') — this database already holds ' +
       r.ruggedCount + ' contract(s) under the name "' + r.sym + '" that rugged. Someone is relaunching a name that already died. ' +
