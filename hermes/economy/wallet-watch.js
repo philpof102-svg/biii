@@ -27,6 +27,7 @@ const ADDRESSES = (process.env.WALLET_WATCH ||
       alerts++;
       lines.push('  ' + (a.severity === 'high' ? '🚨' : a.severity === 'medium' ? '⚠️ ' : '· ') +
         ' ' + addr.slice(0, 10) + '… ' + a.what);
+      for (const n of (a.judgment || [])) lines.push('         · ' + n);
       lines.push('       ' + a.why);
     }
     // Blindness is reported every run, never swallowed: on a wallet monitor an empty alert list reads as
