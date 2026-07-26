@@ -31,6 +31,7 @@ const { whatMoved, readBridgeExit, followTron } = require('../lib/trace');
 const { assessRecoveryOffer } = require('../lib/recovery');
 const { vetApproach } = require('../lib/lure');
 const { checkApprovals } = require('../lib/approvals');
+const { watchWallet } = require('../lib/wallet-watch');
 const L = require('../lib/ledger');
 const X = require('../lib/export');
 const { meterUsage } = require('../lib/meter');
@@ -226,6 +227,12 @@ const TOOLS = [
       owner: { type: 'string', description: 'the wallet address to audit' },
       chain: { type: 'string', description: 'base (default) | ethereum' },
       fromBlock: { type: 'number', description: 'optional: scan from this block (default 0)' } }, required: ['owner'] } },
+
+  { name: 'till_watch_wallet', description: 'WHAT CHANGED AROUND THIS WALLET SINCE WE LAST LOOKED? The other tools answer at a point in time; this is what turns them into a guard, because it REMEMBERS and therefore distinguishes a new door from an old one. Three unlimited approvals granted last year are a standing condition; a fourth appearing this morning is an event, and only the second deserves to interrupt anyone — a monitor that repeats its standing conditions every run teaches its reader to close it, and a closed monitor is worth nothing. Detects new live allowances and first-time counterparties, using TRANSACTIONS rather than event logs (an ERC-20 Transfer log names whoever the emitting contract chose, so it cannot establish that this wallet sent anything). Reports its own blind spots every run: on a wallet monitor an empty alert list reads as "you are safe", so a check that could not complete is stated, never swallowed. First run is an inventory, not a set of events. Read-only: holds no key, cannot revoke or sign.',
+    inputSchema: { type: 'object', properties: {
+      owner: { type: 'string', description: 'the wallet address to watch' },
+      chain: { type: 'string', description: 'base (default) | ethereum' },
+      persist: { type: 'boolean', description: 'default true — save state so the NEXT call can diff against it. Pass false for a one-off look that does not become the baseline.' } }, required: ['owner'] } },
 ];
 
 async function callTool(name, a = {}) {
@@ -383,6 +390,10 @@ async function callTool(name, a = {}) {
       return await followTron(a.address, { maxHops: a.maxHops || 3 });
     }
     return { error: 'mode must be one of: moved, bridge, tron' };
+  }
+  if (name === 'till_watch_wallet') {
+    const r = await watchWallet(a.chain || 'base', a.owner, { persist: a.persist !== false });
+    return r.ok ? r : { error: r.reason };
   }
   if (name === 'till_open_approvals') {
     const r = await checkApprovals(a.chain || 'base', a.owner, a.fromBlock ? { fromBlock: a.fromBlock } : {});

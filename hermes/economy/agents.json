@@ -81,6 +81,15 @@
       "schedule": "every 1h",
       "cost": "free ($0, no_agent — keyless public APIs)",
       "enabled": true
+    },
+    {
+      "name": "wallet-watch",
+      "role": "The continuous half of the wallet guard. Diffs each watched address against the last run and reports ONLY what changed — a new allowance appearing, a counterparty never seen before. A standing condition is printed once, never re-alerted, because a monitor that repeats itself gets closed. Reports its own blind spots every run: on a wallet monitor an empty alert list reads as \"you are safe\", so a check that could not complete has to be visible. Read-only, holds no key, cannot revoke or sign.",
+      "kind": "script",
+      "script": "wallet-watch.sh",
+      "schedule": "every 30m",
+      "cost": "free ($0, no_agent — keyless public APIs)",
+      "enabled": true
     }
   ]
 }
