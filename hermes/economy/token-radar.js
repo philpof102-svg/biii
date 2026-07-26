@@ -387,6 +387,32 @@ async function currentLiquidity(addrs) {
     if (!f || !f.ok || !f.funder) continue;
     db[c.addr].deployer = f.deployer; db[c.addr].funder = f.funder;
     db[c.addr].siblingCount = f.siblingCount; db[c.addr].freshDeployer = f.freshDeployer;
+
+    /* KEEP THE SHARP NUMBERS, NOT ONLY THE BLUNT ONE.
+     *
+     * Until 2026-07-26 this line stored `siblingCount` and nothing else from the trace, and `siblingCount`
+     * turns out to be the WORST of the numbers available:
+     *
+     *   `traceFeeder` reads ONE page from the explorer, which returns at most 50 transactions. So a stored
+     *   50 does not mean "fifty wallets" — it means "the page was full and we stopped counting". Measured
+     *   across the database: 56 of 113 traced tokens sit at exactly 50. Our most common value for our most
+     *   valuable signal is the instrument's ceiling, not a measurement.
+     *
+     * The trace already computes better ones and they were being discarded at the door:
+     *   identicalAmountSiblings — wallets paid the SAME amount. That is the scripted-factory signature, and
+     *                             it is specific where a raw count is merely large.
+     *   morePages               — whether the count is censored at all, which is the difference between
+     *                             "exactly this many" and "at least this many".
+     *   fundedEth               — the size of the float behind this particular launch.
+     *
+     * This matters more than a normal missing field: the scorecard database is the asset here, it only
+     * accrues by having watched, and history CANNOT be backfilled because the explorer's pages move. Every
+     * hour these were dropped is an hour of resolution lost for good. */
+    db[c.addr].identicalAmountSiblings = f.identicalAmountSiblings;
+    db[c.addr].identicalAmountEth = f.identicalAmount;
+    db[c.addr].fundedEth = f.fundedEth;
+    // `siblingCount` is a FLOOR, not a count, whenever the funder's history did not fit on one page.
+    db[c.addr].siblingCountCensored = !!f.morePages || f.siblingCount >= 50;
     if (f.identicalAmountSiblings >= SIBLING_ALERT || f.siblingCount >= SIBLING_ALERT) clusters.push({ ...c, f });
 
     // The one rule this session that survived its own backtest. Measured over 62 tokens with funding data:
@@ -396,10 +422,20 @@ async function currentLiquidity(addrs) {
     // share one deployer with 3 siblings each and not one of them died.
     // Deliberately high_risk and not rug_ready. rug_ready means a power someone can fire; this means the
     // token shares fate with an industrial operation, which is serious without being proof.
+    /* THE THRESHOLD, checked 2026-07-26 rather than assumed.
+     *
+     * Sweeping thresholds and keeping the best is how two rules died here, so the distribution was looked at
+     * FIRST. It is sharply bimodal: 1×15, 3×15, 6×2, 11×1 — then nothing at all — then 26×22, 27×2, 50×56.
+     * The threshold of 20 sits in an entirely empty gap, so any value from 12 to 26 gives an identical
+     * answer. This one cannot be overfitted because there is nothing to fit. */
     if ((f.siblingCount || 0) >= INDUSTRIAL_FUNDER && db[c.addr].firstVerdict !== 'rug_ready') {
+      const censored = !!f.morePages || f.siblingCount >= 50;
       db[c.addr].firstVerdict = 'high_risk';
-      db[c.addr].firstReason = 'its funder has bankrolled ' + f.siblingCount +
-        ' wallets — industrial scale, and 83% of tokens behind such a funder have rugged in what we have watched';
+      // "50" is the page ceiling, not a count — saying "50 wallets" understates it as a fact and overstates
+      // it as a measurement. At least N is the true claim, and it is the stronger one anyway.
+      db[c.addr].firstReason = 'its funder has bankrolled ' + (censored ? 'at least ' : '') + f.siblingCount +
+        ' wallets' + (censored ? ' (its history did not fit on one page, so that is a floor)' : '') +
+        ' — industrial scale, and 83% of tokens behind such a funder have rugged in what we have watched';
       db[c.addr].industrialFunder = f.siblingCount;
     }
   }
