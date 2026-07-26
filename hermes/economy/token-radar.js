@@ -56,6 +56,20 @@ const INDUSTRIAL_FUNDER = 20;    // wallets bankrolled by one funder before it r
 const UNANSWERED = [];
 
 /**
+ * Notes raised DURING the harvest, drained into the digest at report time.
+ *
+ * This exists because of a crash, not a preference. The harvest used to push straight onto the digest's
+ * `lines`, which is declared inside the run closure and is therefore invisible from a module-level function.
+ * The reference sat there harmlessly for weeks: it lives in the branch that skips a pool claiming large
+ * liquidity on almost no volume, and no such pool had ever appeared. The first one that did took the whole
+ * radar down with a ReferenceError — a guard written to skip something gracefully instead killed the run.
+ *
+ * Two things worth keeping from that: a latent crash in a rare branch is invisible to every test that only
+ * exercises the common path, and the blast radius of a *logging* line was an entire cron.
+ */
+const HARVEST_NOTES = [];
+
+/**
  * getJSON — null means "this call did not answer", and nothing else.
  *
  * The previous version never looked at `res.statusCode`. A 429 body is `{"errors":[…]}` — perfectly valid JSON —
@@ -118,7 +132,7 @@ async function harvestNewPools() {
     // large with a real market moves millions, so the ratio is the check, and it costs nothing.
     const vol24 = parseFloat((a.volume_usd && a.volume_usd.h24) || 0) || 0;
     if (liq > 100000 && vol24 / liq < 0.001) {
-      lines.push('💭 ' + (String(a.name || '?').split('/')[0].trim()) + ' claims ' + usd(liq) +
+      HARVEST_NOTES.push('💭 ' + (String(a.name || '?').split('/')[0].trim()) + ' claims ' + usd(liq) +
         ' of liquidity on ' + usd(vol24) + ' of 24h volume — nominal, not dollars. Skipped.');
       continue;
     }
@@ -300,8 +314,38 @@ async function currentLiquidity(addrs) {
     db[c.addr].symbolVerdict = m.status;
     if (m.status === 'impersonation') {
       impostors.push({ ...c, canonical: m.canonical });
-      db[c.addr].firstVerdict = 'rug_ready';   // wearing another token's name IS the fireable trap here
-      db[c.addr].firstReason = 'the symbol "' + c.sym + '" already has a dominant contract elsewhere — this one is not it';
+      /* IDENTITY IS NOT RISK — and this rule used to conflate them, expensively.
+       *
+       * It set `rug_ready`, our loudest verdict, on one fact: the symbol has a bigger contract elsewhere.
+       * Measured 2026-07-26 against the outcomes it had already produced:
+       *
+       *   base rate, resolved tokens ............. 81%  (86 rugged / 20 survived)
+       *   impersonation, resolved ................ 80%  (n=10)   -> lift  -1 point
+       *   by distinct SYMBOL (5 HBULL relaunches are one event, not five)
+       *                          ................. 83%  (n=6)    -> lift  +2 points
+       *   on the cases the FUNDER signal did not already catch
+       *                          ................. 67%  (4 catches, 2 false alarms, n=6)  -> lift -14 points
+       *
+       * So: no lift overall, WORSE than random on its own contribution, half its apparent wins already
+       * belonged to the industrial-funder rule — and it produced both of our confirmed false alarms
+       * (DINO and SOAS, still alive past the maturity window). It carried 13 of 13 `rug_ready` verdicts,
+       * which means our top risk tier rested entirely on a rule that predicts nothing.
+       *
+       * The finding is not that the rule is worthless. Wearing another token's name is a real, checkable
+       * fact and a buyer is genuinely being deceived by it. It is simply an answer to a DIFFERENT question:
+       * "is this the token you think it is?" — identity — not "will this collapse?" — risk. Same mistake as
+       * merging delivery into `verified` on the payment side, and it fails the same way: a serious signal on
+       * one axis inflates a number on another axis that it cannot support.
+       *
+       * So the identity verdict now lives on its own field, reported loudly, and the risk verdict is left to
+       * the risk signals. `rug_ready` is NOT reassigned to the funder rule to fill the gap: that rule scores
+       * 16/16 in-sample, and promoting a tier by looking at the outcomes it will be graded against is the
+       * exact error that killed two escalation rules here. The tier stays empty and the scorecard says so. */
+      db[c.addr].impersonates = m.canonical && m.canonical.address ? m.canonical.address : true;
+      db[c.addr].identityWarning = 'the symbol "' + c.sym + '" already has a dominant contract elsewhere — '
+        + 'this one is not it. That is an identity warning, not a rug prediction: measured over our own '
+        + 'outcomes, impersonators rug at the population rate, so treat this as "you may be buying the wrong '
+        + 'token", not as "this one is about to collapse".';
     }
   }
 
@@ -363,6 +407,10 @@ async function currentLiquidity(addrs) {
         ' call(s) did NOT answer — this is not a clean sweep, it is a partial one.'
       : '✓ token-radar: ' + toJudge.length + ' fresh ' + CHAIN + ' launches judged, none with a fireable rug power.';
   console.log(head);
+
+  // Notes raised during the harvest — pools skipped for claiming liquidity they cannot back with volume.
+  // They belong in the digest: a pool silently dropped looks identical to a pool that never existed.
+  for (const n of HARVEST_NOTES) lines.push(n);
 
   if (UNANSWERED.length) {
     const parSource = {};
@@ -432,7 +480,9 @@ async function currentLiquidity(addrs) {
   for (const im of impostors) {
     lines.push('🎭 ' + im.sym + ' ' + im.addr.slice(0, 10) + '… (' + usd(im.liq) + ') — NOT the dominant contract for its own symbol.' +
       (im.canonical ? ' The one holding the name is ' + im.canonical.address.slice(0, 12) + '… with ' + usd(im.canonical.liquidityUsd) + '.' : '') +
-      ' A clone borrowing a name is a trap the contract itself will never reveal.');
+      ' IDENTITY warning, not a risk verdict: measured over our own outcomes, impersonators rug at the ' +
+      'population rate (80% vs 81% base; 67% on the cases the funder signal did not already catch). You may ' +
+      'be buying the wrong token — that is the harm here, and it is real on its own.');
   }
   for (const c of clusters) {
     lines.push('🕸️ ' + c.sym + ' shares a paymaster: deployer ' + c.f.deployer.slice(0, 10) + '… funded by ' +

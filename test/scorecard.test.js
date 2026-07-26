@@ -113,6 +113,25 @@ t('a clean verdict that rugs is counted as an outright miss', () => {
   assert.equal(c.cleanVerdictsEmitted, 1);
 });
 
+console.log('\nthe top tier discloses whether anything can still reach it:');
+t('rugReadyVerdictsEmitted counts them, so an unreachable tier cannot hide', () => {
+  const c = scoreCalls([rug('rug_ready', 5, 1), rug('high_risk', 5, 1), rug('caution', 5, 1)], NOW);
+  assert.equal(c.rugReadyVerdictsEmitted, 1);
+});
+t('a ledger whose top tier is empty reports 0 rather than omitting the field', () => {
+  // After the impersonation rule moved to the identity axis, nothing new reaches rug_ready. A hierarchy
+  // whose top level is silently unreachable misleads by its shape alone — same reason cleanVerdictsEmitted
+  // travels with missedOutright.
+  const c = scoreCalls([rug('high_risk', 5, 1), live('high_risk', 0.2)], NOW);
+  assert.equal(c.rugReadyVerdictsEmitted, 0);
+  assert.ok('rugReadyVerdictsEmitted' in c, 'the field must be present at zero, not absent');
+});
+t('historical rug_ready calls still count as strong calls — the ledger is not rewritten', () => {
+  const c = scoreCalls([rug('rug_ready', 5, 1)], NOW);
+  assert.equal(c.strongCallsRight, 1, 'a call that was made is graded, however the rule was later changed');
+  assert.equal(c.ofWhichStrong, 1);
+});
+
 console.log('\nthe rest of the ledger still adds up:');
 t('a caution that rugs is a warning, at the strength it was given', () => {
   const c = scoreCalls([rug('caution', 5, 1), rug('rug_ready', 5, 1)], NOW);
