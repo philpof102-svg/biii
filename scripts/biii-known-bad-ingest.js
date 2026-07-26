@@ -193,7 +193,39 @@ if (require.main === module) {
     if (!data.addresses.length) { console.error('[known-bad] every source failed — leaving the existing file intact'); process.exit(1); }
     const outPath = includeGpl && gplOut ? path.resolve(gplOut) : path.join(__dirname, '..', 'data', 'known-bad.json');
     const rejected = data._rejected; delete data._rejected;
+
+    // What CHANGED, before overwriting. This ingest REPLACES the file rather than accumulating, and that is
+    // the right call: when an upstream removes an address because it was a false positive — a Binance deposit,
+    // an AMM router, the exact mislabels this filter was built to survive — a monotonic floor would keep
+    // blocking it forever. Replacement is correct; doing it SILENTLY is not. An address that blocked on Monday
+    // and quietly stops blocking on Friday is a fail-open with no evidence it happened, so the delta is
+    // printed on every run and losses are called out separately from gains.
+    // Measured 2026-07-26: 811 -> 811, nothing gained, nothing lost. The risk is structural, not current —
+    // which is exactly why it needs a witness rather than a fix.
+    let delta = null;
+    try {
+      if (fs.existsSync(outPath)) {
+        const prev = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+        const before = new Set((prev.addresses || []).map((a) => String(a).toLowerCase()));
+        const after = new Set(data.addresses.map((a) => String(a).toLowerCase()));
+        const lost = [...before].filter((a) => !after.has(a));
+        const gained = [...after].filter((a) => !before.has(a));
+        delta = { was: before.size, lost, gained };
+      }
+    } catch { /* unreadable previous file: report no delta rather than a wrong one */ }
+
     fs.writeFileSync(outPath, JSON.stringify(data, null, 2) + '\n');
     console.log(`[known-bad] wrote ${data.addresses.length} addresses to ${path.relative(process.cwd(), outPath)} (asOf ${data.asOf}, ${rejected} rejected)`);
+    if (!delta) {
+      console.log('[known-bad] no previous file at that path, so this run has no delta to report');
+    } else {
+      console.log(`[known-bad] delta vs previous: ${delta.was} -> ${data.addresses.length}  (+${delta.gained.length} / -${delta.lost.length})`);
+      if (delta.lost.length) {
+        // Loud on purpose. These addresses used to be blocked by this floor and no longer are.
+        console.log(`[known-bad] ${delta.lost.length} address(es) STOPPED being known-bad — upstream dropped them. Verify before shipping:`);
+        for (const a of delta.lost.slice(0, 25)) console.log(`[known-bad]   LOST ${a}`);
+        if (delta.lost.length > 25) console.log(`[known-bad]   … and ${delta.lost.length - 25} more`);
+      }
+    }
   })().catch((e) => { console.error('[known-bad] fatal:', e.message); process.exit(1); });
 }
