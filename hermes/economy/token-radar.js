@@ -66,6 +66,16 @@ async function harvestNewPools() {
     const id = ((rel.base_token || {}).data || {}).id || '';       // e.g. "base_0xabc..."
     const addr = id.split('_')[1];
     if (!addr || liq < MIN_LIQ_WATCH) continue;
+    // Liquidity in USD is only meaningful when the other side of the pool has a real market. OSDC entered
+    // this database claiming $496,940,262 -- it was paired with ZORA and traded $55.40 in 24 hours, a
+    // turnover of 0.00001%. The aggregator was not lying: it priced one thin token in another. A pool that
+    // large with a real market moves millions, so the ratio is the check, and it costs nothing.
+    const vol24 = parseFloat((a.volume_usd && a.volume_usd.h24) || 0) || 0;
+    if (liq > 100000 && vol24 / liq < 0.001) {
+      lines.push('💭 ' + (String(a.name || '?').split('/')[0].trim()) + ' claims ' + usd(liq) +
+        ' of liquidity on ' + usd(vol24) + ' of 24h volume — nominal, not dollars. Skipped.');
+      continue;
+    }
     // A pool whose base token the aggregator labels "[invalid]" is not a parsing failure on our side — it
     // means the symbol could not be decoded at all, which happens when a name is deliberately built from
     // control characters or invisible glyphs to slip past text filters. Carrying that through as if it were
@@ -165,7 +175,18 @@ async function currentLiquidity(addrs) {
 
   // ---------- 2. JUDGE --------------------------------------------------------------------------
   const verdicts = toJudge.length ? await scanRug(CHAIN, toJudge.map((c) => c.addr)) : {};
-  const armed = [], survivors = [], watch = [];
+  const armed = [], survivors = [], watch = [], relaunches = [];
+
+  // A symbol already in this database, whose earlier instance died, is the strongest signal found so far:
+  // 9 of 12 such tokens rugged against a 52% rate for first appearances. Deliberately NOT wired into the
+  // verdict. Three rules were added on similar reasoning last night and all three were killed by replay, so
+  // this one gets REPORTED and measured first. The number is also honest about its own weakness — the 84%
+  // that first appeared in the data counted first appearances too, which are invisible at judgment time.
+  const priorBySym = {};
+  for (const t of Object.values(db)) {
+    if (!t.sym) continue;
+    (priorBySym[t.sym] = priorBySym[t.sym] || []).push(t);
+  }
   for (const c of toJudge) {
     const v = verdicts[c.addr] || { verdict: 'unknown', reason: 'no verdict', armed: [], flags: [] };
     db[c.addr] = { sym: c.sym, chain: CHAIN, source: c.source, firstSeen: now, lastSeen: now,
@@ -176,6 +197,12 @@ async function currentLiquidity(addrs) {
     else if (v.verdict === 'clean') survivors.push({ ...c, v });
     else watch.push({ ...c, v });
     if (c.undecodable) lines.push('⚠️ ' + c.addr.slice(0, 10) + '… (' + usd(c.liq) + ') has NO decodable symbol — a name built to defeat text filters, which is a choice, not an accident.');
+    const prior = (priorBySym[c.sym] || []).filter((p) => p.firstSeen && p.firstSeen < now);
+    const priorRugged = prior.filter((p) => p.outcome === 'rugged');
+    if (priorRugged.length) {
+      relaunches.push({ ...c, priorCount: prior.length, ruggedCount: priorRugged.length });
+      db[c.addr].relaunchOfRugged = priorRugged.length;
+    }
   }
 
   // ---------- IS THIS TOKEN EVEN CLAIMING TO BE ITSELF? -----------------------------------------
@@ -257,6 +284,11 @@ async function currentLiquidity(addrs) {
   for (const w of watch) {
     lines.push((w.v.verdict === 'high_risk' ? '⚠️ ' : '·  ') + w.sym + ' ' + w.addr.slice(0, 10) + '… (' + w.source + ', ' + usd(w.liq) +
       ') [' + w.v.verdict + '] — ' + w.v.reason + (w.v.flags.length > 1 ? ' (+' + (w.v.flags.length - 1) + ' more flag(s))' : ''));
+  }
+  for (const r of relaunches) {
+    lines.push('♻️ ' + r.sym + ' ' + r.addr.slice(0, 10) + '… (' + usd(r.liq) + ') — this database already holds ' +
+      r.ruggedCount + ' contract(s) under the name "' + r.sym + '" that rugged. Someone is relaunching a name that already died. ' +
+      '(Observed rate for this pattern: 9/12. NOT wired into the verdict — being measured first.)');
   }
   for (const im of impostors) {
     lines.push('🎭 ' + im.sym + ' ' + im.addr.slice(0, 10) + '… (' + usd(im.liq) + ') — NOT the dominant contract for its own symbol.' +

@@ -1,14 +1,14 @@
 {
-  "updatedAt": "2026-07-25T21:28:02.058Z",
-  "tokensTracked": 16,
-  "rugsObserved": 8,
-  "warnedBeforeTheRug": 7,
-  "ofWhichStrong": 0,
-  "ofWhichCautionOnly": 7,
+  "updatedAt": "2026-07-26T08:18:50.798Z",
+  "tokensTracked": 85,
+  "rugsObserved": 49,
+  "warnedBeforeTheRug": 48,
+  "ofWhichStrong": 4,
+  "ofWhichCautionOnly": 44,
   "abstained": 1,
   "missedOutright": 0,
-  "warnRate": 0.88,
-  "strongRate": 0,
-  "flaggedButStillAlive": 0,
+  "warnRate": 0.98,
+  "strongRate": 0.08,
+  "flaggedButStillAlive": 3,
   "note": "warnRate = share of observed rugs carrying ANY warning at first sight; strongRate = share we called rug_ready or high_risk. Both are published because they say different things: a caution that rugs means the warning was there but too quiet to act on. abstained = rugs we had called unknown, which is honest but useless to a buyer. missedOutright = rugs we had called clean, the only truly damaging error. flaggedButStillAlive is our false-alarm count, published on purpose: a scanner that only reports its wins is marketing, not evidence."
 }
