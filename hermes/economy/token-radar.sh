@@ -25,13 +25,26 @@ if [ "$radar_status" -ne 0 ]; then
 fi
 
 echo ""
+# COMMIT ONLY. `--push` is deliberately absent, and that is a measurement rather than a preference.
+#
+# This cron runs under WSL. Windows git authenticates through the Windows Credential Manager, which WSL cannot
+# see, and WSL git here has no credential helper at all (`git config --get credential.helper` is empty). A push
+# from this side does not fail — it HANGS, waiting for a username on a terminal that does not exist, until
+# something kills it. Measured: `git push -v` printed "Pushing to …" and then nothing for 90 seconds. That is
+# worse than an error, because an hourly job would burn the wait every time and still never publish.
+#
+# So the data is recorded locally, where it cannot be lost, and reaching the remote stays a deliberate step.
 # The script refuses on its own if anything outside the data paths changed, if something is already staged, or
-# on a detached head — so an unattended run cannot sweep code along with the numbers. A push failure means the
-# remote moved; the commit is still safe locally and a human rebases. Reported, never retried in a loop.
-node scripts/commit-radar-data.js --commit --push
+# on a detached head — an unattended run cannot sweep code along with the numbers.
+node scripts/commit-radar-data.js --commit
 commit_status=$?
-if [ "$commit_status" -eq 2 ]; then
-  echo "   (the commit is recorded locally; only the push failed — rebase and push by hand)"
+if [ "$commit_status" -eq 0 ]; then
+  unpushed=$(git log --oneline @{u}..HEAD 2>/dev/null | wc -l | tr -d ' ')
+  if [ "${unpushed:-0}" -gt 0 ]; then
+    echo "   ↑ $unpushed commit(s) waiting to be pushed. The hosted node and the npm package only see PUSHED"
+    echo "     data, so freshness stops here until someone runs \`git push\` from Windows (WSL has no"
+    echo "     credential helper). One-time fix: give WSL git a credential store with a GitHub PAT."
+  fi
 elif [ "$commit_status" -ne 0 ]; then
   echo "   (data left uncommitted, reason above — the radar itself ran fine)"
 fi
