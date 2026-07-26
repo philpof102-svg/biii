@@ -28,6 +28,7 @@ const https = require('node:https');
 const { scanRug } = require('../../lib/rugsignals');
 const { traceFeeder, SIBLING_ALERT } = require('../../lib/feeder');
 const { vetMeme } = require('../../lib/meme');
+const { classifyB20 } = require('../../lib/b20');
 
 const DB_DIR = path.join(__dirname, '..', '..', 'data', 'token-radar');
 const TOKENS = path.join(DB_DIR, 'tokens.json');          // per-token state (the memory)
@@ -221,6 +222,41 @@ async function currentLiquidity(addrs) {
   const verdicts = toJudge.length ? await scanRug(CHAIN, toJudge.map((c) => c.addr)) : {};
   const armed = [], survivors = [], watch = [], relaunches = [];
 
+  // B20 tokens are a STRUCTURAL blind spot for an ERC-20 scanner, and the numbers say so rather than a hunch:
+  // in this database 88% of 0xb200-prefixed tokens came back `unknown` against 18% for everything else. That is
+  // mechanical, not bad luck. A native B20 carries ONE byte of EVM code because its logic is a precompile, so
+  // the curated security index has literally nothing to analyse and must abstain.
+  //
+  // The perverse part is that we abstain on the class whose danger we know EXACTLY. A native B20's issuer can
+  // freeze and burn any holder's balance at the standard level. That is not missing information — it is a
+  // certainty, disclosed by the standard, and reporting "not enough security data" about it is the worst answer
+  // available: it reads quieter than the truth. And Base is migrating to B20, so this share only grows.
+  //
+  // So the prefix is checked directly. It is a cheap prefilter (one eth_getCode per matching address, and only
+  // addresses starting 0xb200 match at all), and it splits into two very different findings:
+  //   native_b20      -> a FLAG stating the issuer power. Never silently escalated to rug_ready: the power is
+  //                      inherent to the standard and disclosed, so calling it a rug would flag every compliant
+  //                      asset on the chain and get this muted.
+  //   prefix_impostor -> ARMED. An ordinary ERC-20 that bought a vanity address to wear the compliant standard's
+  //                      prefix is impersonating it, and impersonation is the fireable trap here.
+  const b20Notes = [];
+  for (const c of toJudge) {
+    if (!/^0xb200/i.test(c.addr)) continue;
+    let b; try { b = await classifyB20(CHAIN, c.addr); } catch { continue; }
+    const v = verdicts[c.addr];
+    if (b.verdict === 'prefix_impostor') {
+      b20Notes.push({ c, kind: 'impostor', b });
+      if (v) { v.verdict = 'rug_ready'; (v.armed = v.armed || []).unshift('wears the B20 address prefix (0xb200…) while carrying ' + b.codeBytes + ' bytes of ordinary ERC-20 code — it is not a B20, it bought an address that looks like one'); }
+    } else if (b.verdict === 'native_b20') {
+      b20Notes.push({ c, kind: 'native', b });
+      if (v) {
+        (v.flags = v.flags || []).push('native B20: its ISSUER can freeze and burn any holder\'s balance at the standard level — a power no ERC-20 scanner can see');
+        // An abstention is no longer honest once we know this much about the token.
+        if (v.verdict === 'unknown') { v.verdict = 'caution'; v.reason = 'no ERC-20 security record exists because this is a native B20 (' + b.codeBytes + ' byte of code, logic in a precompile) — but its issuer holds standard-level freeze-and-burn over holders, which is a certainty rather than a gap'; }
+      }
+    }
+  }
+
   // A symbol already in this database, whose earlier instance died, is the strongest signal found so far:
   // 9 of 12 such tokens rugged against a 52% rate for first appearances. Deliberately NOT wired into the
   // verdict. Three rules were added on similar reasoning last night and all three were killed by replay, so
@@ -347,6 +383,18 @@ async function currentLiquidity(addrs) {
     lines.push('⚠️ ' + UNANSWERED.length + ' call(s) went unanswered this run, so coverage is incomplete:');
     for (const [k, n] of Object.entries(parSource)) lines.push('   · ' + n + '× ' + k);
     lines.push('   A 429 here means the harvest was throttled, NOT that the market was quiet. Judge the counts below accordingly.');
+  }
+
+  // Reported before the generic verdict list, because a B20 finding is the only thing here an ERC-20 scanner
+  // structurally cannot produce — and it is the half of the market this whole tool was blind to.
+  if (b20Notes.length) {
+    const nat = b20Notes.filter((n) => n.kind === 'native');
+    const imp = b20Notes.filter((n) => n.kind === 'impostor');
+    for (const n of imp) lines.push('🎭 ' + n.c.sym + ' ' + n.c.addr.slice(0, 12) + '… wears the B20 prefix with ' +
+      n.b.codeBytes + ' bytes of ordinary ERC-20 code — it is NOT a B20, it bought an address that looks like one.');
+    if (nat.length) lines.push('🏛️ ' + nat.length + ' native B20(s): ' + nat.map((n) => n.c.sym).join(' · ') +
+      ' — no ERC-20 security record exists for these by construction (logic is a precompile), and their ISSUER ' +
+      'holds standard-level freeze-and-burn over any holder. That is a certainty, not a data gap.');
   }
 
   for (const a of armed) lines.push('🚩 ' + a.sym + ' ' + a.addr.slice(0, 10) + '… (' + a.source + ', ' + usd(a.liq) + ') — ' + a.v.armed[0]);
