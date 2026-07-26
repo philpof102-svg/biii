@@ -148,10 +148,38 @@ async function harvestNewPools() {
   return out;
 }
 
-/** What someone is PAYING to promote right now — the paid-impersonation surface. */
+/**
+ * What someone is PAYING to promote right now — the paid-impersonation surface.
+ *
+ * This is also the only HUMAN PREDICTION WITH A PRICE that we harvest: a boost is somebody spending real
+ * money on the belief that a token deserves attention. That makes an empty result worth distinguishing
+ * carefully, and it was not distinguished at all until 2026-07-26.
+ *
+ * Measured that day, across both boost endpoints, 60 entries: solana 37, robinhood 22, stable 1, BASE 0.
+ * The feed is alive and busy — it simply carries nothing for our chain. So the filter below returned an
+ * empty list every run, and an empty list read exactly like "nobody is boosting on Base" when it actually
+ * meant "this feed does not cover Base." 195 of 195 tracked tokens came from new_pool, and nothing said why.
+ *
+ * Silence now gets a reason. Three outcomes, three different sentences — because "the call failed",
+ * "the feed has no rows for us" and "there genuinely are none" are three different facts and only the last
+ * one is a finding.
+ */
 async function harvestBoosts() {
   const j = await getJSON('https://api.dexscreener.com/token-boosts/latest/v1');
-  const picks = (Array.isArray(j) ? j : []).filter((b) => b.chainId === CHAIN).slice(0, 10);
+  if (j === null) {
+    HARVEST_NOTES.push('📢 boosts: the feed did not answer — the paid-promotion surface was NOT checked this run.');
+    return [];
+  }
+  const all = Array.isArray(j) ? j : [];
+  const picks = all.filter((b) => b.chainId === CHAIN).slice(0, 10);
+  if (!picks.length) {
+    const chains = {};
+    for (const b of all) chains[b.chainId] = (chains[b.chainId] || 0) + 1;
+    const seen = Object.entries(chains).sort((a, b) => b[1] - a[1]).map(([c, n]) => c + '×' + n).join(', ');
+    HARVEST_NOTES.push('📢 boosts: ' + all.length + ' entr' + (all.length === 1 ? 'y' : 'ies') + ' returned, NONE on ' +
+      CHAIN + (seen ? ' (' + seen + ')' : '') + '. That is a coverage gap in the feed, not evidence that ' +
+      'nobody is paying to promote here — the only human-priced signal we harvest is blind on this chain.');
+  }
   const out = [];
   for (const b of picks) {
     const t = await getJSON('https://api.dexscreener.com/latest/dex/tokens/' + b.tokenAddress);

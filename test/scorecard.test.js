@@ -44,10 +44,36 @@ t('BIAS: a high_risk that survives costs exactly what a high_risk that rugs earn
 });
 
 console.log('\nthe maturity window is DERIVED from the data, never chosen:');
-t('it is the slowest rug observed, rounded up', () => {
+t('it comes from the rug-lifetime distribution, rounded up', () => {
   const c = scoreCalls([rug('rug_ready', 40, 1), rug('rug_ready', 40, 6.2), rug('caution', 40, 3)], NOW);
-  assert.equal(c.maturityWindowHours, 7, 'slowest rug was 6.2h -> window 7h');
-  assert.match(c.maturityWindowBasis, /6\.2h/);
+  assert.equal(c.maturityWindowHours, 7);
+  assert.match(c.maturityWindowBasis, /percentile/i);
+});
+t('BIAS: ONE slow rug must not widen the window enough to erase a false alarm', () => {
+  // The defect this replaced, reproduced exactly. A flagged token survives 18h and is a resolved false
+  // alarm. Then a single token rugs at 26h. Under a max-based window that outlier pushed the window past
+  // 18h, the false alarm became "still open", and precision rose from 0.93 to 1.00 with no call improving.
+  const many = [];
+  for (let i = 0; i < 20; i++) many.push(rug('high_risk', 40, 1));   // a normal population: rugs land in ~1h
+  const survivor = live('rug_ready', 18);
+  const before = scoreCalls(many.concat([survivor]), NOW);
+  assert.equal(before.strongCallsWrong, 1, 'the 18h survivor is a resolved false alarm');
+
+  const after = scoreCalls(many.concat([survivor, rug('caution', 40, 26)]), NOW);
+  assert.equal(after.strongCallsWrong, 1, 'one 26h outlier must NOT reclassify it as open');
+  assert.ok(after.maturityWindowHours <= 3,
+    'window moved to ' + after.maturityWindowHours + 'h — a quantile should barely notice one outlier');
+  assert.ok(after.strongPrecisionResolved <= before.strongPrecisionResolved,
+    'precision must not RISE because a slow rug appeared elsewhere');
+});
+t('the cost of the window is published, not hidden', () => {
+  const rows = [];
+  for (let i = 0; i < 20; i++) rows.push(rug('high_risk', 40, 1));
+  rows.push(rug('caution', 40, 26));
+  const c = scoreCalls(rows, NOW);
+  assert.ok(c.beyondWindowRugs >= 1, 'a rug landing past the window has to be counted');
+  assert.equal(c.slowestRugHours, 26, 'the maximum is still reported — it just no longer sets the window');
+  assert.match(c.maturityWindowBasis, /slow catches/i);
 });
 t('with no rug observed there is no window, and nothing may be called a false alarm', () => {
   const c = scoreCalls([live('rug_ready', 500)], NOW);
