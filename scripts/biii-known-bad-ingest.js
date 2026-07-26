@@ -151,6 +151,44 @@ function buildKnownBad(pulls, { asOf, sources }) {
   };
 }
 
+/**
+ * OWN_FINDINGS — addresses THIS project proved itself, and the only source here with no network and no URL.
+ *
+ * Every other source is somebody else's list. This one is the reason a local floor beats a copy of third-party
+ * feeds: on the drainer below, Blockscout returns `is_scam: false` to this day. The explorer does not know. We
+ * do, because we traced it.
+ *
+ * It lives in code rather than being hand-added to data/known-bad.json for a specific reason: that file is
+ * REPLACED on every ingest, never merged, so a hand-edit would be silently erased the next time anyone ran the
+ * script. A finding that disappears on the next run is not in the floor.
+ *
+ * The bar for adding a row is deliberately high, and it is the same bar this codebase applies everywhere:
+ *   - proven by a TRANSACTION whose `tx.from` is the claimed sender, never by an event log;
+ *   - the tx hash recorded, so anyone can refute it;
+ *   - structure only. An address that RECEIVED stolen funds is what is recorded. Who controls it is not stated.
+ *
+ * What is deliberately NOT here matters as much. The stolen funds moved through MetaMask's Meta Bridge, a
+ * swap adapter and Bridgers SSwap on the way out. All three are legitimate infrastructure with hundreds of
+ * thousands of users, and the first was very nearly published as "the thief's wallet". Being on a stolen
+ * fund's path is not evidence — a floor that blocked those would break every honest bridge user.
+ *
+ * Coverage boundary, stated because silence here would read as coverage: this screen is EVM-only
+ * (`^0x[0-9a-f]{40}$`). The money left via TRON, so the relay and terminus addresses that actually hold it
+ * CANNOT be represented in this floor at all. The trail is in the case file; the block stops at the bridge.
+ */
+const OWN_FINDINGS = {
+  id: 'MainStreet own forensic findings (first-party, tx-verified)',
+  cap: 5000,
+  license: 'first-party',
+  items: [
+    { address: '0x7239C278139Ea353C0375d5b8c67b33123026a71',
+      reason: 'received a wallet drain on Base — a disposable collector with no prior history. Proven by ' +
+        'transaction, not by an event log: tx.from is the victim key, 2026-07-23T04:42:03Z, after TOSHI and ' +
+        'MOTO were swept in the preceding 34 seconds. Blockscout still reports is_scam:false for it.',
+      provenAt: '2026-07-23' },
+  ],
+};
+
 /** ingest (I/O): fetch each source, build, return {data, report}. fetchImpl injectable for tests. */
 async function ingest(fetchImpl, { includeGpl = false, timeoutMs = 25000 } = {}) {
   const chosen = includeGpl ? [...MIT_SOURCES, GPL_SOURCE] : MIT_SOURCES;
@@ -169,13 +207,19 @@ async function ingest(fetchImpl, { includeGpl = false, timeoutMs = 25000 } = {})
     } catch (e) { r.error = e.message; }   // a failed source leaves the others intact (never zero the floor)
     report[src.id] = r;
   }
-  const okSources = chosen.filter((s) => !report[s.id].error).map((s) => s.id);
+  // First-party findings last, and unconditionally. No fetch means nothing to time out and nothing to fail,
+  // so these are the one part of the floor that cannot be removed by a network problem — which is exactly the
+  // property the hard block needs most.
+  pulls.push({ items: OWN_FINDINGS.items, cap: OWN_FINDINGS.cap });
+  report[OWN_FINDINGS.id] = { seen: OWN_FINDINGS.items.length, rejected: 0, error: null };
+
+  const okSources = chosen.filter((s) => !report[s.id].error).map((s) => s.id).concat(OWN_FINDINGS.id);
   return { data: buildKnownBad(pulls, { asOf: isoDay(), sources: okSources }), report };
 }
 
 function isoDay() { return new Date().toISOString().slice(0, 10); }
 
-module.exports = { buildKnownBad, normalize, parseOfac, parseEthLabels, parseCsv, cleanAddr, maliciousReason, hasLegitContext, ingest, MIT_SOURCES, GPL_SOURCE, KNOWN_SAFE_CONTRACTS };
+module.exports = { buildKnownBad, normalize, parseOfac, parseEthLabels, parseCsv, cleanAddr, maliciousReason, hasLegitContext, ingest, MIT_SOURCES, GPL_SOURCE, OWN_FINDINGS, KNOWN_SAFE_CONTRACTS };
 
 // ── run as a maintainer script ──────────────────────────────────────────────────────────────────
 if (require.main === module) {

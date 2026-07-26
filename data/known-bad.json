@@ -1,9 +1,10 @@
 {
-  "asOf": "2026-07-21",
+  "asOf": "2026-07-26",
   "note": "Bundled snapshot of PUBLIC known-bad addresses, built by scripts/biii-known-bad-ingest.js. The node screens against this LOCALLY — no hosted oracle needed for the hard block. Re-verifiable against the named sources. Absence of an entry is NOT a clean verdict.",
   "sources": [
     "OFAC SDN — github.com/0xB10C/ofac-sanctioned-digital-currency-addresses (MIT)",
-    "dawsbot/eth-labels malicious subset (MIT)"
+    "dawsbot/eth-labels malicious subset (MIT)",
+    "MainStreet own forensic findings (first-party, tx-verified)"
   ],
   "addresses": [
     "0x000000000000be0ab658f92dddac29d6df19a3be",
@@ -403,6 +404,7 @@
     "0x719981cf7d1a1dc681a1cf0c6b1eeee090d0fed6",
     "0x7210336f9a3ce03b8eceed9cc6ca8761f22abb2c",
     "0x722122df12d4e14e13ac3b6895a86e84145b6967",
+    "0x7239c278139ea353c0375d5b8c67b33123026a71",
     "0x723a7084028421994d4a7829108d63ab44658315",
     "0x72a5843cc08275c8171e582972aa4fda8c397b2a",
     "0x72bee46e2bcd6858ff79bd36b9b162e2a0c49cef",
