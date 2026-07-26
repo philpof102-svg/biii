@@ -32,6 +32,7 @@ const { assessRecoveryOffer } = require('../lib/recovery');
 const { vetApproach } = require('../lib/lure');
 const { checkApprovals } = require('../lib/approvals');
 const { watchWallet } = require('../lib/wallet-watch');
+const { vetAgent } = require('../lib/agent-vet');
 const L = require('../lib/ledger');
 const X = require('../lib/export');
 const { meterUsage } = require('../lib/meter');
@@ -233,6 +234,12 @@ const TOOLS = [
       owner: { type: 'string', description: 'the wallet address to watch' },
       chain: { type: 'string', description: 'base (default) | ethereum' },
       persist: { type: 'boolean', description: 'default true — save state so the NEXT call can diff against it. Pass false for a one-off look that does not become the baseline.' } }, required: ['owner'] } },
+
+  { name: 'till_vet_agent', description: 'IS THIS AGENT SAFE TO CONNECT TO, AND SAFE TO PAY? The gap this closes: everything else here judges tokens, launches, thefts and wallets, but never the AGENT — which is the thing that actually holds the tools. Four checkable dangers, none of which require trusting a word of the description. It does not exist (a listing is not a service, and paying an endpoint that never answers is the simplest loss available). Its tools can move money (a name is marketing; the input SCHEMA is the capability, and only a QUANTITY field proves a payment surface, because a message has a recipient exactly as a payment does but you cannot move value without saying how much). It asks for key material (a schema field for a private key or seed is the whole attack, declared in the open). Or it is paid to an address with no past. Deliberately does NOT grade how good the description reads: a well-written tool listing is free to fabricate now, so scoring prose would hand a forgery a good mark. Read-only — it introspects and never calls a tool. Never returns "safe".',
+    inputSchema: { type: 'object', properties: {
+      url: { type: 'string', description: 'the agent\'s HTTP MCP endpoint' },
+      payTo: { type: 'string', description: 'optional: the address that would receive payment' },
+      chain: { type: 'string', description: 'base (default)' } }, required: [] } },
 ];
 
 async function callTool(name, a = {}) {
@@ -390,6 +397,10 @@ async function callTool(name, a = {}) {
       return await followTron(a.address, { maxHops: a.maxHops || 3 });
     }
     return { error: 'mode must be one of: moved, bridge, tron' };
+  }
+  if (name === 'till_vet_agent') {
+    return await vetAgent({ url: a.url, payTo: a.payTo, chain: a.chain || 'base',
+      knownBadScreen: KNOWN_BAD, screenFn: screenAddress });
   }
   if (name === 'till_watch_wallet') {
     const r = await watchWallet(a.chain || 'base', a.owner, { persist: a.persist !== false });
