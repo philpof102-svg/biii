@@ -44,7 +44,29 @@ const MAX_NEW = 40;              // 2 GoPlus batches of 20. Raised from 20 after
                                  // two pages of new_pools offered 40 unseen addresses against a cap of 20, so
                                  // half of what the source gave us was being dropped every run. scanRug already
                                  // chunks by 20, so this is two requests, not one oversized one.
-const TRACE_MAX = 6;             // funding traces per run — 3 explorer calls each, on a free endpoint
+/* FUNDING TRACES PER RUN — raised from 6 to 20 on 2026-07-26, after measuring both halves of the question.
+ *
+ * WHY IT MATTERS MORE THAN IT LOOKS. Scored against our own outcomes, this is the only signal left with any
+ * predictive power: symbol impersonation has none, contract flags are worth +6 points and are redundant with
+ * each other, and `armedAtFirstSight` is empty on every token we have ever seen because the security index
+ * returns an owner address for about one Base token in ten. Walked forward in time, a payer with a prior
+ * kill was followed by another death in 62 of 67 resolved cases. At 6 traces against a MAX_NEW of 40 we were
+ * declining to ask the one question that works, on 34 tokens out of 40 — and calling the result "45% not
+ * traceable", which described our own budget rather than the chain.
+ *
+ * WHY 20 AND NOT 40. The explorer was probed rather than assumed: 40 concurrent address reads returned 40×200
+ * with a median of ~1s and no 429 at any burst size tried. That is a budget, not a permission — a free
+ * endpoint tolerating a burst is no evidence it tolerates sustained hourly load, and losing it would cost the
+ * only signal we have. 20 triples coverage and stays well inside what was measured; raise it further only
+ * after the runs at 20 come back clean, which is a fact to check rather than a hope.
+ *
+ * THE SORT STAYS DESCENDING BY LIQUIDITY, and that was checked too because it looked wrong. Rug factories
+ * seed around $9-13k, so tracing the LARGEST launches seemed to spend a scarce budget on the safest tokens.
+ * The data says otherwise: risk is U-SHAPED, not monotonic — by seed quintile, 81% / 86% / 19% / 3% / 71%.
+ * Both ends are dangerous with a quiet band in the middle, because the big-seed danger is the WELL-FUNDED
+ * factory (the openhuman cluster seeds at a $61k median). The top 15% by liquidity rug at 81% against 46%
+ * for the rest, so the existing sort was already picking the right end. Hypothesis wrong, measurement kept. */
+const TRACE_MAX = 20;
 const IMPOSTOR_MAX = 10;         // symbol checks per run — one search each
 const INDUSTRIAL_FUNDER = 20;    // wallets bankrolled by one funder before it reads as an operation, not a person
                                  // (chosen by sweeping the threshold against known outcomes, not by intuition)
