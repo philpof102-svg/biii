@@ -63,7 +63,13 @@ const BAD = A('a1'), DRAINER = A('b1'), LEGIT = A('c1'), SAFE = '0x833589fcd6edb
     const { data, report } = await K.ingest(fakeFetch, { includeGpl: false });
     assert.ok(data.addresses.includes(BAD), 'OFAC addresses survived the eth-labels failure');
     assert.ok(Object.values(report).some((r) => r.error), 'the failure is reported, not hidden');
-    assert.ok(data.sources.every((s) => /OFAC/.test(s)), 'sources lists only the ones that succeeded');
+    /* The point is that a source which FAILED is not listed as if it had worked — not that exactly one
+     * source survives. This assertion used to read `every(s => /OFAC/.test(s))`, which quietly encoded
+     * "OFAC is the only thing that can succeed here" and went red the moment a legitimate third source
+     * (the first-party findings, which need no network and therefore never fail) was added. Testing the
+     * absence of the broken one is what the sentence above actually claims. */
+    assert.ok(data.sources.some((s) => /OFAC/.test(s)), 'the source that worked is listed');
+    assert.ok(!data.sources.some((s) => /eth-labels/.test(s)), 'the source that returned 500 is NOT listed as a source');
   });
 
   await t('MIT-default: the GPL ScamSniffer source is NOT pulled unless --include-gpl', async () => {

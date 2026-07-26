@@ -7,7 +7,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ac.inference.sh/mcp",
-      "lastSeen": "2026-07-26T09:57:02.301Z"
+      "lastSeen": "2026-07-26T16:02:39.464Z"
     },
     "https://tandem.ac/mcp": {
       "verdict": "answers",
@@ -16,7 +16,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ac.tandem/docs-mcp",
-      "lastSeen": "2026-07-26T09:57:03.281Z"
+      "lastSeen": "2026-07-26T16:02:40.640Z"
     },
     "https://www.hood.ag/api/mcp": {
       "verdict": "answers",
@@ -25,7 +25,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ag.hood/name-service",
-      "lastSeen": "2026-07-26T09:57:04.662Z"
+      "lastSeen": "2026-07-26T16:02:41.891Z"
     },
     "https://mcp.lona.agency/mcp": {
       "verdict": "unauditable",
@@ -34,7 +34,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "agency.lona/trading",
-      "lastSeen": "2026-07-26T09:57:05.676Z"
+      "lastSeen": "2026-07-26T16:02:43.070Z"
     },
     "https://agoclnqfyinwjxdmjnns.supabase.co/functions/v1/mcp": {
       "verdict": "unauditable",
@@ -43,7 +43,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.1325/mcp",
-      "lastSeen": "2026-07-26T09:57:07.729Z"
+      "lastSeen": "2026-07-26T16:02:45.187Z"
     },
     "https://mcp.aarna.ai/mcp": {
       "verdict": "answers",
@@ -52,7 +52,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.aarna/atars-mcp",
-      "lastSeen": "2026-07-26T09:57:09.118Z"
+      "lastSeen": "2026-07-26T16:02:46.620Z"
     },
     "https://mcp.abmeter.ai": {
       "verdict": "answers",
@@ -217,7 +217,493 @@
       "wantsSecret": [],
       "name": "ai.aient/mcp",
       "lastSeen": "2026-07-26T09:58:12.072Z"
+    },
+    "https://mcp.airshelf.ai/mcp": {
+      "verdict": "answers",
+      "tools": 7,
+      "names": "compare_products,explain_product,find_products,get_product,list_merchants,request_quote,search_catalog",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.airshelf/catalog",
+      "lastSeen": "2026-07-26T11:59:00.275Z"
+    },
+    "https://api.aisecuritygateway.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.aisecuritygateway/mcp-gateway",
+      "lastSeen": "2026-07-26T11:59:01.288Z"
+    },
+    "https://mcp.alphacreek.ai/mcp": {
+      "verdict": "answers",
+      "tools": 4,
+      "names": "get_filing_toc,get_latest_filing,list_filings,read_node_content",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.alphacreek/alphacreek-mcp",
+      "lastSeen": "2026-07-26T11:59:02.408Z"
+    },
+    "https://mcp.alpic.ai": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.alpic.mcp/alpic-mcp",
+      "lastSeen": "2026-07-26T11:59:03.699Z"
+    },
+    "https://test.alpic.ai/": {
+      "verdict": "unreachable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.alpic.test/test-mcp-server",
+      "lastSeen": "2026-07-26T11:59:04.491Z"
+    },
+    "https://mcp.ambix.ai": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.ambix/ambix",
+      "lastSeen": "2026-07-26T11:59:05.527Z"
+    },
+    "https://mcp.anomalyarmor.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.anomalyarmor/armor-mcp",
+      "lastSeen": "2026-07-26T11:59:06.874Z"
+    },
+    "https://api-v2.appdeploy.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.appdeploy/deploy-app",
+      "lastSeen": "2026-07-26T11:59:08.126Z"
+    },
+    "https://arclan.ai/mcp": {
+      "verdict": "answers",
+      "tools": 4,
+      "names": "get_server,query_registry,recommend_server,report_server",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.arclan/registry",
+      "lastSeen": "2026-07-26T11:59:09.560Z"
+    },
+    "https://argushq.ai/api/mcp": {
+      "verdict": "answers",
+      "tools": 5,
+      "names": "get_company_history,get_recall_by_lot,get_warning_letter,list_recent_actions,search_enforcement",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.argushq/enforcement-database",
+      "lastSeen": "2026-07-26T11:59:10.991Z"
+    },
+    "https://mcp.arpi.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.arpi/arpi-mcp",
+      "lastSeen": "2026-07-26T11:59:12.908Z"
+    },
+    "https://artidrop.ai/mcp": {
+      "verdict": "answers",
+      "tools": 4,
+      "names": "get,publish,publish_site,versions",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.artidrop/artidrop",
+      "lastSeen": "2026-07-26T11:59:14.406Z"
+    },
+    "https://api.assetlog.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.assetlog/assetlog",
+      "lastSeen": "2026-07-26T11:59:15.523Z"
+    },
+    "https://supershopping-mcp.atdev.ai/mcp": {
+      "verdict": "answers",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.atdev/supershopping",
+      "lastSeen": "2026-07-26T11:59:17.453Z"
+    },
+    "https://api.atlasverified.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.atlasverified/atlas-mcp",
+      "lastSeen": "2026-07-26T11:59:18.638Z"
+    },
+    "https://api.augmentev.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.augmentev/paseo",
+      "lastSeen": "2026-07-26T11:59:20.238Z"
+    },
+    "https://travel.augworlds.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.augworlds/travel-world",
+      "lastSeen": "2026-07-26T11:59:21.946Z"
+    },
+    "https://mcp.auralogs.ai/mcp": {
+      "verdict": "answers",
+      "tools": 7,
+      "names": "get_analysis,get_log,get_project,list_analyses,list_logs,list_projects,search_logs",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.auralogs/auralogs",
+      "lastSeen": "2026-07-26T11:59:22.972Z"
+    },
+    "https://auteng.ai/mcp/docs": {
+      "verdict": "answers",
+      "tools": 7,
+      "names": "auteng_docs_create,auteng_docs_delete,auteng_docs_list,auteng_docs_recent,auteng_docs_share,auteng_docs_update,auteng_publish_markdown",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.auteng/docs",
+      "lastSeen": "2026-07-26T11:59:24.572Z"
+    },
+    "https://auteng.ai/mcp": {
+      "verdict": "unreachable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.auteng/mcp",
+      "lastSeen": "2026-07-26T11:59:25.474Z"
+    },
+    "https://authoryze.ai/api/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.authoryze/authoryze",
+      "lastSeen": "2026-07-26T14:00:20.223Z"
+    },
+    "https://mcp.autonomad.ai/mcp": {
+      "verdict": "answers",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.autonomad/travel",
+      "lastSeen": "2026-07-26T14:00:21.281Z"
+    },
+    "https://{api_host}/mcp": {
+      "verdict": "unreachable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.autorfp/mcp",
+      "lastSeen": "2026-07-26T14:00:21.986Z"
+    },
+    "https://api.auxen.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.auxen/auxen",
+      "lastSeen": "2026-07-26T14:00:23.307Z"
+    },
+    "https://aviado.ai/api/mcp": {
+      "verdict": "answers",
+      "tools": 9,
+      "names": "get_biomarkers_for_supplement,get_interventions_for_biomarker,get_supplement_info,get_supplement_interactions,get_supplements_for_biomarker,get_supplements_for_condition,get_top_brands,search_conditions,search_supplements",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.aviado/health",
+      "lastSeen": "2026-07-26T14:00:25.031Z"
+    },
+    "https://mcp.neuroautomata.axonagentic.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.axonagentic/neuroautomata",
+      "lastSeen": "2026-07-26T14:00:26.454Z"
+    },
+    "https://mcp.backengine.ai/mcp": {
+      "verdict": "unreachable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.backengine/backengine-mcp",
+      "lastSeen": "2026-07-26T14:00:27.282Z"
+    },
+    "https://backengine.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.backengine/backengine-mcp",
+      "lastSeen": "2026-07-26T14:00:28.572Z"
+    },
+    "https://backengine-prod.backengine.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.backengine/backengine-mcp",
+      "lastSeen": "2026-07-26T14:00:29.814Z"
+    },
+    "https://mcp-server-295985738387.europe-west1.run.app/mcp": {
+      "verdict": "answers",
+      "tools": 20,
+      "names": "bank_accounts,crypto_fx_rates,crypto_price,crypto_price_lite,currency_convert,currency_convert_lite,currency_convert_open,currency_fx_lite,currency_rates,financial_calculator,financial_calculator_lite,finnhub_stock_quote,open_banking_transactions,platform_tool_finder,stock_price_lite,stripe_payment_records,stripe_payments,timezone_convert,web_news_headlines,web_url_reader",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.bankee/inferventis-mcp",
+      "lastSeen": "2026-07-26T14:00:30.870Z"
+    },
+    "https://api.bareun.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.bareun/bareun",
+      "lastSeen": "2026-07-26T14:00:32.160Z"
+    },
+    "https://api.baselight.app/mcp": {
+      "verdict": "unreachable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.baselight/baselight",
+      "lastSeen": "2026-07-26T14:00:32.971Z"
+    },
+    "https://mcp.basethread.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.basethread/basethread",
+      "lastSeen": "2026-07-26T14:00:34.202Z"
+    },
+    "https://mcp.bassethound.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.bassethound/bassethound",
+      "lastSeen": "2026-07-26T14:00:35.647Z"
+    },
+    "https://beatbandit.ai/api/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.beatbandit/beatbandit",
+      "lastSeen": "2026-07-26T14:00:38.043Z"
+    },
+    "https://b4-index.vercel.app/mcp": {
+      "verdict": "answers",
+      "tools": 5,
+      "names": "b4_audit,b4_browse,b4_compare,b4_recommend,b4_score",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.benroberts/b4-index",
+      "lastSeen": "2026-07-26T14:00:39.279Z"
+    },
+    "https://betterpost.ai/mcp": {
+      "verdict": "answers",
+      "tools": 22,
+      "names": "betterpost_add_source,betterpost_add_story,betterpost_create_project,betterpost_delete_content,betterpost_delete_project,betterpost_derive_content,betterpost_expand_coverage,betterpost_generate_content,betterpost_get_content,betterpost_get_project,betterpost_get_settings,betterpost_get_usage,betterpost_hide_story,betterpost_list_content,betterpost_list_projects,betterpost_list_sources,betterpost_list_stories,betterpost_remove_source,betterpost_suggest_topics,betterpost_unhide_story,betterpost_update_project,betterpost_update_settings",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.betterpost/server",
+      "lastSeen": "2026-07-26T14:00:40.939Z"
+    },
+    "https://app.bezal.ai/api/mcp": {
+      "verdict": "answers",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.bezal/local-commerce",
+      "lastSeen": "2026-07-26T14:00:42.993Z"
+    },
+    "https://biddeed.ai/api/mcp": {
+      "verdict": "unreachable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.biddeed/biddeed-mcp",
+      "lastSeen": "2026-07-26T14:00:44.074Z"
+    },
+    "https://mcp.biddeed.ai/api/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.biddeed/biddeed-mcp",
+      "lastSeen": "2026-07-26T14:00:45.154Z"
+    },
+    "https://mcp.biel.ai/v2/{project_slug}/mcp": {
+      "verdict": "answers",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.biel/biel-ai",
+      "lastSeen": "2026-07-26T16:02:22.003Z"
+    },
+    "https://bittlebits.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.bittlebits/bittlebits",
+      "lastSeen": "2026-07-26T16:02:23.266Z"
+    },
+    "https://blast-radius.ai/mcp": {
+      "verdict": "answers",
+      "tools": 7,
+      "names": "ask_blast_radius,assess_against_frontier_line,get_diligence_checklist,get_igv_quote,get_latest_update,get_thesis,subscribe",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.blast-radius/blast-radius",
+      "lastSeen": "2026-07-26T16:02:24.389Z"
+    },
+    "https://mcp.bloopo.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.bloopo/bloopo",
+      "lastSeen": "2026-07-26T16:02:25.703Z"
+    },
+    "https://api.bluenexus.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.bluenexus/universal-mcp",
+      "lastSeen": "2026-07-26T16:02:27.181Z"
+    },
+    "https://mcp.bodenrichtwert.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.bodenrichtwert/mcp",
+      "lastSeen": "2026-07-26T16:02:28.194Z"
+    },
+    "https://directory.boolsai.ai/mcp": {
+      "verdict": "answers",
+      "tools": 19,
+      "names": "brands_by_founder,brands_in_city,brands_in_market,bulk_export,bulk_export_url,compare_scans,compare_sites,directory_query,domain_intel,find_similar_by_stack,lookup_id,operator_cluster,prospect_brief,similar_sites,site_dossier,sites_using_vendor,stack_archetype,subdomain_map,summary",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.boolsai/directory",
+      "lastSeen": "2026-07-26T16:02:29.188Z"
+    },
+    "https://grep.boolsai.ai/mcp": {
+      "verdict": "answers",
+      "tools": 4,
+      "names": "count_pattern,grep_pattern,list_signal_types,sites_with_signal",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.boolsai/grep",
+      "lastSeen": "2026-07-26T16:02:30.287Z"
+    },
+    "https://boolsai.ai/mcp": {
+      "verdict": "answers",
+      "tools": 2,
+      "names": "boolsai_scan,boolsai_scan_paths",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.boolsai/scan",
+      "lastSeen": "2026-07-26T16:02:31.402Z"
+    },
+    "https://signals.boolsai.ai/mcp": {
+      "verdict": "answers",
+      "tools": 12,
+      "names": "domain_timeline,event_dossier,farm_domain,find_signals,recent_events,scan_at_date,signal_diff,signal_landscape,test_filter,ticker_history,universe_summary,wayback_backtest",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.boolsai/signals",
+      "lastSeen": "2026-07-26T16:02:32.386Z"
+    },
+    "https://borealhost.ai/mcp/": {
+      "verdict": "answers",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.borealhost/mcp",
+      "lastSeen": "2026-07-26T16:02:33.957Z"
+    },
+    "https://mcp.boundaryai.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.boundaryai/boundaryai",
+      "lastSeen": "2026-07-26T16:02:35.645Z"
+    },
+    "https://api.bowmark.ai/mcp": {
+      "verdict": "answers",
+      "tools": 3,
+      "names": "ask,execute,report_outcome",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.bowmark/bowmark",
+      "lastSeen": "2026-07-26T16:02:37.341Z"
+    },
+    "https://api.bowmark.ai/mcp?s=r": {
+      "verdict": "answers",
+      "tools": 3,
+      "names": "ask,execute,report_outcome",
+      "movesValue": [],
+      "wantsSecret": [],
+      "name": "ai.bowmark/bowmark",
+      "lastSeen": "2026-07-26T16:02:38.479Z"
     }
   },
-  "offset": 24
+  "offset": 6
 }
