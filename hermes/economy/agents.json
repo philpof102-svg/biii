@@ -90,6 +90,15 @@
       "schedule": "every 30m",
       "cost": "free ($0, no_agent — keyless public APIs)",
       "enabled": true
+    },
+    {
+      "name": "agent-watch",
+      "role": "Watches the PUBLIC agent surface CHANGE, not just measure it once. A rotating slice of the official MCP registry per run: reports a server that newly asks for key material, newly exposes a payment surface, or went dark after answering. The registry publishes versions, never diffs, so nobody is watching for the update that adds a key-requesting tool. Also the fix for the survey weakness — the wantsSecret branch has never fired on live input, and continuous coverage is how a rare case eventually walks past. Introspection only (initialize + tools/list, exactly what any client sends on connect), paced, no tool ever called.",
+      "kind": "script",
+      "script": "agent-watch.sh",
+      "schedule": "every 2h",
+      "cost": "free ($0, no_agent — public registry + introspection)",
+      "enabled": true
     }
   ]
 }

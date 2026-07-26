@@ -14,6 +14,10 @@ data/*
 !data/token-radar/
 !data/token-radar/tokens.json
 !data/token-radar/scorecard.json
+# agent-watch's memory of the public agent surface: what each registered server looked like last time we
+# looked. Versioned because the value is the DIFF over months, and a diff needs a past to compare against.
+!data/agent-watch/
+!data/agent-watch/registry.json
 data/token-radar/observations.jsonl
 dist/
 
