@@ -11,7 +11,8 @@ const CHAIN = process.env.WALLET_WATCH_CHAIN || 'base';
 const ADDRESSES = (process.env.WALLET_WATCH ||
   // Phil's drained address: watched because a compromised key means the thief can still act at any time,
   // and because any approval left open there is a second route in.
-  '0x47712673daBA17cc2ddEAA285A8aCBA33012e643'
+  ['0x47712673daBA17cc2ddEAA285A8aCBA33012e643',   // the drained one: a compromised key can act at any time
+   '0xa6cf99d35949c6cb911adb910078f4ca46f0f5d4'].join(',')   // the live merchant payTo — where a surprise approval would actually cost something
 ).split(',').map((s) => s.trim()).filter(Boolean);
 
 (async () => {
