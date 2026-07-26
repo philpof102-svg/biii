@@ -314,6 +314,29 @@ async function currentLiquidity(addrs) {
     const v = verdicts[c.addr] || { verdict: 'unknown', reason: 'no verdict', armed: [], flags: [] };
     db[c.addr] = { sym: c.sym, chain: CHAIN, source: c.source, firstSeen: now, lastSeen: now,
       firstVerdict: v.verdict, firstReason: v.reason, armedAtFirstSight: v.armed, flagsAtFirstSight: v.flags,
+      /* THE BASIS OF THE CALL, frozen at the moment it was made.
+       *
+       * Until 2026-07-26 this row stored the verdict and its flags and nothing about what we had actually
+       * SEEN. That gap surfaced while asking why `armedAtFirstSight` is empty on 214 of 214 tokens: PEEPS
+       * was recorded as `caution — only 3 holders`, and GoPlus today reports `is_honeypot = 1` on it. Did we
+       * miss a honeypot, or did that flag appear after the token died? **Unanswerable**, because the inputs
+       * were never written down — so the question turns into an argument instead of a lookup.
+       *
+       * This is the same rule `meme-trader/lib/journal.js` enforces on the trading side, where it is stated
+       * plainly: freeze the basis, and a later claim of "we knew because X" becomes checkable rather than
+       * reconstructed. A scorecard whose asset is its track record cannot audit itself without it.
+       *
+       * `ownerStateAtFirstSight` matters most: it is the field our entire founding thesis rests on — a
+       * dangerous power only counts if someone can still fire it — and GoPlus returns `owner_address` for
+       * roughly one token in ten, so it is almost always `unknown`. Recording it makes that visible in the
+       * data instead of inferable only by reading the source. */
+      basisAtFirstSight: {
+        ownerState: v.ownerState || null,
+        holders: v.holders == null ? null : v.holders,
+        lpLockedPct: v.lpLockedPct == null ? null : v.lpLockedPct,
+        topWalletPct: v.topWalletPct == null ? null : v.topWalletPct,
+        unreadable: Array.isArray(v.unknowns) ? v.unknowns.length : null,
+      },
       firstLiq: c.liq, peakLiq: c.liq, lastLiq: c.liq, outcome: 'live' };
     obsOut += JSON.stringify({ ts: now, addr: c.addr, sym: c.sym, chain: CHAIN, source: c.source, liq: c.liq, verdict: v.verdict, armed: v.armed, flags: v.flags }) + '\n';
     if (v.verdict === 'rug_ready') armed.push({ ...c, v });

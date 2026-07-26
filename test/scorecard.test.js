@@ -158,6 +158,29 @@ t('historical rug_ready calls still count as strong calls — the ledger is not 
   assert.equal(c.ofWhichStrong, 1);
 });
 
+console.log('\nthe founding signal reports whether it has ever fired:');
+t('armedPowersObserved counts the tokens where a power was actually fireable', () => {
+  const armed = { ...rug('rug_ready', 5, 1), armedAtFirstSight: ['HONEYPOT — buys succeed, sells do not'] };
+  const c = scoreCalls([armed, rug('caution', 5, 1)], NOW);
+  assert.equal(c.armedPowersObserved, 1);
+});
+t('a database where it NEVER fired reports 0 — it must not read as "no danger"', () => {
+  const rows = [rug('caution', 5, 1), live('high_risk', 0.2)].map((r) => ({ ...r, armedAtFirstSight: [] }));
+  const c = scoreCalls(rows, NOW);
+  assert.equal(c.armedPowersObserved, 0);
+  assert.ok('armedPowersObserved' in c, 'present at zero, never omitted');
+});
+t('the basis denominator separates "we looked and saw nothing" from "we never wrote it down"', () => {
+  // Rows older than the basis change carry no inputs at all and simply cannot be audited. Counting them as
+  // "owner unreadable" would invent an observation we never made.
+  const withBasis = { ...rug('caution', 5, 1), basisAtFirstSight: { ownerState: 'live', holders: 12 } };
+  const unknownOwner = { ...rug('caution', 5, 1), basisAtFirstSight: { ownerState: 'unknown', holders: 3 } };
+  const legacy = rug('caution', 5, 1);
+  const c = scoreCalls([withBasis, unknownOwner, legacy], NOW);
+  assert.equal(c.basisRecorded, 2, 'the legacy row has no basis and is not counted as one');
+  assert.equal(c.ownerStateReadable, 1, 'only the row where the owner was actually visible');
+});
+
 console.log('\nthe rest of the ledger still adds up:');
 t('a caution that rugs is a warning, at the strength it was given', () => {
   const c = scoreCalls([rug('caution', 5, 1), rug('rug_ready', 5, 1)], NOW);
