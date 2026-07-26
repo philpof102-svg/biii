@@ -31,6 +31,8 @@ const { whatMoved, readBridgeExit, followTron } = require('../lib/trace');
 const { assessRecoveryOffer } = require('../lib/recovery');
 const { vetApproach } = require('../lib/lure');
 const { checkApprovals } = require('../lib/approvals');
+const SEED = require('../lib/seedscan');
+const KEYS = require('../lib/keyscan');
 const { watchWallet } = require('../lib/wallet-watch');
 const { vetAgent } = require('../lib/agent-vet');
 const L = require('../lib/ledger');
@@ -240,6 +242,13 @@ const TOOLS = [
       url: { type: 'string', description: 'the agent\'s HTTP MCP endpoint' },
       payTo: { type: 'string', description: 'optional: the address that would receive payment' },
       chain: { type: 'string', description: 'base (default)' } }, required: [] } },
+  { name: 'till_seed_exposure', description: 'IS A RECOVERY PHRASE SITTING IN CLEARTEXT ON THIS MACHINE? Everything else here answers whether an ADDRESS is safe to pay; this answers whether the MACHINE is safe to hold a wallet, and a safe address on a compromised machine is worth nothing. "Self custody if you know how to keep your seedphrase safe" puts the whole condition in the sentence and nothing ships that checks it: an antivirus answers "do you have a known virus", which is a different question. This one is DECIDABLE rather than scored. A keyword scan drowns — abandon, able, about and absent are ordinary English and all four are BIP-39 words — but a mnemonic is a RUN of 12/15/18/21/24 consecutive words from a 2048-word list with a CHECKSUM in the last word, so a candidate is proven by arithmetic. Measured across 204 files and 1.6 MB of real prose and source: zero false confirmations. It NEVER outputs the phrase — file, line and word count only, because this output ends up in terminal buffers, logs and screenshots, and a scanner that prints the seed it found is a stealer with good intentions. Reports its own blind spots: no images, PDFs, password managers, browser storage or encrypted archives, so "nothing found" means nothing was found IN WHAT WAS READ. Read-only, no network, nothing is copied.',
+    inputSchema: { type: 'object', properties: {
+      paths: { type: 'array', items: { type: 'string' }, description: 'directories to scan; defaults to Documents, Desktop, Downloads and the OneDrive equivalents' } }, required: [] } },
+
+  { name: 'till_key_exposure', description: 'WHAT KEY MATERIAL IS ON THIS DISK, AND WHAT STILL HOLDS AN OLD COPY OF IT? The companion to till_seed_exposure, and it exists because a real theft happened without the phrase ever being written down: the key was exfiltrated. The trap is that a secp256k1 private key is 64 hex characters and so is every SHA-256 hash, git object id and transaction hash in a saved response, so the value SHAPE carries almost no information. Two things do: STRUCTURE (a Web3 Secret Storage keystore has version 3 and a crypto member with ciphertext, kdf and mac — nothing else looks like that, and finding one is not an exposure but an encrypted wallet whose strength is its password) and THE LABEL (cleartext keys are named by what needs them, so PRIVATE_KEY matches and PRIVATE_KEY_HASH is rejected as a digest). RETAINED COPIES are what people miss: ROTATING A SECRET DOES NOT REMOVE IT FROM THE DISK, because editor history, session caches and backup folders keep snapshots of what the file used to say — on the machine this was built for, one .env holding three named keys had eighteen previous versions still readable, and the folder had been copied into a keep-across-the-reformat backup. Also reports browser wallet vaults by PRESENCE only, nothing opened or parsed, because that is how a key leaves a machine when it was never in a text file. Never outputs key material, not even a prefix: four bytes narrow a brute force. Never decrypts, never derives an address.',
+    inputSchema: { type: 'object', properties: {
+      paths: { type: 'array', items: { type: 'string' }, description: 'directories to scan; defaults to Documents, Desktop and Downloads' } }, required: [] } },
 ];
 
 async function callTool(name, a = {}) {
@@ -397,6 +406,14 @@ async function callTool(name, a = {}) {
       return await followTron(a.address, { maxHops: a.maxHops || 3 });
     }
     return { error: 'mode must be one of: moved, bridge, tron' };
+  }
+  if (name === 'till_seed_exposure') {
+    const paths = Array.isArray(a.paths) && a.paths.length ? a.paths : SEED.defaultPaths();
+    return SEED.scanPaths(paths, SEED.loadWordlist());
+  }
+  if (name === 'till_key_exposure') {
+    const paths = Array.isArray(a.paths) && a.paths.length ? a.paths : SEED.defaultPaths();
+    return KEYS.scanKeyPaths(paths);
   }
   if (name === 'till_vet_agent') {
     return await vetAgent({ url: a.url, payTo: a.payTo, chain: a.chain || 'base',
