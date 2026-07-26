@@ -1,0 +1,11 @@
+# `railway up` envoie l'ARBRE LOCAL, pas le contenu de git — donc les fichiers non suivis
+# partent avec, et .gitignore ne les filtre pas. Ce fichier existe pour ça.
+
+# Un repertoire dont le nom est "D" + U+F03A : un faux deux-points, ecrit par un chemin
+# Windows mal forme quelque part (il apparait aussi dans le repo mainstreet). Il contient
+# des logs Hermes et n'a rien a faire dans une image de deploiement. Le motif "D?/" le vise
+# sans toucher a data/ ni dist/, qui font quatre caracteres.
+D?/
+
+# Les logs ne se deploient pas.
+*.log
