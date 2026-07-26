@@ -46,6 +46,7 @@ const { DISCLAIMER } = require('../lib/disclaimer');
 const { screenAddress, screenMeta, floorProvenance } = require('../lib/screen');
 const V = require('../lib/vet');   // the LOCAL verdict, shared with GET /trust — one judgment, many mouths
 const { loadAssetRegistry } = require('../lib/asset-registry');   // issuer-verified merged over aggregator (shared with /asset)
+const FUNDER = require('../lib/funder-history');   // our OWN observed history of who paid for what, with its age
 const fs = require('node:fs'), path = require('node:path');
 
 // Verified-issuer registry: committed issuer-official entries (green) merged over the generated aggregator
@@ -257,6 +258,9 @@ const TOOLS = [
       receivedHash: { type: 'string', description: '0x + sha256 of what you received, if you would rather not send the artifact' },
       paidAt: { type: 'number', description: 'block or unix ms of the payment — needed for the strong claim' },
       committedAt: { type: 'number', description: 'block or unix ms at which the commitment was recorded somewhere the seller cannot rewrite' } }, required: [] } },
+  { name: 'till_funder_history', description: 'HAS THE WALLET THAT PAID FOR THIS LAUNCH ALREADY KILLED ONE? till_launch_funder reads the graph and tells you a cluster exists; this reads our OWN observation record and tells you what happened to the rest of it. The distinction matters because every other check here asks the token a question it cannot answer in time: a curated security index returns an owner address for roughly one Base token in ten, so "who can still fire a rug power" — the question this whole scanner was built on — came back unanswerable on 221 of 221 launches we watched. Who PAID is answerable, because we watched that ourselves. THE EVIDENCE IS WALK-FORWARD, which is the only kind worth quoting: every token was replayed in time order and judged using strictly earlier history, so no prediction ever saw its own outcome or any later one. A payer with a prior kill was followed by another death in 62 of 67 resolved cases (93%) against a 52% base rate, and it holds across SIX independent payers, each 75-100% lethal — not one outlier carrying an average. Read the limits as part of the answer: six operators is not sixty, "clean so far" rests on two payers and is an absence of a bad record rather than a good one, and 45% of launches have no traceable funder at all and are reported as out of reach instead of safe. AND IT IS EVADABLE FOR THE PRICE OF ONE HOP — a fresh funding wallet lands in "never seen", which is already 30% of cases. It makes REUSE expensive, which is what an operation running dozens of launches an hour actually does; expect the strong bucket to decay as operators adapt. Structure, never intent: a shared funder proves shared control or shared infrastructure, and a launchpad looks identical from the graph. Every answer carries the age of the database, and past the freshness bar the reassuring verdicts are WITHDRAWN rather than annotated, because a stale "never killed" is the exact sentence that gets someone hurt. Pure, offline, read-only.',
+    inputSchema: { type: 'object', properties: {
+      funder: { type: 'string', description: 'the wallet that PAID for the launch — get it from till_launch_funder, which traces deployer→funder on chain. Omit it and the honest answer is that this check has nothing to say.' } }, required: [] } },
 ];
 
 async function callTool(name, a = {}) {
@@ -429,6 +433,11 @@ async function callTool(name, a = {}) {
       paidAt: a.paidAt == null ? null : Number(a.paidAt),
       committedAt: a.committedAt == null ? null : Number(a.committedAt),
     });
+  }
+  if (name === 'till_funder_history') {
+    // No address is not an error and must not read like one: 45% of the launches we watch have no traceable
+    // funder, and that population rugs at roughly the base rate. `lookup(null)` says exactly that.
+    return FUNDER.lookup(a.funder ? String(a.funder) : null);
   }
   if (name === 'till_key_exposure') {
     const paths = Array.isArray(a.paths) && a.paths.length ? a.paths : SEED.defaultPaths();
