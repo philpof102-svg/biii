@@ -30,6 +30,7 @@ const { classifyB20 } = require('../lib/b20');
 const { whatMoved, readBridgeExit, followTron } = require('../lib/trace');
 const { assessRecoveryOffer } = require('../lib/recovery');
 const { vetApproach } = require('../lib/lure');
+const { checkApprovals } = require('../lib/approvals');
 const L = require('../lib/ledger');
 const X = require('../lib/export');
 const { meterUsage } = require('../lib/meter');
@@ -219,6 +220,12 @@ const TOOLS = [
       asksToInstall: { type: 'boolean' }, asksForKeyOrSeed: { type: 'boolean' },
       asksForSignature: { type: 'boolean' }, asksForUpfrontPayment: { type: 'boolean' },
       urgency: { type: 'boolean', description: 'was time pressure applied?' } }, required: [] } },
+
+  { name: 'till_open_approvals', description: 'WHICH DOORS INTO THIS WALLET ARE STILL OPEN? An ERC-20 approval is a standing permission to move your tokens without asking again, and it is the most common drain vector that does NOT require the private key: you approved a contract once for an unlimited amount and forgot. Wallets do not surface these, so almost nobody knows what they have granted. The load-bearing discipline: an Approval EVENT IS NOT THE CURRENT STATE — a later approval of zero revokes an earlier one silently, so the log is used only to find candidate (token, spender) pairs and every one is then confirmed by calling allowance() on the chain right now. Reports three outcomes, never two: live, confirmed-revoked, and COULD-NOT-CHECK. The first draft collapsed the last two and reported forty closed doors having verified nine — an unanswered call is not a closed door. Read-only: it tells you what to revoke and where, and can never revoke or sign anything itself.',
+    inputSchema: { type: 'object', properties: {
+      owner: { type: 'string', description: 'the wallet address to audit' },
+      chain: { type: 'string', description: 'base (default) | ethereum' },
+      fromBlock: { type: 'number', description: 'optional: scan from this block (default 0)' } }, required: ['owner'] } },
 ];
 
 async function callTool(name, a = {}) {
@@ -376,6 +383,10 @@ async function callTool(name, a = {}) {
       return await followTron(a.address, { maxHops: a.maxHops || 3 });
     }
     return { error: 'mode must be one of: moved, bridge, tron' };
+  }
+  if (name === 'till_open_approvals') {
+    const r = await checkApprovals(a.chain || 'base', a.owner, a.fromBlock ? { fromBlock: a.fromBlock } : {});
+    return r.ok ? r : { error: r.reason };
   }
   if (name === 'till_vet_approach') {
     return vetApproach({ links: a.links, platform: a.platform, asksToInstall: a.asksToInstall,
