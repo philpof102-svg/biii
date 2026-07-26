@@ -46,8 +46,23 @@ const SURFACES = [
     what: 'Coin a viral post in one tap.' },
 ];
 
-/** Count tool definitions in a stdio server's source. Crude on purpose — it only has to detect DRIFT. */
+/**
+ * How many tools a stdio server declares — asked of the MODULE, not of its text.
+ *
+ * The first version counted `name: '…'` with a regex and reported 28 where the module's own TOOLS array holds
+ * 27: it was counting `name: 'biii'`, the server's own name in its serverInfo block, as a tool. That produced a
+ * permanent phantom drift of 1 against a correctly deployed endpoint — and a check that is red forever is a
+ * check everyone learns to skip, which is the exact failure this file was written to prevent. I had built the
+ * thing I spent the day removing.
+ *
+ * A module that exports its tool list is the authority on its own length, and requiring it cannot miscount. The
+ * regex survives only as a fallback for a file that exports nothing.
+ */
 function toolsInSource(file) {
+  try {
+    const m = require(path.resolve(file));
+    if (m && Array.isArray(m.TOOLS)) return m.TOOLS.length;
+  } catch { /* not requireable, or exports no TOOLS: fall through to the text scan */ }
   try {
     const src = fs.readFileSync(file, 'utf8');
     const names = new Set();
