@@ -38,18 +38,50 @@ const CHAIN = process.env.RADAR_CHAIN || 'base';
 const MIN_LIQ_WATCH = 5000;      // below this a "pool" is dust, not a market worth tracking
 const RUG_DROP = 0.80;           // >=80% off its own peak liquidity = the pool was pulled
 const RUG_FLOOR = 2000;          // ...and what is left is not a market anymore
-const MAX_NEW = 20;              // GoPlus batches 20 contracts per request
+const MAX_NEW = 40;              // 2 GoPlus batches of 20. Raised from 20 after measuring the actual supply:
+                                 // two pages of new_pools offered 40 unseen addresses against a cap of 20, so
+                                 // half of what the source gave us was being dropped every run. scanRug already
+                                 // chunks by 20, so this is two requests, not one oversized one.
 const TRACE_MAX = 6;             // funding traces per run — 3 explorer calls each, on a free endpoint
 const IMPOSTOR_MAX = 10;         // symbol checks per run — one search each
 const INDUSTRIAL_FUNDER = 20;    // wallets bankrolled by one funder before it reads as an operation, not a person
                                  // (chosen by sweeping the threshold against known outcomes, not by intuition)
 
+/**
+ * Every call that did NOT answer this run. Read by the digest, because a run that could not look must not be
+ * allowed to read like a run that looked and found nothing.
+ */
+const UNANSWERED = [];
+
+/**
+ * getJSON — null means "this call did not answer", and nothing else.
+ *
+ * The previous version never looked at `res.statusCode`. A 429 body is `{"errors":[…]}` — perfectly valid JSON —
+ * so it parsed cleanly and came back as an object, and every harvester then did `((j && j.data) || [])` and got
+ * an empty array. A throttled run therefore harvested zero tokens and the digest announced "0 fresh launches
+ * judged, none with a fireable rug power": a green line manufactured by a failure, on the one asset here that
+ * cannot be rebuilt by reading the code.
+ *
+ * Measured rather than suspected: four rapid calls to the pools endpoint return HTTP 200 with 20 entries, and
+ * the fifth and sixth return HTTP 429 with a retry-after header. The API is honest. We were not listening.
+ *
+ * This is the same fault as counting an unread `allowance()` as a revoked approval, and as a scanner reporting
+ * `holder_count: 0` when the index means "not computed". Third time today: an error rendered as a zero.
+ */
 function getJSON(url) {
   return new Promise((resolve) => {
     https.get(url, { headers: { accept: 'application/json' } }, (res) => {
       let d = ''; res.on('data', (c) => (d += c));
-      res.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve(null); } });
-    }).on('error', () => resolve(null));
+      res.on('end', () => {
+        const code = res.statusCode || 0;
+        if (code < 200 || code >= 300) {
+          UNANSWERED.push({ url: url.split('?')[0], status: code, retryAfter: res.headers['retry-after'] || null });
+          return resolve(null);
+        }
+        try { resolve(JSON.parse(d)); }
+        catch { UNANSWERED.push({ url: url.split('?')[0], status: 'unparseable body' }); resolve(null); }
+      });
+    }).on('error', (e) => { UNANSWERED.push({ url: url.split('?')[0], status: e.message }); resolve(null); });
   });
 }
 
@@ -60,9 +92,19 @@ const usd = (n) => '$' + Math.round(n).toLocaleString('en-US');
 
 /** Freshest launches on the chain — pools created minutes ago, before anyone has looked at them. */
 async function harvestNewPools() {
-  const j = await getJSON('https://api.geckoterminal.com/api/v2/networks/' + CHAIN + '/new_pools?page=1');
+  // Two pages, because the source offers more than one run consumes: measured 40 unseen addresses available
+  // against a MAX_NEW of 20. Page 2 is attempted and its failure is recorded rather than smoothed over, so a
+  // half-harvest never reads as a full one.
+  const pages = [];
+  for (const page of [1, 2]) {
+    const j = await getJSON('https://api.geckoterminal.com/api/v2/networks/' + CHAIN + '/new_pools?page=' + page);
+    if (j === null) break;                 // already recorded in UNANSWERED; stop rather than hammer a 429
+    if (!Array.isArray(j.data)) { UNANSWERED.push({ url: 'new_pools page ' + page, status: 'no data array' }); break; }
+    pages.push(...j.data);
+    if (j.data.length === 0) break;        // genuinely the end of the list
+  }
   const out = [];
-  for (const p of ((j && j.data) || [])) {
+  for (const p of pages) {
     const a = p.attributes || {}, rel = p.relationships || {};
     const liq = parseFloat(a.reserve_in_usd) || 0;
     const id = ((rel.base_token || {}).data || {}).id || '';       // e.g. "base_0xabc..."
@@ -285,10 +327,27 @@ async function currentLiquidity(addrs) {
   if (obsOut) fs.appendFileSync(OBS, obsOut);
 
   // ---------- REPORT ----------------------------------------------------------------------------
+  // A run that could not look must never read like a run that looked and found nothing. Before this, a
+  // rate-limited harvest produced "✓ 0 fresh launches judged, none with a fireable rug power" — the reassuring
+  // sentence, generated by a failure. The tick mark is now withheld the moment anything went unanswered.
   const head = armed.length
     ? '🚩 token-radar: ' + armed.length + ' ARMED rug(s) among ' + toJudge.length + ' fresh ' + CHAIN + ' launches — the deployer can still pull the trigger.'
-    : '✓ token-radar: ' + toJudge.length + ' fresh ' + CHAIN + ' launches judged, none with a fireable rug power.';
+    : UNANSWERED.length
+      ? '⚠️ token-radar: ' + toJudge.length + ' ' + CHAIN + ' launches judged, and ' + UNANSWERED.length +
+        ' call(s) did NOT answer — this is not a clean sweep, it is a partial one.'
+      : '✓ token-radar: ' + toJudge.length + ' fresh ' + CHAIN + ' launches judged, none with a fireable rug power.';
   console.log(head);
+
+  if (UNANSWERED.length) {
+    const parSource = {};
+    for (const u of UNANSWERED) {
+      const k = u.url.replace(/^https?:\/\//, '').split('/').slice(0, 2).join('/') + '  HTTP ' + u.status;
+      parSource[k] = (parSource[k] || 0) + 1;
+    }
+    lines.push('⚠️ ' + UNANSWERED.length + ' call(s) went unanswered this run, so coverage is incomplete:');
+    for (const [k, n] of Object.entries(parSource)) lines.push('   · ' + n + '× ' + k);
+    lines.push('   A 429 here means the harvest was throttled, NOT that the market was quiet. Judge the counts below accordingly.');
+  }
 
   for (const a of armed) lines.push('🚩 ' + a.sym + ' ' + a.addr.slice(0, 10) + '… (' + a.source + ', ' + usd(a.liq) + ') — ' + a.v.armed[0]);
   if (survivors.length) {
