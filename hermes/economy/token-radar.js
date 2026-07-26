@@ -340,12 +340,27 @@ async function currentLiquidity(addrs) {
   // than no metric — so a warning now counts as a warning, at the strength it was actually given.
   const all = Object.values(db);
   const rugged = all.filter((t) => t.outcome === 'rugged');
-  const strong = rugged.filter((t) => t.firstVerdict === 'rug_ready' || t.firstVerdict === 'high_risk');
+  /* ONE definition of "a strong call", used on BOTH sides of the ledger.
+   *
+   * It was written twice with two different meanings, and the difference flattered us exactly where this file's
+   * own note says it must not: `strong` counted rug_ready OR high_risk as a WIN when the token rugged, while
+   * `falseAlarms` counted only rug_ready as an ERROR when it survived. So a high_risk verdict scored when it was
+   * right and cost nothing when it was wrong — a scanner grading its own homework, in the module whose note
+   * reads "a scanner that only reports its wins is marketing, not evidence".
+   *
+   * Measured at the moment of the fix: 3 false alarms under the narrow rule, 5 under the same rule used for the
+   * wins. The two extra are AAPL and openhuman, both called high_risk and both still alive.
+   *
+   * A shared predicate rather than two matching filters, because two filters that agree today drift apart the
+   * next time someone edits one of them — which is precisely how this happened. */
+  const isStrongCall = (t) => t.firstVerdict === 'rug_ready' || t.firstVerdict === 'high_risk';
+
+  const strong = rugged.filter(isStrongCall);
   const soft = rugged.filter((t) => t.firstVerdict === 'caution');
   const silent = rugged.filter((t) => t.firstVerdict === 'unknown');
   const missed = rugged.filter((t) => t.firstVerdict === 'clean');
   const stillLive = all.filter((t) => t.outcome === 'live');
-  const falseAlarms = stillLive.filter((t) => t.firstVerdict === 'rug_ready');
+  const falseAlarms = stillLive.filter(isStrongCall);
   const warned = strong.length + soft.length;
   const card = {
     updatedAt: now, tokensTracked: all.length, rugsObserved: rugged.length,
@@ -355,7 +370,30 @@ async function currentLiquidity(addrs) {
     warnRate: rugged.length ? +(warned / rugged.length).toFixed(2) : null,
     strongRate: rugged.length ? +(strong.length / rugged.length).toFixed(2) : null,
     flaggedButStillAlive: falseAlarms.length,
-    note: 'warnRate = share of observed rugs carrying ANY warning at first sight; strongRate = share we called rug_ready or high_risk. Both are published because they say different things: a caution that rugs means the warning was there but too quiet to act on. abstained = rugs we had called unknown, which is honest but useless to a buyer. missedOutright = rugs we had called clean, the only truly damaging error. flaggedButStillAlive is our false-alarm count, published on purpose: a scanner that only reports its wins is marketing, not evidence.',
+    /* PRECISION of a strong call — the number a buyer actually needs, and one that could not be computed at all
+     * until the two sides of the ledger shared a definition. warnRate is trivially high (0.97) because a caution
+     * counts; strongRate is recall (how many rugs we called loudly). Neither answers "when this thing shouts,
+     * how often is it right?" — and that is the only question that decides whether to act on a warning.
+     *
+     * The asymmetry was not merely flattering the score, it was hiding the DENOMINATOR: false alarms counted
+     * rug_ready only, so the set of strong calls could never be assembled. Raw counts travel with the ratio
+     * because 23 calls is a small sample and a bare 0.78 invites more confidence than it has earned. */
+    strongCallsTotal: strong.length + falseAlarms.length,
+    strongCallsRight: strong.length,
+    strongPrecision: (strong.length + falseAlarms.length)
+      ? +(strong.length / (strong.length + falseAlarms.length)).toFixed(2) : null,
+    /* THE DENOMINATOR BEHIND `missedOutright`, published because without it that zero is worthless.
+     *
+     * `missedOutright` counts rugs we had called `clean` — presented as the one truly damaging error, and it has
+     * been 0 from the start. Checked rather than celebrated: `clean` has been emitted ZERO times in 161 tokens.
+     * You cannot miss with a verdict you never give, so the zero is trivial, not earned, and reporting it as an
+     * achievement would be exactly the "marketing, not evidence" this file claims to avoid.
+     *
+     * Second time in one sitting that a flattering figure here turned out to have a hidden denominator — the
+     * other was false alarms counting fewer verdicts than wins did. The pattern is worth more than either fix:
+     * on this scorecard, check what the denominator is before believing a numerator. */
+    cleanVerdictsEmitted: all.filter((t) => t.firstVerdict === 'clean').length,
+    note: 'warnRate = share of observed rugs carrying ANY warning at first sight; strongRate = share we called rug_ready or high_risk. Both are published because they say different things: a caution that rugs means the warning was there but too quiet to act on. abstained = rugs we had called unknown, which is honest but useless to a buyer. missedOutright = rugs we had called clean, the only truly damaging error — but read cleanVerdictsEmitted first: at 0 clean verdicts ever given, a 0 here is trivial rather than earned. flaggedButStillAlive is our false-alarm count, published on purpose: a scanner that only reports its wins is marketing, not evidence — and it counts the SAME verdicts that count as wins (rug_ready and high_risk), which it did not until 2026-07-26: high_risk scored when it was right and cost nothing when it was wrong. strongPrecision is the number a buyer acts on: when this shouts, how often is it right. Raw counts travel with it because the sample is small.',
   };
 
   writeJSON(TOKENS, db);

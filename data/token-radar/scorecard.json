@@ -1,14 +1,18 @@
 {
-  "updatedAt": "2026-07-26T13:21:40.323Z",
-  "tokensTracked": 134,
-  "rugsObserved": 69,
-  "warnedBeforeTheRug": 67,
-  "ofWhichStrong": 15,
-  "ofWhichCautionOnly": 52,
+  "updatedAt": "2026-07-26T16:17:29.711Z",
+  "tokensTracked": 163,
+  "rugsObserved": 78,
+  "warnedBeforeTheRug": 76,
+  "ofWhichStrong": 20,
+  "ofWhichCautionOnly": 56,
   "abstained": 2,
   "missedOutright": 0,
   "warnRate": 0.97,
-  "strongRate": 0.22,
-  "flaggedButStillAlive": 3,
-  "note": "warnRate = share of observed rugs carrying ANY warning at first sight; strongRate = share we called rug_ready or high_risk. Both are published because they say different things: a caution that rugs means the warning was there but too quiet to act on. abstained = rugs we had called unknown, which is honest but useless to a buyer. missedOutright = rugs we had called clean, the only truly damaging error. flaggedButStillAlive is our false-alarm count, published on purpose: a scanner that only reports its wins is marketing, not evidence."
+  "strongRate": 0.26,
+  "flaggedButStillAlive": 6,
+  "strongCallsTotal": 26,
+  "strongCallsRight": 20,
+  "strongPrecision": 0.77,
+  "cleanVerdictsEmitted": 0,
+  "note": "warnRate = share of observed rugs carrying ANY warning at first sight; strongRate = share we called rug_ready or high_risk. Both are published because they say different things: a caution that rugs means the warning was there but too quiet to act on. abstained = rugs we had called unknown, which is honest but useless to a buyer. missedOutright = rugs we had called clean, the only truly damaging error — but read cleanVerdictsEmitted first: at 0 clean verdicts ever given, a 0 here is trivial rather than earned. flaggedButStillAlive is our false-alarm count, published on purpose: a scanner that only reports its wins is marketing, not evidence — and it counts the SAME verdicts that count as wins (rug_ready and high_risk), which it did not until 2026-07-26: high_risk scored when it was right and cost nothing when it was wrong. strongPrecision is the number a buyer acts on: when this shouts, how often is it right. Raw counts travel with it because the sample is small."
 }
