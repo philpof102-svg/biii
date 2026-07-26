@@ -56,6 +56,43 @@ function toolsInSource(file) {
   } catch { return null; }
 }
 
+/**
+ * Does every npm package a server.json DECLARES actually exist?
+ *
+ * Added because one of ours did not. `biii/server.json` declared `biii-mcp@0.1.0` and registry.npmjs.org returns
+ * 404 for it — submitted as written, the registry entry would have pointed at nothing, and every reader who ran
+ * the suggested `npx biii-mcp` would have hit the same wall. A manifest can be schema-valid and still describe
+ * software that cannot be installed.
+ *
+ * Fixing the one instance was not enough: the check belongs here so the next phantom is caught by a machine
+ * rather than by someone noticing. It resolves the name against the real registry — the one place that can
+ * answer — and never against a memory of what was published.
+ */
+function npmExists(name) {
+  return new Promise((resolve) => {
+    require('node:https').get('https://registry.npmjs.org/' + encodeURIComponent(name), (res) => {
+      res.resume();
+      resolve({ name, ok: res.statusCode === 200, status: res.statusCode });
+    }).on('error', (e) => resolve({ name, ok: false, status: e.message }));
+  });
+}
+
+/** Read every package identifier declared across our server.json manifests. */
+function declaredPackages(root) {
+  const out = [];
+  let dirs = [];
+  try { dirs = fs.readdirSync(root, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); } catch { return out; }
+  for (const d of dirs) {
+    const f = path.join(root, d, 'server.json');
+    let j;
+    try { j = JSON.parse(fs.readFileSync(f, 'utf8')); } catch { continue; }
+    for (const p of (j.packages || [])) {
+      if (p.registryType === 'npm' && p.identifier) out.push({ repo: d, manifest: j.name, pkg: p.identifier, version: p.version || null });
+    }
+  }
+  return out;
+}
+
 (async () => {
   const rows = [];
   for (const s of SURFACES) {
@@ -92,12 +129,28 @@ function toolsInSource(file) {
     console.log('');
   }
 
+  // Phantom packages: schema-valid manifests describing software nobody can install.
+  const declared = declaredPackages(path.join(__dirname, '..', '..'));
+  const checked = await Promise.all(declared.map((d) => npmExists(d.pkg)));
+  const phantoms = declared.filter((d, i) => !checked[i].ok);
+  if (declared.length) {
+    console.log('DECLARED NPM PACKAGES (resolved against registry.npmjs.org, not remembered)');
+    for (const [i, d] of declared.entries()) {
+      console.log('  ' + (checked[i].ok ? 'EXISTS  ' : 'PHANTOM ') + d.pkg.padEnd(24) + ' declared by ' + d.repo + '/server.json' +
+        (checked[i].ok ? '' : '   <-- HTTP ' + checked[i].status + ': this manifest points at nothing'));
+    }
+    console.log('');
+  }
+
   console.log('SUMMARY');
   console.log('  listable now      : ' + listable.length + '/' + rows.length);
   console.log('  blocked by drift  : ' + drifted.length + (drifted.length ? '  (' + drifted.map((d) => d.name).join(', ') + ')' : ''));
+  console.log('  phantom packages  : ' + phantoms.length + (phantoms.length ? '  (' + phantoms.map((p) => p.pkg).join(', ') + ')' : ''));
   console.log('  total live tools  : ' + listable.reduce((a, b) => a + b.liveTools, 0));
   console.log('');
   console.log('  A listing may state ONLY the live numbers above. If a directory asks for a tool count, use');
   console.log('  liveTools — not the repo count, and not the README. Re-run this before every submission.');
-  process.exit(drifted.length ? 2 : 0);   // non-zero on drift: a submission script must stop and deploy first
+  // Non-zero on EITHER fault, so a submission script stops. Drift means deploy first; a phantom package means
+  // publish first or drop the claim. Both produce a listing that is true on paper and false in practice.
+  process.exit(drifted.length || phantoms.length ? 2 : 0);
 })();

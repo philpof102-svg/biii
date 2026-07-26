@@ -8,46 +8,11 @@
     "source": "github"
   },
   "version": "0.1.0",
-  "packages": [
+  "_publishing_note": "This manifest declared an npm package `biii-mcp@0.1.0` that DOES NOT EXIST — registry.npmjs.org returns 404 for it. Submitted as written, the registry entry would have pointed at nothing: a manifest true in its shape and false at install time. The hosted endpoint below, by contrast, was probed and answers with a live tool list, so the remote form is the version that is true today. Restore a `packages` entry only after `npm view biii-mcp` actually resolves. Re-run scripts/listing-manifest.js before any submission: it reads the running server rather than this file, and it exits non-zero on deploy drift.",
+  "remotes": [
     {
-      "registryType": "npm",
-      "registryBaseUrl": "https://registry.npmjs.org",
-      "identifier": "biii-mcp",
-      "version": "0.1.0",
-      "transport": {
-        "type": "stdio"
-      },
-      "runtimeHint": "npx",
-      "runtimeArguments": [
-        {
-          "type": "positional",
-          "value": "biii-mcp",
-          "valueHint": "package-name"
-        },
-        {
-          "type": "positional",
-          "value": "biii-mcp",
-          "valueHint": "bin-name"
-        }
-      ],
-      "environmentVariables": [
-        {
-          "name": "BASE_RPC_URL",
-          "description": "Base RPC used to read the chain (verify payments, inspect contracts). Read-only. Defaults to the public https://mainnet.base.org.",
-          "isRequired": false
-        },
-        {
-          "name": "MAINSTREET_URL",
-          "description": "Optional hosted reputation oracle for the advisory merchant read (till_vet_merchant). Absent, the LOCAL trust-core classifier + known-bad floor still return a verdict (fail-closed).",
-          "isRequired": false
-        },
-        {
-          "name": "BIII_LAWBOR_URL",
-          "description": "Optional gitlawb/LAWBOR node for reputation composition. Absent, verdicts fall back to the local floor (fail-closed).",
-          "isRequired": false
-        }
-      ]
+      "type": "streamable-http",
+      "url": "https://biii-production.up.railway.app/mcp"
     }
-  ],
-  "remotes": []
+  ]
 }
