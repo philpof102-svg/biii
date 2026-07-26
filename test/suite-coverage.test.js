@@ -21,10 +21,20 @@ const assert = require('node:assert');
 const ROOT = path.join(__dirname, '..');
 const script = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).scripts.test || '';
 
-/* Exclusions DELIBEREES, nommees une par une. Une liste d'exclusion par motif se remplit toute seule et
- * finit par cacher exactement ce que ce test cherche ; une liste explicite oblige a justifier chaque ligne. */
-const EXCLUS = new Set([
-  'suite-coverage.test.js',   // ce fichier — il est lui-meme dans le script, mais s'auto-exclure evite un cycle de lecture
+/* Exclusions DELIBEREES, nommees une par une avec leur raison. Une liste d'exclusion par motif se remplit
+ * toute seule et finit par cacher exactement ce que ce test cherche ; une liste explicite oblige a justifier
+ * chaque ligne.
+ *
+ * ⚠️ Etre exclu de `npm test` n'autorise PAS a n'etre lance par rien: c'est le probleme des orphelins sous un
+ * autre nom. Chaque exclusion doit etre referencee par un AUTRE script de package.json, et le test ci-dessous
+ * le verifie. */
+const EXCLUS = new Map([
+  ['suite-coverage.test.js', 'ce fichier — il est dans la suite, mais s\'auto-exclure evite un cycle de lecture'],
+  ['e2e-real-chain.test.js',
+    'depend d\'un VRAI RPC Base. Passe 2/2 en isolation, echoue par intermittence en fin de suite quand '
+    + 'cinquante fichiers avant lui ont deja tape des RPC — donc rouge pour une raison qui n\'est pas le code. '
+    + 'Une suite instable entraine a ignorer le rouge, ce qui est pire que de ne pas avoir le test. Lance '
+    + 'deliberement par `npm run test:chain`.'],
 ]);
 
 let pass = 0, fail = 0;
@@ -33,6 +43,18 @@ const t = (name, fn) => { try { fn(); pass++; console.log('  ok   ' + name); } c
 console.log('couverture de la suite : tout fichier de test est-il reellement lance ?');
 
 const fichiers = fs.readdirSync(__dirname).filter((f) => /\.(c?js|mjs)$/.test(f) && !EXCLUS.has(f));
+
+t('chaque fichier EXCLU de la suite est lance par un autre script', () => {
+  const tous = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).scripts || {};
+  const orphelins = [];
+  for (const [f, raison] of EXCLUS) {
+    if (f === 'suite-coverage.test.js') continue;      // celui-la EST dans la suite, il s'exclut de sa propre lecture
+    const lance = Object.entries(tous).some(([nom, cmd]) => nom !== 'test' && cmd.includes('test/' + f));
+    if (!lance) orphelins.push(f + '  — exclu parce que: ' + raison);
+  }
+  assert.equal(orphelins.length, 0,
+    'exclu de `npm test` ET lance par rien = orphelin sous un autre nom :\n       ' + orphelins.join('\n       '));
+});
 
 t('aucun fichier de test n\'est orphelin', () => {
   const orphelins = fichiers.filter((f) => !script.includes('test/' + f));
