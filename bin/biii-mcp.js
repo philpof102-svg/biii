@@ -122,11 +122,14 @@ const TOOLS = [
       lineItems: { type: 'array', description: '[{description, amountUsd} or {description, qty, unitUsd}]',
         items: { type: 'object', properties: { description: { type: 'string' }, amountUsd: { type: 'string' }, qty: { type: 'number' }, unitUsd: { type: 'string' } } } },
       number: { type: 'string' }, billTo: { type: 'string' }, merchantName: { type: 'string' },
-      dueDateMs: { type: 'number' }, lang: { type: 'string', description: '"en" (default) or "fr"' } }, required: ['to', 'lineItems'] } },
-  { name: 'till_check_invoice', description: 'Check an invoice against the chain: settled (paid on-chain, field-for-field) / overdue / issued. If settled, returns the receipt for the registry.',
+      dueDateMs: { type: 'number' }, lang: { type: 'string', description: '"en" (default) or "fr"' },
+      rail: { type: 'string', description: 'optional — how this invoice SETTLES. Absent or "base" = USDC on Base, which BIII reads and can therefore attest. Name any other rail ("card", "sepa", "cash", "mastercard-agent-pay") and till_check_invoice returns not_observable instead of calling the customer unpaid: an invoice settled by card or in cash will never appear on Base, so the absence of an on-chain transfer says nothing about them. Pass the SAME rail to till_check_invoice.' } },
+      required: ['to', 'lineItems'] } },
+  { name: 'till_check_invoice', description: 'Check an invoice against the chain: settled (paid on-chain, field-for-field) / overdue / issued / not_observable (settles on a rail BIII cannot read — ask the merchant\'s books, never assume unpaid). If settled, returns the receipt for the registry.',
     inputSchema: { type: 'object', properties: {
       to: { type: 'string' }, totalMicro: { type: 'string', description: 'the invoice totalMicro' },
       number: { type: 'string' }, dueDateMs: { type: 'number' }, merchantName: { type: 'string' },
+      rail: { type: 'string', description: 'optional — the SAME rail the invoice was created with. This tool rebuilds the invoice from these arguments, so a rail not passed here is a rail BIII cannot know about, and an off-chain invoice would be reported "overdue, unpaid" about a customer who has paid.' },
       lookbackBlocks: { type: 'number', description: 'default 43200 (~1 day on Base); invoices are slower than tills' } }, required: ['to', 'totalMicro'] } },
   { name: 'till_vet_asset', description: 'Is a TOKENIZED ASSET (stock/treasury/RWA) contract the GENUINE issuer\'s, or an impersonator? genuine / impersonation / unsafe / unknown — fail-closed (unknown is never genuine). Catches the FBI-flagged lookalike-token fraud. Registry is authoritative: seed only; source real addresses from issuer official docs.',
     inputSchema: { type: 'object', properties: {
@@ -407,15 +410,42 @@ async function callTool(name, a = {}) {
   }
   if (name === 'till_create_invoice') {
     const invoice = I.createInvoice({ to: a.to, lineItems: a.lineItems, number: a.number, billTo: a.billTo,
-      merchantName: a.merchantName, dueDateMs: a.dueDateMs, issueDateMs: Date.now(), nowMs: Date.now() });
+      merchantName: a.merchantName, dueDateMs: a.dueDateMs, rail: a.rail, issueDateMs: Date.now(), nowMs: Date.now() });
     return { invoice, bill: I.renderInvoice(invoice, { lang: a.lang || 'en' }), paymentURI: I.invoiceURI(invoice),
       note: 'Same registry as the till: the payer\'s OWN wallet executes the EIP-681; only the chain says "settled". Then till_check_invoice.' };
   }
   if (name === 'till_check_invoice') {
+    /* ⚠️ CE HANDLER RECONSTRUIT LA FACTURE DE ZERO a partir de ses arguments — il ne recoit jamais
+     * l'objet emis par till_create_invoice. Tout champ non repris ici est donc INVISIBLE pour le
+     * verdict, quoi qu'ait pose le createur.
+     *
+     * `rail` manquait aux DEUX bouts: till_create_invoice ne le transmettait pas a createInvoice, et
+     * cette reconstruction ne le portait pas. `not_observable` etait donc totalement inatteignable par
+     * la surface MCP — le correctif de lib/invoice.js ne servait qu'a un appelant qui importe le module
+     * en direct. Troisieme fois dans la journee que le lecteur precede l'ecrivain; ici la chaine etait
+     * rompue en deux points a la fois. */
     const invoice = { kind: 'biii-invoice', number: a.number || null, dueDateMs: a.dueDateMs || null,
+      rail: T.railOf(a.rail).rail,
       merchant: { name: a.merchantName || null, address: String(a.to || '').toLowerCase() },
       charge: { to: String(a.to || '').toLowerCase(), amountMicro: String(a.totalMicro || ''), amountUsd: T.microToUsd(String(a.totalMicro || '0')), token: T.USDC_BASE, chainId: 8453 },
       lineItems: [], totalMicro: String(a.totalMicro || ''), totalUsd: T.microToUsd(String(a.totalMicro || '0')) };
+
+    /* LE RAIL SE LIT AVANT LA CHAINE. Interroger Base pour une facture reglee par carte coute un appel
+     * RPC qui ne peut rien apprendre — et surtout, une panne de ce RPC faisait echouer TOUT l'outil,
+     * alors que la reponse (`not_observable`) n'a besoin d'aucune lecture. Constate a l'ecriture de ce
+     * chemin: `rpc eth_getLogs HTTP 413` sur la fenetre de 43 200 blocs, et le tool rendait une erreur
+     * generique pour une facture dont le verdict etait connu d'avance.
+     *
+     * C'est aussi le cas d'usage le plus concret du produit: un commercant hors ligne, une facture
+     * reglee en especes. Il ne doit dependre d'aucun noeud. */
+    const railInv = T.railOf(invoice.rail);
+    if (railInv.named && !railInv.witnessable) {
+      const status = I.invoiceStatus(invoice, null, Date.now());
+      return { status, verdict: null, fact: null, receipt: null,
+        note: 'No chain read was attempted: this invoice settles on a rail BIII cannot witness, so the '
+          + 'answer does not depend on Base being reachable. Its payment state lives in the merchant\'s books.' };
+    }
+
     const fact = await findPayment({ to: invoice.charge.to, minMicro: invoice.charge.amountMicro, lookbackBlocks: a.lookbackBlocks || 43200 });
     const verdict = I.verifyInvoice(invoice, fact);
     const status = I.invoiceStatus(invoice, verdict, Date.now());

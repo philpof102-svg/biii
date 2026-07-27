@@ -96,6 +96,46 @@ t('le test mordrait vraiment — verifie sur un orphelin simule', () => {
   assert.ok(!script.includes('test/' + faux), 'un fichier absent du script doit etre detecte comme orphelin');
 });
 
+/* ── UN HARNAIS SYNCHRONE REND TOUT TEST `async` INCAPABLE D'ECHOUER ────────────────────────────────
+ * Constate le 2026-07-27 dans test/invoice.test.js:
+ *
+ *     const t = (n, fn) => { try { fn(); pass++; } catch (e) { fail++; } };
+ *
+ * Un corps `async` ne jette JAMAIS de facon synchrone — il rend une promesse rejetee. Le `catch` ne voit
+ * rien, `pass++` s'execute toujours. Trois cas ecrits ce jour-la pour couvrir la chaine MCP des factures
+ * passaient donc inconditionnellement; ils sont restes verts a travers QUATRE mutations qui cassaient
+ * exactement ce qu'ils pretendaient couvrir.
+ *
+ * Sans le mutation-test, trois tests verts auraient garanti un chemin non couvert. C'est le pire genre
+ * de test: il ne manque pas, il rassure.
+ *
+ * Cette garde compare, par fichier, la definition du harnais et la forme des corps de test. */
+t('aucun harnais synchrone ne pilote de test async', () => {
+  const coupables = [];
+  for (const f of fs.readdirSync(__dirname).filter((x) => /\.(c?js|mjs)$/.test(x))) {
+    const src = fs.readFileSync(path.join(__dirname, f), 'utf8');
+    /* La DECLARATION du harnais, dans sa forme fleche mono-ligne (celle qui piege). */
+    const decl = (src.match(/^\s*const\s+(?:t|check|test)\s*=\s*\([^)]*\)\s*=>\s*\{.*$/m) || [])[0];
+    if (!decl) continue;
+    /* Un harnais sur — il empile (push) ou il attend (await/then/Promise). */
+    const sur = /await|\.then\(|Promise|\.push\(/.test(decl);
+    if (sur) continue;
+    /* Des corps de test async pilotes par ce harnais — SUR UNE SEULE LIGNE.
+     *
+     * ⚠️ Premier jet: `[\s\S]*?` entre le nom et `async`. Ca traverse les retours a la ligne, donc un
+     * `t('...')` synchrone en haut du fichier s appariait avec un `async` situe cent lignes plus bas,
+     * dans un tout autre appel. Quatre faux positifs (erc8004, export, harden, rwa-registry) — dont
+     * erc8004, qui pilote justement ses cas async par un SECOND harnais `tA`, correctement attendu.
+     *
+     * Une garde qui crie au loup se fait desactiver; c est pire que pas de garde. La classe de
+     * caracteres exclut donc le saut de ligne. */
+    const asyncs = (src.match(/^\s*(?:t|check|test)\(\s*(['"`])[^'"`\n]*\1\s*,\s*async\s/gm) || []).length;
+    if (asyncs > 0) coupables.push(f + ' (' + asyncs + ' cas async)');
+  }
+  assert.deepStrictEqual(coupables, [],
+    'harnais synchrone + corps async = des tests qui ne peuvent pas echouer: ' + JSON.stringify(coupables));
+});
+
 console.log('\n' + fichiers.length + ' fichier(s) de test verifie(s)');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

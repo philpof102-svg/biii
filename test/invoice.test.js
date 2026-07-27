@@ -7,7 +7,19 @@ const L = require('../lib/ledger');
 const { assessTriangle } = require('../lib/trust');
 
 let pass = 0, fail = 0;
-const t = (n, fn) => { try { fn(); pass++; console.log('  ✓ ' + n); } catch (e) { fail++; console.log('  ✗ ' + n + '\n      ' + (e && e.message)); } };
+/* ⚠️ CE HARNAIS ETAIT SYNCHRONE, ET IL RENDAIT TOUT TEST `async` INCAPABLE D'ECHOUER.
+ *
+ *     const t = (n, fn) => { try { fn(); pass++; } catch (e) { fail++; } };
+ *
+ * Un corps `async` ne jette JAMAIS de facon synchrone: il rend une promesse rejetee. Le `catch` ne voit
+ * donc rien et `pass++` s'execute toujours. Trois cas ajoutes le 2026-07-27 pour couvrir la chaine MCP
+ * des factures passaient ainsi inconditionnellement — decouvert parce que 4 mutations sur 4 sont restees
+ * VERTES. Sans le mutation-test, trois tests verts auraient garanti un chemin non couvert.
+ *
+ * Les cas sont desormais EMPILES et deroules en sequence, chacun attendu. Un test qui ne peut pas
+ * echouer est pire qu'absent: il occupe la place et il rassure. */
+const files = [];
+const t = (n, fn) => files.push([n, fn]);
 
 const MERCHANT = '0x' + 'ab'.repeat(20);
 const NOW = 1753100000000; // injected clock — the core never reads Date.now()
@@ -174,5 +186,58 @@ t('une PREUVE on-chain l emporte sur le rail declare', () => {
   assert.strictEqual(r.txHash, '0x' + 'a'.repeat(64));
 });
 
-console.log(`\n${pass} passed · ${fail} failed`);
-process.exit(fail ? 1 : 0);
+/* ── LA CHAINE MCP, PAS SEULEMENT LE MODULE ─────────────────────────────────────────────────────────
+ * `rail` marchait dans lib/invoice.js et etait INATTEIGNABLE par la surface MCP, aux DEUX bouts:
+ * till_create_invoice ne le passait pas a createInvoice, et till_check_invoice RECONSTRUIT la facture
+ * de zero a partir de ses arguments — il ne recoit jamais l'objet emis. Tout champ non repris dans cette
+ * reconstruction est invisible pour le verdict, quoi qu'ait pose le createur.
+ *
+ * Ces cas passent donc par callTool, pas par le module: c'est le seul niveau ou la rupture se voyait. */
+const { callTool } = require('../bin/biii-mcp');
+
+t('★ till_create_invoice transmet le rail jusqu a la facture', async () => {
+  const r = await callTool('till_create_invoice', {
+    to: '0x' + 'a'.repeat(40), lineItems: [{ description: 'prestation', amountUsd: '250.00' }], rail: 'carte' });
+  assert.strictEqual(r.invoice.rail, 'carte');
+});
+
+t('★ till_check_invoice rend not_observable — et SANS toucher la chaine', async () => {
+  /* Le handler interrogeait Base AVANT de lire le rail: une facture reglee en especes brulait un appel
+   * RPC incapable de rien apprendre, et une panne de ce RPC faisait echouer tout l outil alors que la
+   * reponse etait connue d avance. Constate a l ecriture: `rpc eth_getLogs HTTP 413`.
+   * Un commercant hors ligne avec une facture reglee en especes ne doit dependre d aucun noeud. */
+  const r = await callTool('till_check_invoice', {
+    to: '0x' + 'a'.repeat(40), totalMicro: '250000000', rail: 'especes', dueDateMs: Date.now() - 86400000 });
+  assert.strictEqual(r.status.status, 'not_observable');
+  assert.strictEqual(r.fact, null, 'aucun fait on-chain ne doit avoir ete cherche');
+  assert.strictEqual(r.verdict, null, 'ni verdict de chaine');
+  assert.match(r.note, /No chain read was attempted/i, 'le lecteur doit savoir qu on n a rien interroge');
+});
+
+t('un rail temoignable, lui, passe bien par la chaine', async () => {
+  /* La borne inverse: si le raccourci s appliquait a tout, une vraie facture USDC ne serait plus jamais
+   * verifiee. On ne peut pas tester le succes on-chain sans reseau, mais on peut prouver que le chemin
+   * n est PAS court-circuite — il tente la lecture, donc il echoue ou rend un fait. */
+  let atteintLaChaine = false;
+  try {
+    const r = await callTool('till_check_invoice', {
+      to: '0x' + 'a'.repeat(40), totalMicro: '250000000', rail: 'base', lookbackBlocks: 10 });
+    atteintLaChaine = r.note === undefined || !/No chain read/i.test(r.note || '');
+  } catch { atteintLaChaine = true; }        // une erreur RPC prouve aussi qu on a tente
+  assert.ok(atteintLaChaine, 'rail base = la chaine doit rester le juge');
+});
+
+(async () => {
+  for (const [n, fn] of files) {
+    try { await fn(); pass++; console.log('  ✓ ' + n); }
+    catch (e) { fail++; console.log('  ✗ ' + n + '\n      ' + (e && e.message)); }
+  }
+  console.log(`\n${pass} passed · ${fail} failed`);
+  /* Un ecart entre cas empiles et cas deroules voudrait dire qu on est sorti de la boucle en route: le
+   * bilan serait vrai sur ce qu il a vu et faux sur ce qu il pretend couvrir. */
+  if (pass + fail !== files.length) {
+    console.log('✗ ' + files.length + ' cas empiles mais ' + (pass + fail) + ' deroules');
+    process.exit(1);
+  }
+  process.exit(fail ? 1 : 0);
+})();
