@@ -41,6 +41,12 @@ const EXCLUS = new Map([
     + 'contraintes FIGEES dans server-json.test.js, qui vieillissent en silence — il compare le fige au reel '
     + 'et sort en 1 s\'il y a derive. Lance par `npm run test:schema`, a faire tourner quand le registre '
     + 'annonce une version de schema ou apres un 422 inattendu.'],
+  ['suite-total.js',
+    'lance `npm test` lui-meme pour en additionner les bilans: l\'inclure dans la suite ferait tourner la '
+    + 'suite entiere a l\'interieur de la suite. Il repare le fait que le total etait compte a la main et '
+    + 'publie faux deux fois le 2026-07-27 (une fois ecrit avant la mesure, une fois mesure avec un '
+    + 'compteur aveugle a 13 suites sur 63). Lance par `npm run test:total`, a faire tourner avant '
+    + 'd\'ecrire un nombre de tests ou que ce soit.'],
 ]);
 
 let pass = 0, fail = 0;

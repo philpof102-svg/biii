@@ -20,9 +20,13 @@ const { loadWordlist, checksumValid, scanText, VALID_LENGTHS } = require('../lib
 const WORDS = require('../lib/bip39-english');
 
 const index = loadWordlist();
-let failed = 0;
+/* `lances` compte les cas REELLEMENT executes. Voir lure-ask.js: sans ce compte, `failed === 0` rend le
+ * meme message que la boucle ait tourne ou non, et le fichier ne peut plus distinguer « verifie » de
+ * « jamais atteint ». */
+let failed = 0, lances = 0;
 const check = (label, got, want) => {
   const ok = got === want;
+  lances++;
   if (!ok) failed++;
   process.stdout.write(`  ${ok ? 'ok  ' : 'FAIL'} ${label}\n`);
   if (!ok) process.stdout.write(`       expected ${want}, got ${got}\n`);
@@ -77,5 +81,5 @@ const out24 = JSON.stringify(scanText(V24.split(' ').map((w, i) => `${i + 1}. ${
 check('nor for a 24-word vertical list', /abandon|art\b/.test(out24), false);
 check('valid lengths are the five the standard defines', VALID_LENGTHS.join(','), '12,15,18,21,24');
 
-process.stdout.write('\n' + (failed ? `${failed} case(s) failed\n` : 'all cases hold\n'));
+process.stdout.write(`\n${lances - failed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);

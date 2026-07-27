@@ -85,11 +85,16 @@ const CASES = [
 ];
 
 const BUCKETS = ['movesValue', 'callerSigned', 'witnessesPayment', 'namedButNoSurface', 'wantsSecret', 'readOnly'];
-let failed = 0;
+/* `lances` compte les cas REELLEMENT atteints — la mesure qui manquait quand un `process.exit` place
+ * trop haut a rendu onze assertions inatteignables ici meme (voir la note plus bas). Le fichier imprimait
+ * alors « all cases hold » et sortait 0: rien dans sa sortie ne pouvait reveler qu'il en avait saute la
+ * moitie. Un compteur d'echecs seul ne distingue pas « aucun echec » de « aucun test ». */
+let failed = 0, lances = 0;
 for (const [label, expected, tool] of CASES) {
   const r = auditTools([tool]);
   const got = BUCKETS.find((b) => (r[b] || []).length);
   const ok = got === expected;
+  lances++;
   if (!ok) failed++;
   process.stdout.write(`  ${ok ? 'ok  ' : 'FAIL'} ${label}\n`);
   if (!ok) process.stdout.write(`       expected ${expected}, got ${got}\n`);
@@ -125,6 +130,7 @@ const { detectBrowserControl } = require('../lib/agent-vet');
 const bc = (tools) => !!detectBrowserControl(tools);
 const check = (label, got, want) => {
   const ok = got === want;
+  lances++;
   if (!ok) failed++;
   process.stdout.write(`  ${ok ? 'ok  ' : 'FAIL'} ${label}\n`);
   if (!ok) process.stdout.write(`       expected ${want}, got ${got}\n`);
@@ -165,5 +171,7 @@ check('reading pages without acting is not control',
 check('navigating without acting is not control',
   bc([{ name: 'navigate', inputSchema: { properties: { url: {} } } }]), false);
 
-process.stdout.write('\n' + (failed ? `${failed} case(s) failed after the browser rows\n` : 'browser rows hold too\n'));
+/* Le bilan porte le NOMBRE de cas atteints, pas seulement le nombre d'echecs: c'est ce chiffre qui aurait
+ * signale les onze assertions sautees, et c'est lui que l'agregateur (`npm run test:total`) additionne. */
+process.stdout.write(`\n${lances - failed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);

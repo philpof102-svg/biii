@@ -14,9 +14,14 @@
  */
 const { vetApproach, readAsk, registrableDomain } = require('../lib/lure');
 
-let failed = 0;
+/* `lances` compte les cas REELLEMENT executes, pas seulement ceux qui echouent. Sans lui, `failed === 0`
+ * imprime le meme « tout tient » qu'on ait verifie quarante cas ou zero — et zero cas arrive pour de vrai:
+ * un `process.exit` place trop haut a deja rendu onze assertions inatteignables dans agent-vet-gate.js,
+ * run vert et sortie 0. Un compte est ce qui distingue « verifie » de « pas atteint ». */
+let failed = 0, lances = 0;
 const check = (label, got, want) => {
   const ok = got === want;
+  lances++;
   if (!ok) failed++;
   process.stdout.write(`  ${ok ? 'ok  ' : 'FAIL'} ${label}\n`);
   if (!ok) process.stdout.write(`       expected ${want}, got ${got}\n`);
@@ -79,5 +84,5 @@ check('bare hostname', registrableDomain('wechat.web09eu.com'), 'web09eu.com');
 check('two-part suffix', registrableDomain('https://sub.example.co.uk/path?q=1'), 'example.co.uk');
 check('an email address', registrableDomain('info@beaconlayer.co'), 'beaconlayer.co');
 
-process.stdout.write('\n' + (failed ? `${failed} case(s) failed\n` : 'all cases hold\n'));
+process.stdout.write(`\n${lances - failed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);

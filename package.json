@@ -30,7 +30,8 @@
     "eval": "node eval/verdict-harness.js",
     "serve": "node lib/server.js",
     "test:chain": "node test/e2e-real-chain.test.js",
-    "test:schema": "node test/schema-drift.js"
+    "test:schema": "node test/schema-drift.js",
+    "test:total": "node test/suite-total.js"
   },
   "dependencies": {
     "trust-core": "file:./vendor/trust-core"
