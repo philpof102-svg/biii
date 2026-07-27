@@ -38,11 +38,54 @@ jobs:
             '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
             | node bin/biii-mcp.js | grep -q '"tools"' && echo "MCP ok"
 
+      # ══════════════════════════════════════════════════════════════════════════════════════
+      # npm ET LE REGISTRE MCP SONT DEUX CANAUX, PAS UNE CHAINE.
+      #
+      # Avant le 2026-07-27 ils etaient chaines sans garde, et ca expliquait arithmetiquement
+      # notre absence du registre : biii-mcp@0.1.0 avait ete publie a la main sur npm, donc sur
+      # un tag v0.1.0 `npm publish` echouait forcement (EPUBLISHCONFLICT — on ne republie pas
+      # une version existante), le job s'arretait, et les trois etapes du registre ne tournaient
+      # jamais. Le registre restait vide pour une raison qui n'avait rien a voir avec lui, et
+      # rien dans les logs ne disait "le registre a ete saute".
+      #
+      # Corrige en rendant l'etape npm CONDITIONNELLE a l'etat reel du registre npm, au lieu de
+      # la laisser echouer. Pas de continue-on-error : ca avalerait aussi les vraies pannes npm.
+      # ══════════════════════════════════════════════════════════════════════════════════════
+      - name: npm — cette version est-elle deja publiee ?
+        id: npmstate
+        run: |
+          V=$(node -p "require('./package.json').version")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if npm view "biii-mcp@$V" version >/dev/null 2>&1; then
+            echo "deja publie sur npm: biii-mcp@$V — l'etape publish sera sautee"
+            echo "already=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "absent de npm: biii-mcp@$V — l'etape publish tournera"
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: npm publish (bundles trust-core)
-        if: ${{ inputs.dry_run != 'true' }}
+        if: ${{ inputs.dry_run != 'true' && steps.npmstate.outputs.already != 'true' }}
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # GARDE FAIL-CLOSED, avant de lister quoi que ce soit.
+      #
+      # server.json annonce aux clients un package npm a installer. Lister une version qui
+      # n'existe pas sur npm produit exactement le pire cas : une entree de registre qui a l'air
+      # bonne, que des agents decouvrent, et dont l'installation echoue chez eux. Mieux vaut ne
+      # pas etre liste que d'etre liste et casse — donc on VERIFIE au lieu de supposer.
+      - name: Garde — le package annonce par server.json existe-t-il vraiment sur npm ?
+        if: ${{ inputs.dry_run != 'true' }}
+        run: |
+          node -e '
+            const s = require("./server.json");
+            const p = (s.packages || []).find((x) => x.registryType === "npm");
+            if (!p) { console.log("server.json ne declare aucun package npm — rien a verifier"); process.exit(0); }
+            console.log("server.json annonce : " + p.identifier + "@" + p.version);
+            require("child_process").execFileSync("npm", ["view", p.identifier + "@" + p.version, "version"], { stdio: "inherit" });
+          '
 
       - name: Install mcp-publisher
         if: ${{ inputs.dry_run != 'true' }}
