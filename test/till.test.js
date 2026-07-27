@@ -73,5 +73,43 @@ t('receipt only exists for a verified payment, carries txHash + explorer link', 
   assert.throws(() => T.receipt(c, { paid: false }), /no receipt without/);
 });
 
+/* ── LES RAILS TEMOIGNABLES: UNE SEULE DEFINITION ───────────────────────────────────────────────────
+ * ⚠️ Cette liste a existe EN DOUBLE pendant deux heures le 2026-07-27 — une copie dans bin/biii-mcp.js,
+ * une autre dans lib/invoice.js, ecrites le meme jour par la meme main, normalisation dupliquee avec.
+ * Et ce, quelques heures apres avoir passe la journee a reparer exactement cette faute ailleurs: le
+ * marqueur B20 present dans deux paquets, cinq modules recopies a la main dans onchain-forensics.
+ *
+ * Ajouter une constante a deux endroits est plus rapide que de choisir ou elle vit. La difference se
+ * paie le jour ou l'une des deux bouge — et personne ne le voit, parce que rien ne compare. */
+t('la liste des rails temoignables n existe qu a UN endroit', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const racine = path.join(__dirname, '..');
+  const trouve = [];
+  for (const d of ['lib', 'bin']) {
+    const dir = path.join(racine, d);
+    for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.js'))) {
+      const src = fs.readFileSync(path.join(dir, f), 'utf8');
+      /* On cherche la DECLARATION, pas les mentions: un commentaire qui cite la liste ne compte pas.
+       * (Lecon du jour: une assertion sur du texte source ne distingue pas le code de sa prose.) */
+      if (/^\s*const\s+\w*RAILS?\w*\s*=\s*new Set\(/m.test(src)) trouve.push(d + '/' + f);
+    }
+  }
+  assert.deepStrictEqual(trouve, ['lib/till.js'],
+    'une seule declaration, dans till.js — vu: ' + JSON.stringify(trouve));
+});
+
+t('railOf normalise, et distingue « aucun rail » de « rail inconnu »', () => {
+  /* Trois etats, encore: pas de rail declare (comportement d origine) / rail lisible / rail nomme mais
+   * illisible. Replier les deux premiers ferait basculer tous les appels existants. */
+  assert.deepStrictEqual(T.railOf(undefined), { named: false, rail: null, witnessable: true });
+  assert.deepStrictEqual(T.railOf(''), { named: false, rail: null, witnessable: true });
+  assert.deepStrictEqual(T.railOf('   '), { named: false, rail: null, witnessable: true },
+    'une chaine d espaces n est pas un rail nomme');
+  assert.deepStrictEqual(T.railOf(' BASE '), { named: true, rail: 'base', witnessable: true });
+  assert.deepStrictEqual(T.railOf('carte'), { named: true, rail: 'carte', witnessable: false });
+  assert.deepStrictEqual(T.railOf('bse'), { named: true, rail: 'bse', witnessable: false },
+    'fail-closed: une faute de frappe n envoie pas chercher sur Base');
+});
+
 console.log(`\n${pass} passed · ${fail} failed`);
 process.exit(fail ? 1 : 0);

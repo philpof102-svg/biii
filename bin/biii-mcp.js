@@ -381,10 +381,9 @@ async function callTool(name, a = {}) {
      * 'bse' mal tape, un rail inconnu, un nom qu'on n'a jamais vu — tout ca vaut « non temoignable »,
      * jamais « on-chain ». Se tromper dans ce sens fait dire « je ne peux pas voir »; dans l'autre, ca
      * ferait chercher sur Base un paiement qui n'y sera pas et conclure a un echec. */
-    const WITNESSABLE = new Set(['base', 'usdc-base', 'base-usdc']);
-    const rail = a.rail == null || a.rail === '' ? null : String(a.rail).trim().toLowerCase();
+    const { named: railNamed, rail, witnessable } = T.railOf(a.rail);
     let settlement = null;
-    if (rail && !WITNESSABLE.has(rail)) {
+    if (railNamed && !witnessable) {
       settlement = { offChain: true, rail };
     } else if (a.amountMicro) {
       const fact = await findPayment({ to: cp, minMicro: String(a.amountMicro), lookbackBlocks: 900 });
