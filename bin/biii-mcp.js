@@ -111,6 +111,7 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: {
       counterparty: { type: 'string', description: '0x address to assess (the merchant, or a payer)' },
       amountMicro: { type: 'string', description: 'optional — if given, also check on-chain settlement to this address' },
+      rail: { type: 'string', description: 'optional — the rail this payment settles on. BIII can WITNESS only "base" / "usdc-base" (it reads Base directly). Name any other rail — "card", "mastercard-agent-pay", "sepa", "stripe" — and the settlement vertex returns not_observable instead of pretending: the payment may well have completed, BIII simply cannot see it. Fail-closed: a rail we do not recognise is treated as unwitnessable, never as on-chain. Reputation and standing still decide, so a vetted counterparty stays payable; `proven` stays false because nothing was seen.' },
       resourceUrl: { type: 'string', description: 'optional — the endpoint/resource URL you would pay; enables the local phishing/plain-http/admin-path URL lens in the local classifier' },
       agentId: { type: 'string', description: 'optional — the counterparty\'s ERC-8004 agentId; surfaces a SEPARATE, advisory, re-verifiable ERC-8004 reputation lens (interop, never rival)' },
       erc8004Summary: { type: 'object', description: 'optional — a ReputationRegistry.getSummary result {count, summaryValue, summaryValueDecimals} for the agentId; BIII applies the sybil-honest lens + a re-verify pointer (BIII does not read the registry live yet)' },
@@ -368,9 +369,24 @@ async function callTool(name, a = {}) {
           reason: 'the LAWBOR node could not be reached (' + (e && e.name ? e.name : 'error') + ') — unread, not empty' };
       }
     }
-    // vertex 3 — settlement (on-chain), only if an amount is being checked
+    /* vertex 3 — settlement.
+     *
+     * BIII ne sait temoigner QU'UN rail: l'USDC sur Base, qu'il lit directement. Tout autre rail — carte,
+     * virement, une jambe Mastercard Agent Pay reglee vers un compte bancaire — n'apparaitra JAMAIS
+     * on-chain. Avant, ces cas tombaient dans `settlement: null` -> `pending` (« rien vu pour l'instant »),
+     * ce qui promet une arrivee qui ne viendra pas, et comptait comme sommet LU: le triangle se declarait
+     * complet alors qu'un rail entier lui echappait.
+     *
+     * FAIL-CLOSED SUR LE NOM DU RAIL: seuls les rails qu'on sait lire prennent le chemin on-chain. Un
+     * 'bse' mal tape, un rail inconnu, un nom qu'on n'a jamais vu — tout ca vaut « non temoignable »,
+     * jamais « on-chain ». Se tromper dans ce sens fait dire « je ne peux pas voir »; dans l'autre, ca
+     * ferait chercher sur Base un paiement qui n'y sera pas et conclure a un echec. */
+    const WITNESSABLE = new Set(['base', 'usdc-base', 'base-usdc']);
+    const rail = a.rail == null || a.rail === '' ? null : String(a.rail).trim().toLowerCase();
     let settlement = null;
-    if (a.amountMicro) {
+    if (rail && !WITNESSABLE.has(rail)) {
+      settlement = { offChain: true, rail };
+    } else if (a.amountMicro) {
       const fact = await findPayment({ to: cp, minMicro: String(a.amountMicro), lookbackBlocks: 900 });
       settlement = T.verifyPayment({ to: cp, amountMicro: String(a.amountMicro), token: T.USDC_BASE, chainId: 8453 }, fact);
     }

@@ -48,6 +48,45 @@ const { callTool } = require('../bin/biii-mcp');
     assert.match(r.sources.reputation.local.disclosure, /overrides any oracle answer/);
   });
 
+  /* ── LE RAIL, CABLE JUSQU'AU TOOL ────────────────────────────────────────────────────────────────
+   * `not_observable` a d'abord ete ajoute dans lib/trust.js — et RIEN ne pouvait le produire: aucun
+   * appelant ne passait `offChain`. Exactement la faute corrigee le matin meme dans feeder
+   * (FRESH_FUNDING_WINDOW_MS defini, exporte, utilise nulle part). Un etat inatteignable n'est pas une
+   * capacite, c'est du code mort avec des tests.
+   *
+   * Ces cas passent donc par le HANDLER, pas par la fonction pure: c'est le maillon qui manquait. */
+  await t('★ un rail non temoignable remonte jusqu au verdict du tool', async () => {
+    const r = await callTool('till_trust', { counterparty: CLEAN, rail: 'mastercard-agent-pay' });
+    const s = r.triangle.vertices.settlement;
+    assert.equal(s.status, 'not_observable');
+    assert.equal(s.rail, 'mastercard-agent-pay', 'le rail nomme doit revenir au lecteur');
+    assert.equal(r.triangle.complete, false, 'un rail invisible rend le triangle incomplet');
+    assert.ok(r.triangle.unqueriedVertices.includes('settlement'));
+  });
+
+  await t('un rail inconnu vaut NON TEMOIGNABLE, jamais on-chain (fail-closed sur le nom)', async () => {
+    /* Une faute de frappe — 'bse' pour 'base' — ne doit pas envoyer chercher sur Base un paiement qui
+     * n'y sera pas, puis conclure a un echec. Se tromper dans ce sens dit « je ne peux pas voir ». */
+    const r = await callTool('till_trust', { counterparty: CLEAN, rail: 'bse' });
+    assert.equal(r.triangle.vertices.settlement.status, 'not_observable');
+  });
+
+  await t('« base » reste le rail temoignable, et la casse ne compte pas', async () => {
+    /* La borne inverse: si tout devenait non temoignable, BIII perdrait la seule chose qu il sait
+     * vraiment prouver. */
+    for (const rail of ['base', 'BASE', ' usdc-base ']) {
+      const r = await callTool('till_trust', { counterparty: CLEAN, rail });
+      assert.notEqual(r.triangle.vertices.settlement.status, 'not_observable',
+        'rail ' + JSON.stringify(rail) + ' doit rester le chemin on-chain');
+    }
+  });
+
+  await t('sans rail, le comportement d avant ne bouge pas', async () => {
+    const r = await callTool('till_trust', { counterparty: CLEAN });
+    assert.equal(r.triangle.vertices.settlement.status, 'pending',
+      'aucun rail nomme = on ne suppose rien de nouveau');
+  });
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })();
