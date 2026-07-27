@@ -87,6 +87,61 @@ const { callTool } = require('../bin/biii-mcp');
       'aucun rail nomme = on ne suppose rien de nouveau');
   });
 
+  /* ── AUCUN VERDICT POUR UNE ENTREE QUE LE CRIBLE NE PEUT PAS JUGER ────────────────────────────────
+   * lib/server.js:265 rend 400 sur une adresse malformee (« no verdict for a malformed address »); le
+   * handler MCP, lui, composait le triangle sur n'importe quelle chaine — la chaine vide comprise, qui
+   * partait interroger l'oracle et le noeud LAWBOR a propos de rien.
+   *
+   * Rien de dangereux n'en sortait (tout tombait unknown / payable:false), MAIS la lentille locale
+   * affichait alors available:true, blocked:false, reason:"not a 0x address": un lecteur y lit « liste a
+   * jour, pas bloque » quand rien n'a ete crible. `available` decrit la LISTE, `reason` decrit le CRIBLE.
+   *
+   * Ce cas est ce qui reste d'un champ `screen` ajoute puis retire: une fois l'entree validee, ce champ
+   * s'accordait toujours avec `available` — variance nulle. Un test rougit; un champ decoratif, non. */
+  await t('aucun verdict n\'est compose pour une entree que le crible ne peut pas juger', async () => {
+    for (const cp of ['pas-une-adresse', '0x123', '', '0x' + '1'.repeat(39), '0x' + 'g'.repeat(40)]) {
+      const r = await callTool('till_trust', { counterparty: cp });
+      assert.ok(r.error, JSON.stringify(cp) + ' devrait etre refuse, pas juge');
+      assert.ok(!r.triangle, 'un refus ne doit porter AUCUN triangle — sinon le refus se lit comme un verdict');
+    }
+    /* Sanity: le refus n'avale pas les entrees valides. Sans ce cas, tout casser passerait pour un fix. */
+    const bon = await callTool('till_trust', { counterparty: '0x' + '1'.repeat(40) });
+    assert.ok(!bon.error && bon.triangle, 'une adresse valide reste jugee');
+    /* La casse majuscule est acceptee: l'entree est minusculisee AVANT le test, donc une adresse a
+     * checksum EIP-55 ne se fait pas refuser sur sa casse. */
+    const maj = await callTool('till_trust', { counterparty: '0X' + 'A'.repeat(40) });
+    assert.ok(!maj.error && maj.triangle, 'une adresse en majuscules reste jugee');
+  });
+
+  /* Une panne RPC est un sommet NON LU, pas la fin du triangle. L'appel on-chain etait le seul des trois
+   * sans try/catch (l'oracle en a un, le standing aussi), donc un RPC injoignable faisait remonter une
+   * exception jusqu'au handler: reponse -32000 « check arguments », et la reputation et le standing DEJA
+   * calcules jetes avec. Le module savait se degrader par sommet; le handler ne lui en laissait pas
+   * l'occasion. */
+  await t('un RPC Base injoignable rend le sommet NON LU — il ne tue pas le triangle', async () => {
+    const avant = process.env.BASE_RPC_URL;
+    process.env.BASE_RPC_URL = 'http://127.0.0.1:9/dead';
+    try {
+      const r = await callTool('till_trust', { counterparty: '0x' + '1'.repeat(40), amountMicro: '1000000' });
+      assert.ok(r.triangle, 'le triangle doit exister: une panne reseau n\'est pas une erreur d\'argument');
+      assert.strictEqual(r.triangle.vertices.settlement.status, 'unqueried');
+      /* ⚠️ PAS `failed`. Sans la branche lectrice ajoutee a settlementVertex, cette forme tombait dans le
+       * return final et sortait « not paid »: une panne RPC AFFIRMANT l'echec du paiement. */
+      assert.notStrictEqual(r.triangle.vertices.settlement.status, 'failed');
+      assert.strictEqual(r.triangle.complete, false, 'un sommet non lu rend le triangle incomplet');
+      /* ⚠️ AUCUNE assertion sur `payable` ici. Premier jet: `payable === false`. Rouge par intermittence —
+       * il depend de l'ORACLE, qui est un appel reseau: oracle injoignable => reputation nulle =>
+       * payable false; oracle joignable et favorable => payable true, avec le MEME sommet settlement non
+       * lu. Un cas qui bascule pour une raison qui n'est pas le code entraine a ignorer le rouge.
+       *
+       * Ce que ca met au jour est un CHOIX DE CONCEPTION, pas un defaut: `payable` ne branche pas sur
+       * l'ensemble UNREAD — un settlement non lu n'empeche pas un paiement dont la reputation repond,
+       * et le triangle le DIT via complete:false. A porter a Phil, pas a modifier en douce ici. */
+    } finally {
+      if (avant === undefined) delete process.env.BASE_RPC_URL; else process.env.BASE_RPC_URL = avant;
+    }
+  });
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })();

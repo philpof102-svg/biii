@@ -304,6 +304,19 @@ async function callTool(name, a = {}) {
   }
   if (name === 'till_trust') {
     const cp = String(a.counterparty || '').toLowerCase();
+    /* LA MEME ENTREE, LE MEME REFUS, SUR LES DEUX SURFACES. lib/server.js:265 rend 400 sur une adresse
+     * malformee (« no verdict for a malformed address »); ce handler, lui, composait le triangle sur
+     * n'importe quelle chaine — y compris la chaine vide, qui partait interroger l'oracle et le noeud
+     * LAWBOR « a propos de rien ». Le resultat sortait fail-closed (unknown / payable:false), donc rien
+     * de dangereux n'en sortait: c'est un defaut de FORME, corrige pour l'asymetrie, pas pour un risque.
+     *
+     * Le pont d'identite ne perd rien: till_resolve est un outil distinct, et sa propre description dit
+     * de passer a till_trust l'ADRESSE resolue. Le schema de ce parametre dit deja « 0x address ». */
+    if (!/^0x[0-9a-f]{40}$/.test(cp)) {
+      return { error: 'counterparty must be a 0x Base address (40 hex) — no verdict is composed for a '
+        + 'malformed identifier. Resolve an npub/did:key with till_resolve first, then pass the bound '
+        + 'address here (resolving is not trusting).' };
+    }
     // vertex 1 — reputation, shown as TWO LENSES kept SEPARATE (LAWBOR's discipline, verbatim): the LOCAL
     // known-bad screen (verified by THIS node against public lists, no network — decisive on a BLOCK) and
     // the ORACLE (MainStreet, ORACLE-REPORTED, advisory). They are never merged into one score — averaging
@@ -315,6 +328,18 @@ async function callTool(name, a = {}) {
     const reputation = localScreen.blocked ? { decision: 'BLOCK', score: null }
       : ((oracle.decision != null || oracle.score != null) ? { decision: oracle.decision, score: oracle.score } : null);
     const reputationLenses = {
+      /* ⚠️ `available` (« une liste est-elle chargee ? ») et `reason` (« CETTE adresse a-t-elle pu etre
+       * criblee ? ») repondent a deux questions differentes et sont colles cote a cote. Sur une
+       * contrepartie qui n'etait pas une adresse, ca donnait available:true, blocked:false,
+       * reason:"not a 0x address" — un lecteur y lit « liste a jour, pas bloque » alors que RIEN n'avait
+       * ete crible. Mesure du 2026-07-28.
+       *
+       * Un champ `screen` a d'abord ete ajoute ici pour separer les deux. Il a ete RETIRE apres mesure:
+       * la validation de `counterparty` en tete de ce handler supprime le seul cas ou les deux valeurs
+       * divergeaient, donc le champ s'accordait desormais toujours avec `available` — un signal a variance
+       * nulle, qui n'observe pas, il affirme. L'invariant est porte par un cas de test (« aucun verdict
+       * n'est compose pour une entree que le crible ne peut pas juger »), qui rougit s'il casse au lieu de
+       * rester vert en decorant. */
       local: { blocked: localScreen.blocked, available: meta.available, asOf: meta.asOf, ageDays: meta.ageDays, stale: meta.stale, reason: localScreen.reason,
         floorFingerprint: floorProvenance(KNOWN_BAD).fingerprint,   // which floor this verdict judged on — compare across nodes to prove same basis
         disclosure: 'LOCAL — screened by THIS node against public known-bad lists (no network). A BLOCK here is decisive and overrides any oracle answer. The floorFingerprint identifies WHICH floor this is: another node with the same fingerprint shares the same objective judgment basis (till_floor), proven without trusting either node.' },
@@ -389,8 +414,24 @@ async function callTool(name, a = {}) {
     if (railNamed && !witnessable) {
       settlement = { offChain: true, rail };
     } else if (a.amountMicro) {
-      const fact = await findPayment({ to: cp, minMicro: String(a.amountMicro), lookbackBlocks: 900 });
-      settlement = T.verifyPayment({ to: cp, amountMicro: String(a.amountMicro), token: T.USDC_BASE, chainId: 8453 }, fact);
+      /* UNE PANNE RPC EST UN SOMMET NON LU, PAS LA FIN DU TRIANGLE. lib/chain.js jette sur !r.ok; cet
+       * appel etait le seul des trois sans try/catch — l'oracle en a un, le standing aussi. Un RPC
+       * injoignable remontait donc jusqu'au handler, qui repondait -32000 « check arguments » et jetait la
+       * reputation et le standing DEJA calcules, en envoyant l'appelant deboguer des arguments qui n'y
+       * etaient pour rien. Le module savait se degrader par sommet; le handler ne lui en laissait pas
+       * l'occasion. Mesure du 2026-07-28: avec BASE_RPC_URL mort, till_trust JETAIT. */
+      try {
+        const fact = await findPayment({ to: cp, minMicro: String(a.amountMicro), lookbackBlocks: 900 });
+        settlement = T.verifyPayment({ to: cp, amountMicro: String(a.amountMicro), token: T.USDC_BASE, chainId: 8453 }, fact);
+      } catch (e) {
+        /* `unqueried` et pas `pending`: « je n'ai pas pu regarder » n'est pas « rien vu pour l'instant ».
+         * La branche lectrice a ete ajoutee A settlementVertex EN PREMIER — sans elle cette forme tombait
+         * dans le return final et sortait `failed`, c'est-a-dire une panne RPC AFFIRMANT que le paiement a
+         * echoue. Pire que pending, qui promet au moins une arrivee. */
+        settlement = { unqueried: true,
+          reason: 'the Base RPC could not be read (' + (e && e.name ? e.name : 'error') + ') — this vertex '
+            + 'is unread on OUR side. It is NOT "no payment found", and it is NOT pending.' };
+      }
     }
     // LOCAL CLASSIFIER lens — MainStreet's judgment reproduced on THIS node via trust-core (pure, no oracle).
     // A SEPARATE lens, never merged into the triangle's reputation input: a green-unverified PROCEED_LOW_VALUE
