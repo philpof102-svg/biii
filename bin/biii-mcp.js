@@ -135,7 +135,7 @@ const TOOLS = [
   { name: 'till_vet_meme', description: 'Which contract is the REAL memecoin among 10+ look-alikes? Fail-closed verdict from live market data (DexScreener). Returns: genuine (one contract dominates liquidity), ambiguous (top-2 tied — never certified), impersonation (the address you passed is NOT the dominant one), thin (no credible liquidity). Advisory + re-verifiable.',
     inputSchema: { type: 'object', properties: {
       symbol: { type: 'string', description: 'memecoin symbol, e.g. "TOSHI", "BRETT"' },
-      chainId: { type: 'number', description: 'optional chainId filter (e.g. 8453 for Base)' },
+      chainId: { type: ['string', 'number'], description: 'optional chain filter — the DexScreener slug ("base", "solana", "ethereum") or an EVM chain id (8453 = Base). A chain we cannot map returns NO candidates rather than silently searching every chain: being handed a Solana contract after asking for Base is worse than being handed nothing.' },
       address: { type: 'string', description: 'optional specific contract address to judge' } }, required: ['symbol'] } },
   { name: 'till_receipt', description: 'Produce the chain-anchored receipt for a VERIFIED payment (txHash + basescan link). Refuses without verification.',
     inputSchema: { type: 'object', properties: {
@@ -415,7 +415,11 @@ async function callTool(name, a = {}) {
       note: 'ADVISORY. genuine = the contract matches a verified issuer address; impersonation/unknown fail closed.' };
   }
   if (name === 'till_vet_meme') {
-    const result = await vetMeme({ symbol: a.symbol, chainId: a.chainId ? Number(a.chainId) : undefined, address: a.address });
+    /* `Number(a.chainId)` transformait 'base' en NaN — donc en « pas de filtre » — et 8453 en une valeur
+     * qui ne correspondait a aucun slug DexScreener, donc en « tout ecarter ». On passe la valeur TELLE
+     * QUELLE; lib/meme.js accepte le slug comme l'identifiant numerique et refuse ce qu'il ne sait pas
+     * traduire. Voir l'en-tete de candidatesFrom pour la mesure en production. */
+    const result = await vetMeme({ symbol: a.symbol, chainId: a.chainId, address: a.address });
     return { ...result, note: 'ADVISORY. genuine = one contract dominates liquidity (>3x runner-up); ambiguous = top-2 tied (never certified); re-verify on DexScreener/Basescan.' };
   }
   if (name === 'till_rug_powers') {
