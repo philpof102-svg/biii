@@ -132,6 +132,62 @@ t('rendre la pareille APRES la fenetre reste de l information', () => {
   assert.equal(vite.counted.length, 1, 'un renvoi dans l heure ne compte pas');
 });
 
+console.log('\nlivraison: deux bornes, jamais une seule');
+
+t('un paiement LIVRE compte dans les DEUX bornes', () => {
+  const actors = { a: acteur('a', { funder: '0xF1' }), b: acteur('b', { funder: '0xF2' }) };
+  const r = P.assess([{ from: 'a', to: 'b', amount: 10, at: 0, deliveryVerdict: 'served' }], actors);
+  assert.equal(r.reputationPaid.b, 10, 'borne haute');
+  assert.equal(r.reputationServed.b, 10, 'borne basse — la livraison est prouvee');
+  assert.equal(r.delivery.served, 1);
+  assert.equal(r.delivery.provenShare, 1);
+});
+
+t('un paiement NON VERIFIABLE compte dans la haute, PAS dans la basse', () => {
+  /* C est l etat de presque toute transaction d agent aujourd hui (cf. lib/delivery.js). L exclure
+   * rendrait le systeme inutilisable au lancement; l inclure sans le dire ferait passer un paiement pour
+   * une preuve de service. On le compte dans une borne et pas dans l autre, et l ecart est l information. */
+  const actors = { a: acteur('a', { funder: '0xF1' }), b: acteur('b', { funder: '0xF2' }) };
+  const r = P.assess([{ from: 'a', to: 'b', amount: 40, at: 0 }], actors);   // aucun verdict fourni
+  assert.equal(r.reputationPaid.b, 40, 'paye: 40');
+  assert.equal(r.reputationServed.b, undefined, 'servi: rien de prouve');
+  assert.equal(r.delivery.unverifiable, 1);
+  assert.equal(r.delivery.provenShare, 0, 'part prouvee nulle, et elle doit se voir');
+});
+
+t('une SUBSTITUTION est retiree des DEUX bornes', () => {
+  /* L acheteur a paye et recu autre chose que ce qui etait engage. Compter ca recompenserait la
+   * substitution — c est le seul verdict de livraison qui retire activement une arete. */
+  const actors = { a: acteur('a', { funder: '0xF1' }), b: acteur('b', { funder: '0xF2' }) };
+  const r = P.assess([{ from: 'a', to: 'b', amount: 999, at: 0, deliveryVerdict: 'substituted' }], actors);
+  assert.equal(r.counted.length, 0, 'l arete ne compte plus du tout');
+  assert.equal(r.reputationPaid.b, undefined, 'pas de reputation payee');
+  assert.equal(r.reputationServed.b, undefined, 'ni servie');
+  assert.equal(r.excluded.pop().reason, 'delivery_substituted');
+});
+
+t('l ecart entre les deux bornes est lisible sur un cas mixte', () => {
+  const actors = {
+    a: acteur('a', { funder: '0xF1' }), b: acteur('b', { funder: '0xF2' }),
+    c: acteur('c', { funder: '0xF3' }), d: acteur('d', { funder: '0xF4' }),
+  };
+  const r = P.assess([
+    { from: 'a', to: 'd', amount: 10, at: 0, deliveryVerdict: 'served' },
+    { from: 'b', to: 'd', amount: 30, at: 1 * H },                          // non verifiable
+    { from: 'c', to: 'd', amount: 50, at: 2 * H, deliveryVerdict: 'substituted' },
+  ], actors);
+  assert.equal(r.reputationPaid.d, 40, 'paye = 10 + 30 (la substitution est retiree)');
+  assert.equal(r.reputationServed.d, 10, 'servi = 10 seulement');
+  assert.equal(r.delivery.substituted, 1);
+  assert.ok(r.delivery.provenShare > 0 && r.delivery.provenShare < 1, 'une part prouvee intermediaire');
+});
+
+t('`reputation` reste l alias de la borne HAUTE (compatibilite)', () => {
+  const actors = { a: acteur('a', { funder: '0xF1' }), b: acteur('b', { funder: '0xF2' }) };
+  const r = P.assess([{ from: 'a', to: 'b', amount: 7, at: 0 }], actors);
+  assert.deepEqual(r.reputation, r.reputationPaid, 'alias, pour ne pas casser un appelant existant');
+});
+
 console.log('\nla sortie se qualifie elle-meme');
 
 t('la divulgation dit ce qu un paiement NE prouve PAS', () => {
