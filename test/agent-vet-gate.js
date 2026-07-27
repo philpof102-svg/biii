@@ -171,7 +171,69 @@ check('reading pages without acting is not control',
 check('navigating without acting is not control',
   bc([{ name: 'navigate', inputSchema: { properties: { url: {} } } }]), false);
 
-/* Le bilan porte le NOMBRE de cas atteints, pas seulement le nombre d'echecs: c'est ce chiffre qui aurait
- * signale les onze assertions sautees, et c'est lui que l'agregateur (`npm run test:total`) additionne. */
-process.stdout.write(`\n${lances - failed} passed, ${failed} failed\n`);
-process.exit(failed ? 1 : 0);
+/* ── LE CRIBLE A-T-IL SEULEMENT TOURNE ? ────────────────────────────────────────────────────────────
+ * `lib/screen.js` refuse explicitement d'appeler son zero un verdict propre: quand aucune liste n'est
+ * chargee il rend `{blocked:false, available:false}` avec la raison « screening UNAVAILABLE, not a clean
+ * verdict ». La couche du dessous etait donc prudente — et `vetAgent` aplatissait les deux cas sur le
+ * meme `knownBad: false`. Rien dans sa sortie ne disait si le crible avait tourne.
+ *
+ * Le cas dangereux n'est pas theorique: `vet.loadFloor()` rend `loadScreen(null)` quand
+ * `data/known-bad.json` est absent ou corrompu — un objet TRUTHY dont `available` vaut false. C'est
+ * exactement ce que le handler MCP passe. Donc au moment precis ou le plancher casse, le verdict devient
+ * faussement rassurant, en silence.
+ *
+ * Les cas passent par vetAgent(), le vrai producteur — pas par des objets fabriques a la main. Trois
+ * defauts « lecteur avant ecrivain » ont ete masques cette semaine par des fixtures ecrites a la main,
+ * qui prouvent seulement que le lecteur sait lire ce que le test vient d'ecrire.
+ *
+ * Aucune URL n'est fournie: l'introspection reseau est alors sautee, ce qui garde ces cas hors-ligne et
+ * deterministes. On mesure la frontiere screen -> payment, pas le HTTP. */
+const { vetAgent } = require('../lib/agent-vet');
+const { screenAddress, loadScreen } = require('../lib/screen');
+const PAYE = '0x' + '1'.repeat(40);
+
+(async () => {
+  process.stdout.write('\nle crible known-bad: quatre etats, pas un booleen:\n');
+
+  const plancherReel = require('../lib/vet').loadFloor();
+  const cas = [
+    ['crible cable + plancher charge -> clear', 'clear',
+      { payTo: PAYE, knownBadScreen: plancherReel, screenFn: screenAddress }],
+    /* Le cas de panne: plancher TRUTHY mais vide. Le crible est appele et repond « indisponible ». */
+    ['plancher illisible -> unavailable', 'unavailable',
+      { payTo: PAYE, knownBadScreen: loadScreen(null), screenFn: screenAddress }],
+    ['aucun crible fourni -> not_run', 'not_run', { payTo: PAYE }],
+  ];
+
+  for (const [label, attendu, opts] of cas) {
+    const r = await vetAgent(opts);
+    check(label, r.payment && r.payment.screen, attendu);
+  }
+
+  /* Le plancher charge doit VRAIMENT contenir des adresses, sinon le premier cas dit « clear » pour une
+   * raison qui n'est pas celle qu'on croit — et la garde se contenterait d'un crible vide. */
+  check('le plancher du repo n\'est pas vide', screenAddress(PAYE, plancherReel).available, true);
+
+  /* La disclosure accompagne les DEUX etats non-concluants, et seulement ceux-la: une note qui apparait
+   * aussi sur `clear` serait du bruit, et du bruit sur une garde de securite finit desactive. */
+  const nonCrible = await vetAgent({ payTo: PAYE });
+  const crible = await vetAgent({ payTo: PAYE, knownBadScreen: plancherReel, screenFn: screenAddress });
+  check('non-crible: la sortie le DIT', typeof nonCrible.unscreened === 'string', true);
+  check('crible: pas de note parasite', crible.unscreened === undefined, true);
+
+  /* ⚠️ Le verdict lui-meme ne bascule PAS. Un beneficiaire non crible n'est pas un mauvais beneficiaire,
+   * et refuser ici rendrait vetAgent inutilisable sans plancher — le fail-closed pousse trop loin cesse
+   * d'informer. La divulgation remplace le refus; c'est un choix, il est donc epingle. */
+  check('non-crible n\'est PAS traite comme known-bad', nonCrible.payment.knownBad, false);
+
+  /* Le bilan porte le NOMBRE de cas atteints, pas seulement le nombre d'echecs: c'est ce chiffre qui aurait
+   * signale les onze assertions sautees, et c'est lui que l'agregateur (`npm run test:total`) additionne. */
+  process.stdout.write(`\n${lances - failed} passed, ${failed} failed\n`);
+  process.exit(failed ? 1 : 0);
+})().catch((e) => {
+  /* Sans ce filet, une promesse rejetee tuerait le processus AVANT le bilan — et l'agregateur compte les
+   * bilans. Un fichier sans bilan doit crier, pas disparaitre. */
+  process.stdout.write(`  FAIL harnais async: ${e && e.message}\n`);
+  process.stdout.write(`\n${lances - failed} passed, ${failed + 1} failed\n`);
+  process.exit(1);
+});
