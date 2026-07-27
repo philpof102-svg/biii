@@ -76,6 +76,59 @@ function req(server, method, p, body, headers) {
     assert.equal(r.status, 200);
   });
 
+  /* ── LES DEUX CHAMPS QUI ANCRENT LA GARDE, ET LA COERCITION QUI LES ANNULAIT ──────────────────────
+   *
+   * `Number(proof.confirmations || 0)` faisait d'un champ absent un age de ZERO, c'est-a-dire la
+   * fraicheur maximale: le test `age > maxAgeBlocks` passait toujours. Et `Number(proof.blockNumber || 0)`
+   * enregistrait l'empreinte consommee au bloc 0, que le reglement suivant purgeait — rendant le
+   * paiement rejouable.
+   *
+   * ⚠️ NON EXPLOITABLE AU MOMENT DE LA CORRECTION, et le dire fait partie du travail: dans lib/chain.js,
+   * toute branche de verifyTxHash qui rend `paid: true` porte les deux champs. C'est une validation
+   * d'entree fail-closed sur une fonction EXPORTEE, pas la fermeture d'un trou ouvert.
+   *
+   * Ces cas existent parce que j'ai bouche la coercition DEUX FOIS avant qu'elle soit fermee:
+   * `Number(null)` vaut 0, puis `Number('')` vaut 0 aussi. Enumerer les valeurs fautives est un jeu
+   * qu'on perd; exiger la forme attendue le termine. */
+  await t('un age ou un bloc ILLISIBLE ne franchit pas la garde (toutes les formes falsy)', () => {
+    const M = '0x' + 'a'.repeat(40);
+    const H = (n) => '0x' + String(n).repeat(64).slice(0, 64);
+    const bon = { paid: true, to: M, valueMicro: '250000', confirmations: 5, blockNumber: 30000000 };
+    const refuse = (patch, quoi) => {
+      settle._reset();
+      const r = settle.settleOnce({ proof: { ...bon, ...patch, txHash: H(1) }, merchant: M, needMicro: '250000' });
+      assert.equal(r.ok, false, quoi + ' doit etre refuse');
+      assert.equal(r.code, 402, quoi + ' -> 402');
+    };
+    for (const v of [undefined, null, '', '   ', [], false, '5abc', NaN]) {
+      refuse({ confirmations: v }, 'confirmations=' + JSON.stringify(v));
+      refuse({ blockNumber: v }, 'blockNumber=' + JSON.stringify(v));
+    }
+  });
+
+  await t('les formes numeriques LEGITIMES passent — la garde ne doit pas tout refuser', () => {
+    /* La borne inverse. Un fail-closed pousse trop loin refuserait des preuves valides et fermerait la
+     * caisse: il faut tenir les deux cotes, pas seulement celui qui rassure. */
+    const M = '0x' + 'a'.repeat(40);
+    const H = (n) => '0x' + String(n).repeat(64).slice(0, 64);
+    const bon = { paid: true, to: M, valueMicro: '250000', blockNumber: 30000000 };
+    [5, '5', 5n].forEach((v, i) => {
+      settle._reset();
+      const r = settle.settleOnce({ proof: { ...bon, confirmations: v, txHash: H(i + 2) }, merchant: M, needMicro: '250000' });
+      assert.equal(r.ok, true, 'confirmations=' + String(v) + ' (' + typeof v + ') doit passer');
+    });
+  });
+
+  await t('un paiement trop VIEUX reste refuse — la validation n a pas remplace la fraicheur', () => {
+    const M = '0x' + 'a'.repeat(40);
+    settle._reset();
+    const r = settle.settleOnce({
+      proof: { paid: true, to: M, valueMicro: '250000', confirmations: 999999, blockNumber: 30000000, txHash: '0x' + '9'.repeat(64) },
+      merchant: M, needMicro: '250000' });
+    assert.equal(r.ok, false);
+    assert.match(r.reason, /too old/i);
+  });
+
   server.close();
   try { fs.unlinkSync(process.env.BIII_X402_CONSUMED); } catch {}
   console.log(`\nx402-replay: ${pass} passed, ${fail} failed`);
