@@ -158,6 +158,34 @@ t('historical rug_ready calls still count as strong calls — the ledger is not 
   assert.equal(c.ofWhichStrong, 1);
 });
 
+console.log('\nCOVERAGE BREACH — a verdict that recorded no basis is a failure, not a gap:');
+t('a post-feature verdict without a basis is COUNTED, not tolerated', () => {
+  // Borrowed from block/buzz's conformance crate: an entry into a critical seam that emits no trace records
+  // an implementation bug and fails closed. Ours is the verdict — if a new path stops recording its inputs,
+  // every number stays green and nothing says the ledger became unauditable.
+  const recent = at(Date.parse('2026-07-27T00:00:00.000Z'));
+  const c = scoreCalls([
+    { firstVerdict: 'caution', outcome: 'live', firstSeen: recent },                                   // no basis
+    { firstVerdict: 'caution', outcome: 'live', firstSeen: recent, basisAtFirstSight: { ownerState: 'unknown' } },
+  ], recent);
+  assert.equal(c.verdictsWithoutBasis, 1);
+  assert.equal(c.preBasisRows, 0);
+});
+t('rows OLDER than the feature are excluded and reported separately', () => {
+  // They legitimately have none. Counting them as breaches would drown the real one; hiding them entirely
+  // would leave the denominator unstated, which is the other half of the same mistake.
+  const old = at(Date.parse('2026-07-25T12:00:00.000Z'));
+  const c = scoreCalls([{ firstVerdict: 'caution', outcome: 'live', firstSeen: old }], NOW);
+  assert.equal(c.verdictsWithoutBasis, 0, 'a pre-feature row is not a breach');
+  assert.equal(c.preBasisRows, 1, 'but it is named, so the audited fraction is visible');
+});
+t('a full ledger reports zero breaches rather than staying silent', () => {
+  const recent = at(Date.parse('2026-07-27T00:00:00.000Z'));
+  const c = scoreCalls([{ firstVerdict: 'caution', outcome: 'live', firstSeen: recent, basisAtFirstSight: {} }], recent);
+  assert.equal(c.verdictsWithoutBasis, 0);
+  assert.ok('verdictsWithoutBasis' in c, 'present at zero — a field that vanishes cannot be checked');
+});
+
 console.log('\nthe watch reports its own blind hours:');
 t('a gap is counted, totalled, and named as a FLOOR', () => {
   const c = scoreCalls([rug('high_risk', 20, 1)], NOW, { blackouts: [{ hours: 9.3 }, { hours: 3 }] });
