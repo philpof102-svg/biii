@@ -197,6 +197,57 @@ function deps({ logs, allowances, solo = () => null, meta = () => null }) {
     assert.match(r.note, /STATE, not history/i);
   });
 
+  /* ── liveAllowance: QUATRE SIGNIFICATIONS, PAS DEUX ───────────────────────────────────────────────
+   * `checkApprovals` trie deja ses candidats sur trois valeurs — null (non verifie), 0n (revoque),
+   * false (« rien ici », definitif). Le repli solo, lui, rendait `null` pour TOUT ce qui n'etait pas un
+   * nombre: congestion et revert confondus, alors que le commentaire juste au-dessus du `return null`
+   * affirmait la distinction (« a revert is a definitive answer, not congestion »).
+   *
+   * Rien n'etait cache — `unchecked` est plus prudent que `notApplicable` — mais ca DILUE le seul champ
+   * qui dit « va regarder toi-meme ». Un lecteur qui voit « 12 non verifiees » dont 9 sont des
+   * non-jetons cesse de lire la ligne, et la vraie lecture ratee s'y noie. Un signal bruyant est ignore
+   * aussi surement qu'un signal absent.
+   *
+   * Cette fonction etait EXPORTEE et nommee dans aucun test, parce que `post` utilisait https.request en
+   * dur: intestable sans reseau. Le joint `postImpl` est ce qui rend ces cas possibles. */
+  const repond = (r) => async () => r;
+  const lire = (impl, opts = {}) => A.liveAllowance(opts.chain || 'base', TOKEN(2), OWNER, TOKEN(3),
+    { ...opts, postImpl: impl });
+
+  await t('une allowance vivante rend un BigInt, et zero rend 0n (pas null)', async () => {
+    assert.strictEqual(await lire(repond({ result: '0x' + '0'.repeat(63) + '5' })), 5n);
+    /* ⚠️ strictEqual: `assert.equal(0n, null)` ne PASSE pas, mais `deepEqual([0n],[null])` si — et c'est
+     * exactement la distinction a plusieurs etats que porte ce module. */
+    assert.strictEqual(await lire(repond({ result: '0x' + '0'.repeat(64) })), 0n);
+  });
+
+  await t('un revert et une reponse vide sont DEFINITIFS (false), pas « non verifie »', async () => {
+    assert.strictEqual(await lire(repond({ error: { message: 'execution reverted' } })), false);
+    /* '0x' = aucune donnee de retour: il n'y a rien a cette adresse. multicall.js le traite deja comme
+     * false; le repli solo re-essayait trois fois pour finir par rendre null. */
+    assert.strictEqual(await lire(repond({ result: '0x' })), false);
+  });
+
+  await t('la congestion et une forme illisible restent NON VERIFIEES (null)', async () => {
+    /* Le mot-cle rate/limit/busy/timeout est ce qui distingue « reessaie » de « c'est la reponse ». */
+    assert.strictEqual(await lire(repond({ error: { message: 'rate limit exceeded' } }), { attempts: 2 }), null);
+    assert.strictEqual(await lire(repond({ result: '0xzz' })), null);
+    assert.strictEqual(await lire(repond(null), { attempts: 1 }), null, 'pas de reponse du tout');
+    /* Une chaine non cablee n'est pas « rien ici »: on n'a pas regarde. */
+    assert.strictEqual(await lire(repond({ result: '0x1' }), { chain: 'chaine-inexistante' }), null);
+  });
+
+  await t('les quatre significations sont DISTINCTES deux a deux', async () => {
+    const vus = [await lire(repond({ result: '0x' + '0'.repeat(63) + '5' })),
+      await lire(repond({ result: '0x' + '0'.repeat(64) })),
+      await lire(repond({ result: '0x' })),
+      await lire(repond({ result: '0xzz' }))];
+    /* Sans ce cas, aplatir deux etats l'un sur l'autre laisserait les trois cas ci-dessus au vert tant
+     * qu'ils ne se croisent pas. C'est la garde qui empeche le retour de la confusion. */
+    assert.strictEqual(new Set(vus.map((v) => String(typeof v) + ':' + String(v))).size, 4,
+      'quatre entrees opposees doivent donner quatre sorties distinguables, pas deux');
+  });
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })();
