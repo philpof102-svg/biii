@@ -162,6 +162,51 @@ const TOKEN = '0x' + '33'.repeat(20);
     assert.notEqual(typeof reverte, 'bigint', 'un revert n est pas une valeur');
   });
 
+  await t('★ un appel REUSSI dont la donnee est illisible est NON LU, pas un revert', async () => {
+    /* LE QUATRIEME CAS, longtemps range avec le mauvais. `success` vrai et `data` non vide: l appel a
+     * abouti, mais son retour ne se decode pas. Ce n est pas un revert — c est une reponse qu on n a pas
+     * su lire. L ancienne ligne rendait `false`, c est-a-dire « repondu definitivement: aucune
+     * allocation ».
+     *
+     * La consequence traversait TROIS modules, et c est pour ca qu aucun test ne la voyait:
+     *   multicall   : illisible -> false
+     *   approvals   : ne compte comme `unchecked` que les null  -> complete: true
+     *   wallet-watch: remplace sa reference des que complete    -> l allocation SORT de la memoire
+     *   run suivant : « NEW approval … Someone granted it since » sur une allocation jamais lue.
+     * La correction de wallet-watch du 2026-07-27 fermait la QUEUE de cette chaine; la tete etait ici,
+     * dans le fichier dont l en-tete annonce justement qu un fail-open y « defeat that guard from
+     * underneath while every approvals test still passed ». Le motif etait juste, le cas manquait. */
+    const map = (r) => {
+      if (!r) return null;
+      if (!r.success || r.data === '0x') return false;
+      try { return BigInt(r.data); } catch { return null; }
+    };
+    assert.strictEqual(map(null), null, 'pas de reponse = non lu');
+    assert.strictEqual(map({ success: false, data: '0x' }), false, 'revert = reponse definitive');
+    assert.strictEqual(map({ success: true, data: '0x' }), false, 'retour vide = pas de fonction a lire');
+    assert.strictEqual(map({ success: true, data: '0xzz' }), null,
+      'succes + donnee illisible = NON LU, surtout pas « pas d allocation »');
+    assert.strictEqual(map({ success: true, data: '0x64' }), 100n);
+  });
+
+  await t('la source elle-meme applique bien cette regle', async () => {
+    /* Le cas ci-dessus reproduit la logique; celui-ci verifie qu elle est bien DANS le module — sinon on
+     * teste une copie et le fichier peut deriver sans qu un test rougisse. */
+    const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'lib', 'multicall.js'), 'utf8');
+    assert.match(src, /catch \{ return null; \}/,
+      'le catch de decodage doit rendre null (non lu), pas false (revert)');
+    assert.ok(!/try \{ return BigInt\(r\.data\); \} catch \{ return false; \}/.test(src),
+      'l ancienne forme ne doit pas revenir');
+    /* ET LA DIRECTION INVERSE. Ajoute apres une mutation qui ne mordait pas: transformer les VRAIS
+     * reverts en « non lu » passait tous les tests. Ce serait une sur-correction couteuse — le balayage
+     * ne serait plus JAMAIS complet, wallet-watch ne remplacerait plus jamais sa reference, et une
+     * allocation revoquee resterait « connue » pour toujours. Un fail-closed pousse trop loin cesse
+     * d informer: il faut que les deux bornes soient tenues, pas seulement celle qui rassure. */
+    assert.match(src, /if \(!r\.success \|\| r\.data === '0x'\) return false;/,
+      'un revert reel reste une reponse DEFINITIVE (false), sinon le balayage n est jamais complet');
+    assert.match(src, /if \(!r\) return null;/, 'aucune reponse reste NON LU');
+  });
+
   await t('zero paire demandee ne fait aucun appel et rend un tableau vide', async () => {
     assert.deepStrictEqual(await allowancesBatch('base', ADDR, []), []);
   });
