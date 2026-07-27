@@ -592,6 +592,27 @@ async function handleRpc(m) {
   } catch (e) {
     try { console.error('[biii-mcp]', method, '·', (e && (e.stack || e.message)) || e); } catch { /* log must not throw */ }
     if (isNotification) return null;
+
+    /* AN UNKNOWN TOOL IS NOT A FAILED ONE — measured by a third party before it was fixed.
+     *
+     * On 2026-07-27 the usage counter showed a call to `__verifymcp_auth_probe_<hex>__`: an external
+     * conformance probe asking what this server does with a tool name that does not exist. We answered
+     * `-32000  tool "…" failed — check arguments`, sending the caller to debug parameters for a name that
+     * was never implemented. The information was already there — callTool throws `unknown tool <name>` —
+     * and the generic catch was overwriting it.
+     *
+     * The two cases need different codes because they need different actions from the caller:
+     *   unknown tool  -> -32601 Method not found. Re-read tools/list; nothing about the arguments matters.
+     *   tool threw    -> -32000. The tool exists; the call did not work.
+     *
+     * Naming the unknown tool leaks nothing: `tools/list` is public and unauthenticated by design. The
+     * CWE-209 concern is about internal detail (stack traces, paths, upstream errors), and that stays in
+     * the server log — which is why the failed-tool branch keeps its deliberately uninformative message. */
+    const unknownTool = method === 'tools/call' && /^unknown tool /.test(String(e && e.message));
+    if (unknownTool) {
+      return { jsonrpc: '2.0', id, error: { code: -32601,
+        message: `unknown tool "${params && params.name}" — it does not exist on this server; call tools/list for the current set` } };
+    }
     // stable, non-leaky error (CWE-209): the detail is in the server log, not the JSON-RPC reply.
     const msg = method === 'tools/call' ? `tool "${params && params.name}" failed — check arguments` : 'request failed';
     return { jsonrpc: '2.0', id, error: { code: -32000, message: msg } };

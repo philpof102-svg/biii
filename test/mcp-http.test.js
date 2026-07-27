@@ -49,11 +49,35 @@ const getStatus = (s, path) => new Promise((resolve) => { const a = s.address();
   await t('GET /mcp → 405 (no server→client SSE offered)', async () => {
     assert.equal(await getStatus(s, '/mcp'), 405);
   });
-  await t('a tools/call error is GENERIC — no raw e.message leak (CWE-209)', async () => {
-    const r = await rpc(s, { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'does-not-exist' } });
+  await t('a FAILING tool gives a generic error — no raw e.message leak (CWE-209)', async () => {
+    /* The CWE-209 property, tested where it actually applies: a tool that EXISTS and throws. Its raw
+     * message can carry internal detail — paths, upstream errors, state — and none of that may reach the
+     * JSON-RPC reply. The detail belongs in the server log.
+     *
+     * This assertion used to be made against 'does-not-exist', i.e. the one case where the raw text holds
+     * no internal detail at all: 'unknown tool <name>' echoes back the caller's OWN input plus a public
+     * fact (tools/list is unauthenticated by design). Enforcing the rule there bought no safety and cost a
+     * wrong answer — see the next test. */
+    const r = await rpc(s, { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'till_create_charge', arguments: {} } });
     assert.ok(r.body.error, 'a JSON-RPC error is returned');
+    assert.strictEqual(r.body.error.code, -32000, 'a tool that exists and fails keeps the generic code');
     assert.match(r.body.error.message, /failed/, 'stable category');
-    assert.ok(!/unknown tool/i.test(r.body.error.message), 'the internal throw text is NOT leaked');
+    assert.ok(!/at \/|\bError:|node_modules|stack/i.test(r.body.error.message),
+      'no path, no stack, no upstream error text in the reply');
+  });
+  await t('an UNKNOWN tool is -32601, not a failure — measured by a third party before it was fixed', async () => {
+    /* On 2026-07-27 the usage counter recorded a call to `__verifymcp_auth_probe_<hex>__`: an external
+     * conformance probe asking what this server does with a tool that does not exist. We answered
+     * '-32000 tool "…" failed — check arguments', sending the caller to debug parameters for a name that
+     * was never implemented. An unknown tool is not a failed one, and the two need different actions:
+     * re-read tools/list, versus fix the call. */
+    const r = await rpc(s, { jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'does-not-exist' } });
+    assert.ok(r.body.error, 'a JSON-RPC error is returned');
+    assert.strictEqual(r.body.error.code, -32601, 'JSON-RPC "method not found", not a generic failure');
+    assert.match(r.body.error.message, /does not exist on this server/i, 'it must say the tool is absent');
+    assert.match(r.body.error.message, /tools\/list/, 'and point at where the real set is');
+    assert.ok(!/check arguments/i.test(r.body.error.message),
+      'never send someone to debug arguments for a tool that was never implemented');
   });
 
   s.close();
