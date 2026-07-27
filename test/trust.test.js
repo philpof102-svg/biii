@@ -86,16 +86,56 @@ t('an explicit unqueried marker carries ITS OWN reason through', () => {
   assert.match(v.reason, /503/, 'a node failure must not be flattened into a generic message');
 });
 
-t('a CONSULTED zero is a real finding, and says so', () => {
+/* ⚠️ CE TEST AFFIRMAIT L'INVERSE JUSQU'AU 2026-07-27, et il avait tort.
+ * Il posait `standingVertex({ paidMicro: '0' })` puis exigeait 'none' — « consulte, et c'est vide ».
+ * Un zero n'est une trouvaille que si le noeud POUVAIT voir autre chose. Le standing est borne par la
+ * depense propre du noeud; a spend zero il rend zero pour toute adresse de Base. Mesure sur le noeud de
+ * prod: `bound.spendMicro` = "0" — il aurait dit 'none' sur tout le monde, honnetes compris. */
+t('un zero SANS borne declaree n\'est pas une trouvaille', () => {
   const v = standingVertex({ paidMicro: '0' });
-  assert.equal(v.status, 'none', 'consulted-and-empty stays "none"');
-  assert.match(v.reason, /consulted/i, 'the wording must distinguish it from "unqueried"');
+  assert.strictEqual(v.status, 'uninformative',
+    'sans borne on ne peut pas savoir si ce zero est une mesure ou un angle mort');
+  assert.match(v.reason, /blind spot|cannot tell/i, 'la raison doit dire ce qui manque');
 });
 
-t('unqueried and none never share a wording — the bug was that they did', () => {
-  const un = standingVertex(null).reason;
-  const none = standingVertex({ paidMicro: '0' }).reason;
-  assert.notEqual(un, none, 'identical reasons is exactly the defect being fixed');
+t('un zero d\'un noeud a borne ZERO est un demarrage a froid, pas un verdict', () => {
+  const v = standingVertex({ paidMicro: '0', bound: { spendMicro: '0', maxTotalMicro: '0' } });
+  assert.strictEqual(v.status, 'uninformative');
+  assert.match(v.reason, /every address|cold start/i,
+    'il doit dire que ce noeud rend zero pour TOUT LE MONDE — c est ca l information utile');
+});
+
+t('un zero d\'un noeud qui a REELLEMENT depense est, lui, une mesure', () => {
+  /* La contrepartie de la correction: sans ce cas, `uninformative` avalerait tout et le sommet ne
+   * pourrait plus jamais rien affirmer — on aurait remplace un faux positif par une cecite totale. */
+  const v = standingVertex({ paidMicro: '0', bound: { spendMicro: '5000000' } });
+  assert.strictEqual(v.status, 'none', 'un noeud qui a paye des gens et ne voit rien ici, ca compte');
+  assert.match(v.reason, /consulted/i, 'la formulation doit la distinguer de "unqueried"');
+});
+
+t('les quatre etats du sommet ont quatre formulations distinctes', () => {
+  /* Le defaut d'origine etait deux etats partageant un texte. Le meme piege se rejoue a chaque etat
+   * ajoute, donc on verifie l'ensemble plutot que la paire. */
+  const raisons = [
+    standingVertex(null).reason,
+    standingVertex({ paidMicro: '0' }).reason,
+    standingVertex({ paidMicro: '0', bound: { spendMicro: '0' } }).reason,
+    standingVertex({ paidMicro: '0', bound: { spendMicro: '5000000' } }).reason,
+  ];
+  assert.strictEqual(new Set(raisons).size, raisons.length,
+    'deux etats qui se lisent pareil sont deux etats qu un lecteur confondra');
+});
+
+t('une borne illisible ne se devine pas — elle vaut non-declaree', () => {
+  const { standingCeiling } = require('../lib/trust.js');
+  assert.strictEqual(standingCeiling(null), null);
+  assert.strictEqual(standingCeiling({}), null, 'un objet sans champ de borne');
+  assert.strictEqual(standingCeiling({ spendMicro: 'abc' }), null, 'une borne non numerique ne vaut pas 0');
+  assert.strictEqual(standingCeiling({ spendMicro: '42' }), 42n);
+  assert.strictEqual(standingCeiling({ maxTotalMicro: '9' }), 9n, 'repli quand seul maxTotal est publie');
+  /* La somme DIRECTE est bornee par spend, pas par (1+alpha)*spend: quand les deux sont la, c est spend
+   * qui gouverne, sinon on s autoriserait une borne trop large. */
+  assert.strictEqual(standingCeiling({ spendMicro: '3', maxTotalMicro: '99' }), 3n);
 });
 
 t('a real paid history still reads as proven', () => {
@@ -118,12 +158,37 @@ t('an unqueried vertex flips `complete` and names itself', () => {
 t('a fully read triangle carries NO warning — a permanent banner stops being read', () => {
   const r = assessTriangle({
     reputation: { decision: 'PROCEED', score: 80 },
-    standing: { paidMicro: '0' },
+    /* La borne est ce qui rend ce sommet LU: elle prouve que le noeud aurait pu voir un historique et
+     * n en a pas vu. Le meme appel sans borne est desormais `uninformative`, cf. le test suivant. */
+    standing: { paidMicro: '0', bound: { spendMicro: '5000000' } },
     settlement: null,
   });
-  assert.equal(r.complete, true, 'all three were consulted, even if two answered negatively');
+  assert.strictEqual(r.complete, true, 'all three were consulted, even if two answered negatively');
   assert.deepStrictEqual(r.unqueriedVertices, []);
-  assert.equal(r.incompleteNote, undefined, 'no note when there is nothing to warn about');
+  assert.strictEqual(r.incompleteNote, undefined, 'no note when there is nothing to warn about');
+});
+
+t('un sommet UNINFORMATIF compte comme non-lu, comme un sommet absent', () => {
+  /* LE COEUR DE LA CORRECTION. Une reponse complete en apparence, qui ne distingue rien, comptait comme
+   * un sommet lu: `complete: true`, aucun avertissement, et un lecteur croyait a un triangle a trois
+   * sommets. C est plus traitre qu une absence, parce que ca a la forme d une reponse. */
+  const r = assessTriangle({
+    reputation: { decision: 'PROCEED', score: 80 },
+    standing: { paidMicro: '0', bound: { spendMicro: '0' } },
+    settlement: null,
+  });
+  assert.strictEqual(r.complete, false, 'un noeud aveugle ne rend pas le triangle complet');
+  assert.deepStrictEqual(r.unqueriedVertices, ['standing']);
+  assert.match(r.incompleteNote, /carry no information/i);
+  assert.match(r.incompleteNote, /without distinguishing this counterparty/i,
+    'la note doit couvrir le cas « a repondu, mais sans rien distinguer », pas seulement « illisible »');
+});
+
+t('uninformative n\'est jamais un vert et ne leve jamais le verdict', () => {
+  const froid = assessTriangle({ reputation: null, standing: { paidMicro: '0', bound: { spendMicro: '0' } }, settlement: null });
+  assert.strictEqual(froid.trust, 'unknown', 'un noeud aveugle n accorde aucune confiance');
+  assert.strictEqual(froid.greens, 0);
+  assert.strictEqual(froid.payable, false, 'fail-closed: on ne paie pas sur une absence d information');
 });
 
 t('unqueried never counts as a green, and never lifts the verdict', () => {

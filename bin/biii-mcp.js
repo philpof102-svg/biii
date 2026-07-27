@@ -340,14 +340,26 @@ async function callTool(name, a = {}) {
         }
         if (r.ok) {
           const j = await r.json();
-          const directMicro = String(j.directMicro || '0');
-          standing = { paidMicro: directMicro };
-          standingLens = {
-            paidUsdc: T.microToUsd(directMicro), directMicro, node: process.env.BIII_LAWBOR_URL,
-            evidence: (Array.isArray(j.direct) ? j.direct : []).slice(0, 20).map((e) => ({ txHash: e.txHash, jobId: e.jobId, amountMicro: e.amountMicro, reVerify: 'https://basescan.org/tx/' + e.txHash })),
-            bound: j.bound || null,
-            disclosure: 'ORACLE-REPORTED by the LAWBOR node (BIII does not control it) — its viewer-relative view. RE-VERIFY each txHash on Base: a number without its evidence is not proof. Never merged into reputation.',
-          };
+          /* DERIVE DE FORMAT != ZERO. `String(j.directMicro || '0')` rendait '0' quand le champ etait
+           * ABSENT, et ce '0' descendait ensuite dans le verdict comme s'il avait ete mesure. Un noeud
+           * d'une autre version, ou une reponse d'erreur en 200, devenait ainsi « aucun historique
+           * prouve » — une affirmation sur la contrepartie tiree d'une incomprehension de la reponse. */
+          if (j == null || j.directMicro == null) {
+            standing = { unqueried: true,
+              reason: 'the LAWBOR node answered 200 but without a directMicro field — a shape we do not '
+                + 'understand is unread, never zero' };
+          } else {
+            const directMicro = String(j.directMicro);
+            /* La borne du noeud voyage avec le chiffre: sans elle, un zero de demarrage a froid serait lu
+             * comme une mesure. Voir standingVertex/standingCeiling dans lib/trust.js. */
+            standing = { paidMicro: directMicro, bound: j.bound || null };
+            standingLens = {
+              paidUsdc: T.microToUsd(directMicro), directMicro, node: process.env.BIII_LAWBOR_URL,
+              evidence: (Array.isArray(j.direct) ? j.direct : []).slice(0, 20).map((e) => ({ txHash: e.txHash, jobId: e.jobId, amountMicro: e.amountMicro, reVerify: 'https://basescan.org/tx/' + e.txHash })),
+              bound: j.bound || null,
+              disclosure: 'ORACLE-REPORTED by the LAWBOR node (BIII does not control it) — its viewer-relative view. RE-VERIFY each txHash on Base: a number without its evidence is not proof. Never merged into reputation.',
+            };
+          }
         }
       } catch (e) {
         /* Un catch VIDE transformait une panne reseau en « aucun historique ». La raison est desormais
