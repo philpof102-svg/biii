@@ -131,5 +131,100 @@ t('le test morderait: un fichier de reference retire de l allowlist est detecte'
   assert.ok(!packed.has(faux), 'un fichier absent doit etre vu comme absent');
 });
 
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════
+ * CE QUI PART SANS AVOIR ETE ECRIT POUR PARTIR
+ *
+ * Les trois tests ci-dessus demandent "les bons fichiers sont-ils la ?". Ceux-ci demandent l inverse,
+ * qui est la question dangereuse: "qu est-ce qui est parti sans que personne l ait decide ?"
+ *
+ * Mesure du 2026-07-27, en reponse a "npm pas dangereux de laisser ?". Le champ `files` liste des
+ * DOSSIERS (`lib/`, `bin/`, `web/`, `vendor/`), et un dossier est empaquete tel qu il est SUR LE DISQUE
+ * au moment du publish. Pas tel qu il est dans git. Verifie en deposant deux leurres:
+ *
+ *     lib/.env             44B   -> PRESENT dans le tarball
+ *     lib/scratch-decoy.js 11B   -> PRESENT dans le tarball
+ *
+ * Aucun des deux n etait suivi par git, aucun n avait ete relu par qui que ce soit, et npm pack les a
+ * pris sans un mot. Le paquet 0.1.0 publie ne contenait aucun secret — verifie deux fois, par
+ * till_key_exposure et par un grep brut sur les octets. Ce qui manquait n etait pas la proprete du
+ * paquet, c etait ce qui la maintient au prochain coup.
+ *
+ * Et un vrai passager clandestin y etait deja: `lib/agent-vet-gate.js`, 10,7 kB, copie exacte de
+ * `test/agent-vet-gate.js` — un fichier de TEST, avec shebang et sans un seul export, dans le dossier
+ * que les consommateurs importent. Non suivi par git, donc invisible a toute relecture de diff, et
+ * pourtant livre a chaque installation depuis npm.
+ * ══════════════════════════════════════════════════════════════════════════════════════════════ */
+console.log('\npassagers clandestins: qu est-ce qui part sans avoir ete decide ?');
+
+/* Formes de fichier qui ne doivent JAMAIS sortir, quel que soit le dossier. Volontairement large: un
+ * faux positif se corrige en une ligne, un secret publie ne se retire pas — npm garde les versions, et
+ * un paquet depublie a deja ete miroite. */
+const FORMES_INTERDITES = /(^|\/)\.env|\.pem$|\.key$|(^|\/)id_(rsa|dsa|ecdsa|ed25519)$|keystore|credential|\.p12$|\.pfx$|(^|\/)secrets?\.json$|\.mnemonic$/i;
+
+t('aucun fichier en forme de secret dans le tarball', () => {
+  if (!packed) throw new Error('liste du paquet indisponible');
+  const susp = [...packed].filter((p) => FORMES_INTERDITES.test(p));
+  assert.equal(susp.length, 0,
+    'forme(s) de secret dans ce qui partirait chez tous les installateurs :\n       ' + susp.join('\n       '));
+});
+
+t('la regle de forme mord vraiment (auto-test)', () => {
+  /* Un motif qui ne matche rien passe le test precedent en etant casse. On le prouve sur des chemins
+   * temoins plutot que de faire confiance a la regex. */
+  for (const t of ['lib/.env', '.env.local', 'bin/id_rsa', 'a/b/wallet.key', 'x/credentials.json']) {
+    assert.ok(FORMES_INTERDITES.test(t), 'devrait etre refuse: ' + t);
+  }
+  for (const t of ['lib/keyscan.js', 'data/known-bad.json', 'web/index.html', 'lib/env-helper.js']) {
+    assert.ok(!FORMES_INTERDITES.test(t), 'faux positif: ' + t);
+  }
+});
+
+t('tout .js livre sous lib/ est un module, pas un script', () => {
+  if (!packed) throw new Error('liste du paquet indisponible');
+  /* `lib/` est le dossier que les consommateurs importent. Un fichier avec shebang et sans export n y
+   * est pas une bibliotheque: c est un script, un test ou un brouillon. Le require d un tel fichier
+   * EXECUTE son contenu au lieu de rendre une API. */
+  const fautifs = [];
+  for (const p of [...packed].filter((f) => f.startsWith('lib/') && /\.c?js$/.test(f))) {
+    let src; try { src = fs.readFileSync(path.join(ROOT, p), 'utf8'); } catch { continue; }
+    const raisons = [];
+    if (src.startsWith('#!')) raisons.push('shebang');
+    if (!/module\.exports|^exports\./m.test(src)) raisons.push('aucun export');
+    if (raisons.length) fautifs.push(p + '  [' + raisons.join(', ') + ']');
+  }
+  assert.equal(fautifs.length, 0,
+    'livre(s) sous lib/ sans etre un module :\n       ' + fautifs.join('\n       '));
+});
+
+t('tout fichier livre depuis un chemin de `files` est suivi par git', () => {
+  if (!packed) throw new Error('liste du paquet indisponible');
+  /* LA REGLE DE MECANISME, celle qui rattrape les cas qu on n a pas listes.
+   *
+   * npm empaquete l arbre de travail. Git est la seule chose qui garantisse qu un fichier a ete VU par
+   * quelqu un: un fichier non suivi n apparait dans aucun diff, aucune relecture, aucun historique. S il
+   * part quand meme chez tous les installateurs, il est sorti sans decision.
+   *
+   * EXEMPTION, une seule et nommee: `node_modules/trust-core/`. C est une bundleDependency declaree
+   * (`trust-core: file:./vendor/trust-core`), et npm resout le lien symbolique node_modules -> vendor
+   * pour l embarquer. La source EST suivie, sous vendor/. node_modules est gitignore par construction,
+   * donc l exiger suivi serait exiger l impossible. */
+  const EXEMPT = (p) => p.startsWith('node_modules/');
+  let suivis;
+  try {
+    suivis = new Set(execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' })
+      .split('\n').map((s) => s.trim()).filter(Boolean));
+  } catch {
+    /* Pas de git ici (installation depuis un tarball, CI sans historique): on ne peut pas conclure.
+     * Ne PAS passer en silence — un garde qui se desactive tout seul est un garde absent. */
+    console.log('       (ignore: `git ls-files` indisponible, la regle ne peut pas etre evaluee)');
+    return;
+  }
+  assert.ok(suivis.size > 50, 'sanity: git ls-files a rendu ' + suivis.size + ' entrees, trop peu pour etre vrai');
+  const clandestins = [...packed].filter((p) => !EXEMPT(p) && !suivis.has(p));
+  assert.equal(clandestins.length, 0,
+    'livre(s) a tous les installateurs sans etre suivi(s) par git — donc jamais relu(s) :\n       '
+    + clandestins.join('\n       '));
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
