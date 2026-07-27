@@ -226,5 +226,25 @@ t('tout fichier livre depuis un chemin de `files` est suivi par git', () => {
     + clandestins.join('\n       '));
 });
 
+/* ── LA VOIE MANUELLE DOIT AVOIR LA MEME PORTE QUE LA CI ────────────────────────────────────────────
+ * Constate le 2026-07-27: `biii/package.json` n'avait AUCUN `prepublishOnly`. Le workflow CI porte bien
+ * son garde-fou (« Test — never publish a red build »), mais `npm publish` lance depuis une machine —
+ * exactement le chemin emprunte ce soir-la pour sortir la 0.2.1 — ne lancait rien du tout. La 0.2.1 est
+ * partie d'un arbre vert, mais rien ne l'imposait: rouge, elle serait partie pareil.
+ *
+ * Le depot jumeau onchain-forensics avait la variante voisine: un `prepublishOnly` avec sa PROPRE liste
+ * de fichiers, qui avait diverge de `test` — la garde de derive ajoutee le meme jour n'etait donc pas
+ * sur le chemin de publication. Deux listes divergentes est la cause racine dans les deux cas.
+ *
+ * Une seule liste: `prepublishOnly` delegue a `npm test`. Tout test ajoute a la suite garde la
+ * publication par construction, au lieu de dependre de quelqu'un qui pense a editer une seconde chaine. */
+t('la publication manuelle passe par la MEME suite que la CI', () => {
+  const p = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+  const pre = String((p.scripts || {}).prepublishOnly || '');
+  assert.ok(pre, '`npm publish` sans prepublishOnly ne lance aucun test — la voie manuelle serait nue');
+  assert.strictEqual(pre.trim(), 'npm test',
+    'prepublishOnly doit DELEGUER a npm test, pas recopier une liste qui derivera (vu: ' + pre + ')');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
