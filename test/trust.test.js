@@ -1,7 +1,9 @@
 'use strict';
 // BIII trust triangle — pure composition. Run: node test/trust.test.js
 const assert = require('node:assert');
-const { assessTriangle, standingVertex, settlementVertex } = require('../lib/trust');
+/* `repVertex` etait EXPORTE mais nomme dans aucun test — le sommet dont la faute a tenu un jour de plus
+ * que les deux autres etait aussi le seul des trois sans cas direct. */
+const { assessTriangle, repVertex, standingVertex, settlementVertex } = require('../lib/trust');
 
 let pass = 0, fail = 0;
 const t = (n, fn) => { try { fn(); pass++; console.log('  ✓ ' + n); } catch (e) { fail++; console.log('  ✗ ' + n + '\n      ' + (e && e.message)); } };
@@ -31,7 +33,12 @@ t('trusted (safe to pay) when reputation is safe OR standing is proven, before s
 t('unknown when there is no positive signal (fail-closed: absence is never trust)', () => {
   const r = assessTriangle({});
   assert.equal(r.trust, 'unknown'); assert.equal(r.payable, false);
-  assert.equal(r.vertices.reputation.status, 'unknown');
+  /* CHANGED 2026-07-28, and the story is worth keeping: this line asserted 'unknown' — a NEVER-CONSULTED
+   * reputation reporting the same status as a consulted-and-empty one. The comment five lines below
+   * describes that exact trap, fixed for the standing vertex the day before, in this very file. The
+   * lesson was written down and not applied one assertion further up. Locking in a defect does not
+   * require ignorance; it only requires not re-reading the neighbour. */
+  assert.strictEqual(r.vertices.reputation.status, 'unqueried');
   /* CHANGED 2026-07-27: this line used to assert 'none', and in doing so it LOCKED IN the defect —
    * it required a never-consulted vertex to report the same verdict as a consulted-and-empty one.
    * A test can protect a bug as firmly as it protects a property. The vertex is now 'unqueried'
@@ -149,7 +156,10 @@ console.log('\nan incomplete triangle must SAY it is incomplete');
 t('an unqueried vertex flips `complete` and names itself', () => {
   const r = assessTriangle({ reputation: null, standing: null, settlement: null });
   assert.equal(r.complete, false, 'two-of-three is not a triangle');
-  assert.deepStrictEqual(r.unqueriedVertices, ['standing']);
+  /* CHANGED 2026-07-28: asserted ['standing'] on an input whose REPUTATION is just as unread (null). The
+   * list whose whole job is to NAME every unread vertex silently omitted one of the three — a triangle
+   * missing two corners reported one. Both are named now, in vertex order. */
+  assert.deepStrictEqual(r.unqueriedVertices, ['reputation', 'standing']);
   assert.match(r.incompleteNote, /INCOMPLETE/);
   assert.match(r.incompleteNote, /not a negative one/i,
     'the note must say a missing vertex is not a negative one');
@@ -327,6 +337,36 @@ t('une forme de standing illisible rend `unqueried`, elle ne jette pas', () => {
    * ferait disparaitre la distinction demarrage-a-froid / mesure que la borne sert justement a trancher. */
   assert.strictEqual(standingVertex({ paidMicro: null, bound: { spendMicro: '9000000' } }).status, 'none');
   assert.strictEqual(standingVertex({ bound: { spendMicro: '9000000' } }).status, 'none');
+});
+
+/* ── LE TROISIEME SOMMET AVAIT LA MEME FAUTE, ET ELLE A TENU UN JOUR DE PLUS ─────────────────────────
+ * repVertex rendait `unknown` pour DEUX origines opposees: « on n'a rien recu » et « on a recu une
+ * reponse sans signal exploitable ». Comme `unknown` n'appartient pas a l'ensemble UNREAD, un oracle
+ * injoignable sortait en triangle COMPLET — aucune ligne de la sortie ne disait qu'un sommet des trois
+ * n'avait pas ete lu. L'information existait pourtant chez le producteur: fetchOracle rend
+ * {error:'oracle unreachable: …'}, que le handler ecrasait sur null.
+ *
+ * Standing a ete separe le 2026-07-27, settlement aussi. La reputation est restee confondue un jour de
+ * plus, protegee par deux cas de CE fichier — dont l'un porte, cinq lignes plus haut, le commentaire qui
+ * decrit exactement ce piege pour le sommet d'a cote. */
+t('reputation: « pas interroge » et « interroge, rien trouve » sont deux statuts differents', () => {
+  assert.strictEqual(repVertex(null).status, 'unqueried', 'rien fourni = non lu');
+  assert.strictEqual(repVertex({ unqueried: true, reason: 'oracle unreachable: timeout' }).status, 'unqueried');
+  /* Consulte, et la reponse ne porte rien: c'est une MESURE, pas une absence de lecture. */
+  assert.strictEqual(repVertex({ decision: null, verdict: null, score: null }).status, 'unknown');
+  /* ⚠️ Les deux doivent DIFFERER: c'est toute la correction. Sans cette ligne, un futur aplatissement des
+   * deux sur un meme statut repasserait au vert. */
+  assert.notStrictEqual(repVertex(null).status, repVertex({ decision: null, score: null }).status);
+  /* Et le chemin normal ne bouge pas — un durcissement qui avale les cas verts n'est pas un correctif. */
+  assert.strictEqual(repVertex({ decision: 'PROCEED', score: 80 }).status, 'safe');
+  assert.strictEqual(repVertex({ decision: 'REFUSE' }).status, 'unsafe');
+});
+
+t('un oracle injoignable rend le triangle INCOMPLET (avant: il se disait complet)', () => {
+  const r = assessTriangle({ reputation: { unqueried: true, reason: 'oracle unreachable: timeout' },
+    standing: { paidMicro: '5000000', bound: { spendMicro: '9000000' } }, settlement: null });
+  assert.strictEqual(r.complete, false);
+  assert.deepStrictEqual(r.unqueriedVertices, ['reputation']);
 });
 
 t('un noeud qui se contredit rend le triangle INCOMPLET (il a repondu, il n\'a rien appris)', () => {

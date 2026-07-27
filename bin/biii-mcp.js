@@ -325,8 +325,13 @@ async function callTool(name, a = {}) {
     const meta = screenMeta(KNOWN_BAD);
     const oracle = localScreen.blocked ? { note: 'not consulted — the local BLOCK is decisive' } : await fetchOracle(cp);
     // The single decision fed to assessTriangle: local BLOCK wins; else the oracle's; else null (unknown).
+    /* ⚠️ `oracle.error` EXISTE et se perdait ici. fetchOracle distingue deja « injoignable / non-200 »
+     * ({error}) de « a repondu » ({decision, score}); cette ligne ecrasait les deux sur `null`, et
+     * repVertex(null) rendait `unknown` — un statut qui compte comme LU. Une panne de l'oracle sortait
+     * donc en triangle COMPLET. La distinction est desormais transmise telle quelle. */
     const reputation = localScreen.blocked ? { decision: 'BLOCK', score: null }
-      : ((oracle.decision != null || oracle.score != null) ? { decision: oracle.decision, score: oracle.score } : null);
+      : (oracle.error ? { unqueried: true, reason: oracle.error + ' — unread on our side, not a verdict' }
+        : ((oracle.decision != null || oracle.score != null) ? { decision: oracle.decision, score: oracle.score } : null));
     const reputationLenses = {
       /* ⚠️ `available` (« une liste est-elle chargee ? ») et `reason` (« CETTE adresse a-t-elle pu etre
        * criblee ? ») repondent a deux questions differentes et sont colles cote a cote. Sur une

@@ -271,7 +271,18 @@ function main() {
 
   if (check) {
     let drift = null;
-    try { const cur = fs.readFileSync(outPath, 'utf8'); if (cur !== rendered) drift = 'policy.json differs from the current verdict behavior'; }
+    /* ⚠️ COMPARER LE COMPORTEMENT, PAS LES FINS DE LIGNE. La comparaison etait octet a octet: le harnais
+     * ecrit en \n, et git (autocrlf) reecrit le fichier en \r\n a chaque checkout sous Windows. Un simple
+     * `git checkout eval/policy.json` suffisait donc a declencher « ⛔ DRIFT: policy.json differs from the
+     * current verdict behavior » — une DERIVE DE COMPORTEMENT annoncee alors que le contenu est identique
+     * au caractere pres. Constate le 2026-07-28: diff brut = 45 lignes changees, diff --strip-trailing-cr
+     * = aucune.
+     *
+     * Une garde qui crie au loup se fait desactiver, et celle-ci sort en 1 (elle casse `npm test`). Le
+     * risque n'est donc pas cosmetique: le premier reflexe devant une alerte permanente est de la retirer,
+     * et avec elle la detection des VRAIES derives de verdict. */
+    const memeContenu = (a, b) => a.replace(/\r\n/g, '\n') === b.replace(/\r\n/g, '\n');
+    try { const cur = fs.readFileSync(outPath, 'utf8'); if (!memeContenu(cur, rendered)) drift = 'policy.json differs from the current verdict behavior'; }
     catch { drift = 'policy.json missing — run `node eval/verdict-harness.js` to generate it'; }
     if (gateBreach.length || drift) {
       for (const g of gateBreach) console.error('  ⛔ GATE: ' + g);
