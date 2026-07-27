@@ -114,7 +114,7 @@ const sortant = (eth) => ({ to: { hash: '0x' + 'ff'.repeat(20) }, value: ETH(eth
         }
       }
     }
-    assert.deepEqual([...vus].sort(), ['fraud', 'unverified'],
+    assert.deepStrictEqual([...vus].sort(), ['fraud', 'unverified'],
       'seuls fraud et unverified doivent exister ici, jamais un verdict rassurant');
   });
 

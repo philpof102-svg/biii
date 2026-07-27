@@ -173,7 +173,7 @@ t('scanKeyPaths annonce explicitement la portee de chaque champ', () => {
 t('un dossier sans cle rend un verdict propre, et pas un verdict vide', () => {
   const r = K.scanKeyPaths([__dirname]);
   assert.equal(r.verdict, 'no_cleartext_key', 'ce dossier de tests ne doit contenir aucune vraie cle');
-  assert.deepEqual(r.secrets, [], 'aucun secret attendu');
+  assert.deepStrictEqual(r.secrets, [], 'aucun secret attendu');
   assert.ok(Array.isArray(r.vaults), 'vaults reste un tableau meme quand secrets est vide');
   assert.ok(typeof r.complete === 'boolean', '`complete` dit si quelque chose a ete saute');
 });

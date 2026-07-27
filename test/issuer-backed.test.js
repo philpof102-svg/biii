@@ -35,7 +35,7 @@ t('FAIL-SAFE: unknown network / non-0x address are dropped (never a wrong chainI
   assert.ok(!reg.some((e) => e.address === '0x' + '3c'.repeat(20)), 'unknown chain dropped');
   assert.ok(!reg.some((e) => !/^0x[0-9a-f]{40}$/.test(e.address)), 'no malformed address admitted');
   assert.doesNotThrow(() => buildFromBacked(null));
-  assert.deepEqual(buildFromBacked({ nodes: 'x' }), []);
+  assert.deepStrictEqual(buildFromBacked({ nodes: 'x' }), []);
 });
 
 t('COMPOSES with assessAsset: a Backed entry reads genuine + issuer-official (green) on its own chain', () => {

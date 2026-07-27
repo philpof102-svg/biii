@@ -109,7 +109,7 @@ console.log('\nan incomplete triangle must SAY it is incomplete');
 t('an unqueried vertex flips `complete` and names itself', () => {
   const r = assessTriangle({ reputation: null, standing: null, settlement: null });
   assert.equal(r.complete, false, 'two-of-three is not a triangle');
-  assert.deepEqual(r.unqueriedVertices, ['standing']);
+  assert.deepStrictEqual(r.unqueriedVertices, ['standing']);
   assert.match(r.incompleteNote, /INCOMPLETE/);
   assert.match(r.incompleteNote, /not a negative one/i,
     'the note must say a missing vertex is not a negative one');
@@ -122,7 +122,7 @@ t('a fully read triangle carries NO warning — a permanent banner stops being r
     settlement: null,
   });
   assert.equal(r.complete, true, 'all three were consulted, even if two answered negatively');
-  assert.deepEqual(r.unqueriedVertices, []);
+  assert.deepStrictEqual(r.unqueriedVertices, []);
   assert.equal(r.incompleteNote, undefined, 'no note when there is nothing to warn about');
 });
 

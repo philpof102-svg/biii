@@ -38,7 +38,7 @@ t('provenance names sources + asOf + a re-derive path — never asks you to trus
   const p = floorProvenance(floor([A, B], '2026-07-21', ['OFAC (MIT)', 'eth-labels (MIT)']), { now: Date.parse('2026-07-25') });
   assert.equal(p.count, 2);
   assert.equal(p.asOf, '2026-07-21');
-  assert.deepEqual(p.sources, ['OFAC (MIT)', 'eth-labels (MIT)']);
+  assert.deepStrictEqual(p.sources, ['OFAC (MIT)', 'eth-labels (MIT)']);
   assert.equal(p.ageDays, 4);
   assert.match(p.fingerprint, /^sha256:/);
   assert.match(p.reDerive, /known-bad-ingest/);

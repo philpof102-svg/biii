@@ -69,7 +69,7 @@ t('a token missing iss or sub is refused (an unidentified vouch is not an identi
 
 t('POSTURE: an attested token surfaces expires + audienceBound (the reader is never blind to a weak token)', () => {
   const strong = kyaLens(jwt(claims()), { verified: true, expectedAudience: 'seller:cafe-central', now: NOW });
-  assert.deepEqual(strong.posture, { expires: true, audienceBound: true });
+  assert.deepStrictEqual(strong.posture, { expires: true, audienceBound: true });
   assert.doesNotMatch(strong.disclosure, /NO EXPIRY|NOT REPLAY-BOUND/, 'a strong token carries no warning');
 });
 

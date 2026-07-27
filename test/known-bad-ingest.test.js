@@ -14,7 +14,7 @@ const BAD = A('a1'), DRAINER = A('b1'), LEGIT = A('c1'), SAFE = '0x833589fcd6edb
 
   await t('parseOfac: one address per line, blanks dropped', () => {
     const items = K.parseOfac(`${BAD}\n\n  ${DRAINER}  \n`);
-    assert.deepEqual(items.map((x) => x.address.toLowerCase()), [BAD, DRAINER]);
+    assert.deepStrictEqual(items.map((x) => x.address.toLowerCase()), [BAD, DRAINER]);
   });
 
   await t('parseEthLabels: a malicious label is kept; a NON-malicious label is dropped', () => {
@@ -51,7 +51,7 @@ const BAD = A('a1'), DRAINER = A('b1'), LEGIT = A('c1'), SAFE = '0x833589fcd6edb
       { items: [{ address: A('11') }, { address: A('22') }, { address: A('33') }], cap: 2 },   // cap → keep first 2
     ], { asOf: '2026-07-21', sources: ['s1', 's2'] });
     assert.equal(d.addresses.length, 4, '2 from src1 (deduped) + 2 from capped src2');
-    assert.deepEqual(d.addresses, [...d.addresses].sort(), 'sorted');
+    assert.deepStrictEqual(d.addresses, [...d.addresses].sort(), 'sorted');
     assert.equal(d.asOf, '2026-07-21');
   });
 

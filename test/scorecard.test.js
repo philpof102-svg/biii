@@ -262,7 +262,7 @@ t('it accepts the on-disk shape (an object keyed by address) as well as an array
 console.log('\nit is pure — no clock, no disk, no network:');
 t('the same rows and the same `now` give the same card twice', () => {
   const rows = [rug('rug_ready', 5, 1), live('high_risk', 0.5)];
-  assert.deepEqual(scoreCalls(rows, NOW), scoreCalls(rows, NOW));
+  assert.deepStrictEqual(scoreCalls(rows, NOW), scoreCalls(rows, NOW));
 });
 t('moving `now` forward turns an open call into a resolved false alarm, with no other input changing', () => {
   const rows = [rug('rug_ready', 10, 2), live('rug_ready', 1)];

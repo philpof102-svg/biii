@@ -80,7 +80,7 @@ t('accepts raw receipts OR ledger rows; empty input → header-only CSV', () => 
 t('buildExport bundles csv + re-checkable totals + non-custodial disclosure + a brandable filename', () => {
   const ex = buildExport([{ receipt: rcpt() }], { brand: 'Kev Pay' });
   assert.equal(ex.format, 'csv');
-  assert.deepEqual(ex.columns, COLUMNS);
+  assert.deepStrictEqual(ex.columns, COLUMNS);
   assert.equal(ex.summary.count, 1);
   assert.equal(ex.summary.grossUsd, '5.00');
   assert.equal(ex.summary.tipsUsd, '0.50');
@@ -101,7 +101,7 @@ const tA = async (n, fn) => { try { await fn(); pass++; console.log('  ✓ ' + n
     assert.ok(tool, 'till_export declared');
     assert.ok(/accountant|quickbooks|xero/i.test(tool.description), 'names the accounting job');
     assert.ok(/non-custodial|re-verif/i.test(tool.description), 'keeps the discipline in the copy');
-    assert.deepEqual(tool.inputSchema.required, ['receipts']);
+    assert.deepStrictEqual(tool.inputSchema.required, ['receipts']);
   });
 
   await tA('callTool(till_export) folds receipts → CSV + summary + disclosure (dedup honored)', async () => {

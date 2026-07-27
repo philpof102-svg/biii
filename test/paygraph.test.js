@@ -61,7 +61,7 @@ t('LAVAGE a 3: la boucle A->B->C->A est detectee comme cycle', () => {
   ], actors);
   assert.ok(r.cycles.length >= 1, 'au moins un cycle attendu, vu ' + r.cycles.length);
   assert.equal(r.counted.length, 0, 'aucune arete d un cycle pur ne doit compter');
-  assert.deepEqual(Object.keys(r.reputation), [], 'reputation nulle sur un carrousel');
+  assert.deepStrictEqual(Object.keys(r.reputation), [], 'reputation nulle sur un carrousel');
 });
 
 t('SYBIL: dix agents du meme proprietaire, finances separement', () => {
@@ -185,7 +185,7 @@ t('l ecart entre les deux bornes est lisible sur un cas mixte', () => {
 t('`reputation` reste l alias de la borne HAUTE (compatibilite)', () => {
   const actors = { a: acteur('a', { funder: '0xF1' }), b: acteur('b', { funder: '0xF2' }) };
   const r = P.assess([{ from: 'a', to: 'b', amount: 7, at: 0 }], actors);
-  assert.deepEqual(r.reputation, r.reputationPaid, 'alias, pour ne pas casser un appelant existant');
+  assert.deepStrictEqual(r.reputation, r.reputationPaid, 'alias, pour ne pas casser un appelant existant');
 });
 
 console.log('\nla sortie se qualifie elle-meme');

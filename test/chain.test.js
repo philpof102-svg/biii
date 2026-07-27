@@ -89,7 +89,7 @@ const fakeRpc = (logs, head = '0x100') => async (url, init) => {
       'till_create_invoice', 'till_check_invoice', 'till_vet_asset', 'till_receipt', 'till_roll', 'till_export',
       'till_meter', 'till_floor', 'till_resolve', 'till_kya', 'till_authorize'];
     const missing = ORIGINAL.filter((n) => !byName.has(n));
-    assert.deepEqual(missing, [], 'tools disappeared: ' + missing.join(', '));
+    assert.deepStrictEqual(missing, [], 'tools disappeared: ' + missing.join(', '));
 
     const posture = (name, re) => assert.match(byName.get(name).description, re, name + ' lost its posture line');
     posture('till_create_charge', /holds no key|moves no funds/i);

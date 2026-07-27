@@ -148,7 +148,7 @@ t('sans simulation exploitable, le verdict est unknown — pas caution', () => {
   for (const sim of [null, undefined, { ok: false }, { ok: false, honeypot: true }]) {
     const v = R.assessFromSimulationOnly(sim);
     assert.equal(v.verdict, 'unknown', JSON.stringify(sim));
-    assert.deepEqual(v.unknowns, ['*'], 'tout est inconnu, et ca doit se voir dans le champ');
+    assert.deepStrictEqual(v.unknowns, ['*'], 'tout est inconnu, et ca doit se voir dans le champ');
   }
 });
 

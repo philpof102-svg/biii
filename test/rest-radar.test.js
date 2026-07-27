@@ -29,7 +29,7 @@ function get(server, path) {
   await t('an empty radar still reports COVERAGE (what this node can authenticate)', async () => {
     const r = await get(server, '/radar');
     assert.equal(r.body.radar.coverage.issuerVerified, 2);
-    assert.deepEqual(r.body.radar.coverage.byIssuer, { Dinari: 1, Ondo: 1 });
+    assert.deepStrictEqual(r.body.radar.coverage.byIssuer, { Dinari: 1, Ondo: 1 });
     assert.equal(r.body.radar.coverage.chains, 2, 'Base + Ethereum');
     assert.equal(r.body.radar.coverage.floor.addresses, 1);
     assert.equal(r.body.radar.served, 0);
@@ -44,7 +44,7 @@ function get(server, path) {
     assert.equal(r.body.radar.served, 4, 'all four checks logged');
     assert.equal(r.body.radar.recentFlags.length, 2, 'only the impersonation + the known-bad block are flags');
     const kinds = r.body.radar.recentFlags.map((f) => f.kind + ':' + f.verdict).sort();
-    assert.deepEqual(kinds, ['asset:impersonation', 'trust:blocked']);
+    assert.deepStrictEqual(kinds, ['asset:impersonation', 'trust:blocked']);
     assert.ok(r.body.radar.recentChecks.length >= 4);
     assert.match(r.body.note, /trust radar/i);
   });

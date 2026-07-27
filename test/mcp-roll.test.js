@@ -22,7 +22,7 @@ function mkReceipt(txHash, usd) {
     assert.ok(tool, 'till_roll present in TOOLS');
     assert.match(tool.description, /trust no one/i);
     assert.match(tool.description, /non-custodial/i);
-    assert.deepEqual(tool.inputSchema.required, ['receipts']);
+    assert.deepStrictEqual(tool.inputSchema.required, ['receipts']);
   });
 
   await t('renders the provable statement + per-line txHashes + carries the disclaimer', async () => {

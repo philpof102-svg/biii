@@ -91,7 +91,7 @@ function req(server, path) {
   await t('vetLocal + localClassify agree with the MCP path (one judgment, many mouths)', async () => {
     const viaVet = vetLocal(BAD, { knownBad: FLOOR, tc: TC_STUB }).classifier;
     const direct = localClassify(BAD, { knownBad: FLOOR, tc: TC_STUB });
-    assert.deepEqual(viaVet, direct, 'the REST surface and the lib return the SAME classifier verdict');
+    assert.deepStrictEqual(viaVet, direct, 'the REST surface and the lib return the SAME classifier verdict');
   });
 
   console.log('\n' + pass + ' passed, ' + fail + ' failed');

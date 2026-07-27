@@ -81,7 +81,7 @@ t('appending nothing leaves the log untouched', () => {
   assert.equal(log.length, 1);
 });
 t('a malformed log is replaced rather than crashed on', () => {
-  assert.deepEqual(appendGap('pas un tableau', { hours: 2 }), [{ hours: 2 }]);
+  assert.deepStrictEqual(appendGap('pas un tableau', { hours: 2 }), [{ hours: 2 }]);
 });
 
 console.log('\nit is pure — no clock, no disk, no network:');
