@@ -110,10 +110,28 @@ t('renderInvoice: a non-crypto human reads the bill (FR too), pay line is the EI
  * phrase sur une PERSONNE, dans un outil pense pour « en personne + factures Web2 + agents ». Une facture
  * reglee en especes, par virement ou par carte n'apparaitra jamais sur Base — l'absence de trace n'y est
  * pas une information sur le client. */
+/* ⚠️ CES CAS PASSENT PAR createInvoice, PAS PAR UN OBJET LITTERAL.
+ * Premiere version: `I.invoiceStatus({ dueDateMs, rail }, ...)`. Ils passaient tous — pendant que
+ * `createInvoice` ne posait AUCUN champ `rail`. Le champ n'existait sur aucune facture que ce module
+ * sache produire, et les tests ne pouvaient pas s'en apercevoir puisqu'ils fabriquaient l'entree
+ * eux-memes.
+ *
+ * 💎 Un test qui CONSTRUIT son entree a la main ne prouve pas que cette entree existe. C'est la
+ * troisieme fois dans la journee que j'ecris le lecteur avant l'ecrivain (FRESH_FUNDING_WINDOW_MS dans
+ * feeder, l'etat not_observable dans trust.js, ce champ-ci) — et les trois fois, des tests verts. Passer
+ * par le producteur est ce qui transforme « la fonction gere ce cas » en « ce cas peut arriver ». */
+const facture = (rail, dueDateMs) => I.createInvoice({
+  to: '0x' + 'a'.repeat(40),
+  lineItems: [{ label: 'prestation', qty: 1, unitUsd: '250.00' }],
+  dueDateMs, rail, nowMs: Date.now(),
+});
+
 t('★ une facture sur un rail non lisible n est PAS declaree impayee', () => {
   const hier = Date.now() - 48 * 3600 * 1000;
   for (const rail of ['carte', 'sepa', 'especes', 'mastercard-agent-pay']) {
-    const r = I.invoiceStatus({ dueDateMs: hier, rail }, null, Date.now());
+    const inv = facture(rail, hier);
+    assert.strictEqual(inv.rail, rail, 'createInvoice doit POSER le rail — sinon rien ne le lit jamais');
+    const r = I.invoiceStatus(inv, null, Date.now());
     assert.strictEqual(r.status, 'not_observable', 'rail ' + rail);
     assert.strictEqual(r.rail, rail, 'le rail doit revenir au lecteur');
     assert.match(r.reason, /merchant's own records/i, 'dire OU se trouve la reponse');
@@ -125,24 +143,32 @@ t('★ une facture sur un rail non lisible n est PAS declaree impayee', () => {
 t('un rail INCONNU vaut non lisible, jamais on-chain (fail-closed sur le nom)', () => {
   /* 'bse' pour 'base': se tromper dans ce sens dit « je ne peux pas voir ». Dans l autre, ca produit
    * l accusation qu on vient de retirer. */
-  const r = I.invoiceStatus({ dueDateMs: Date.now() - 1000, rail: 'bse' }, null, Date.now());
+  const r = I.invoiceStatus(facture('bse', Date.now() - 1000), null, Date.now());
   assert.strictEqual(r.status, 'not_observable');
+});
+
+t('le rail est normalise A LA CREATION, une seule fois', () => {
+  assert.strictEqual(facture(' CARTE ', null).rail, 'carte');
+  assert.strictEqual(facture('BASE', null).rail, 'base');
+  assert.strictEqual(facture(undefined, null).rail, null, 'aucun rail declare reste null');
+  assert.strictEqual(facture('   ', null).rail, null, 'des espaces ne sont pas un rail');
 });
 
 t('sans rail, ou sur Base, le cycle de vie ne bouge pas', () => {
   /* La borne inverse: si tout devenait non lisible, le module perdrait la seule chose qu il sait prouver,
    * et une vraie facture USDC impayee cesserait d etre signalee. */
   const hier = Date.now() - 48 * 3600 * 1000;
-  for (const inv of [{ dueDateMs: hier }, { dueDateMs: hier, rail: 'base' }, { dueDateMs: hier, rail: 'BASE' }]) {
-    assert.strictEqual(I.invoiceStatus(inv, null, Date.now()).status, 'overdue', JSON.stringify(inv.rail));
+  for (const rail of [undefined, 'base', 'BASE']) {
+    assert.strictEqual(I.invoiceStatus(facture(rail, hier), null, Date.now()).status, 'overdue',
+      JSON.stringify(rail));
   }
-  assert.strictEqual(I.invoiceStatus({ dueDateMs: Date.now() + 9e6 }, null, Date.now()).status, 'issued');
+  assert.strictEqual(I.invoiceStatus(facture(undefined, Date.now() + 9e6), null, Date.now()).status, 'issued');
 });
 
 t('une PREUVE on-chain l emporte sur le rail declare', () => {
   /* La preuve bat la declaration: si quelqu un annonce « carte » mais paie en USDC et qu on peut le
    * verifier, le fait gagne. Sinon une etiquette suffirait a masquer un reglement reel. */
-  const r = I.invoiceStatus({ dueDateMs: Date.now() - 1000, rail: 'carte' },
+  const r = I.invoiceStatus(facture('carte', Date.now() - 1000),
     { paid: true, tier: 'confirmed', txHash: '0x' + 'a'.repeat(64) }, Date.now());
   assert.strictEqual(r.status, 'settled');
   assert.strictEqual(r.txHash, '0x' + 'a'.repeat(64));
