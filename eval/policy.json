@@ -25,8 +25,8 @@
     "denylistSource": "OFAC SDN extract (0xB10C) sample; production injects the full MainStreet denylist"
   },
   "corpus": {
-    "fingerprint": "3c287fd4accf5f21",
-    "size": 17,
+    "fingerprint": "cf2c4d3057b8e22e",
+    "size": 22,
     "negatives": 7,
     "failclosed": 6,
     "positives": 4
@@ -34,10 +34,12 @@
   "metrics": {
     "recall": 1,
     "failClosedHeld": 1,
+    "signalsInformative": 1,
     "positivesPayable": 1
   },
   "gates": {
     "recall": 1,
-    "failClosedHeld": 1
+    "failClosedHeld": 1,
+    "signalsInformative": 1
   }
 }
