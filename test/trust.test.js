@@ -1,7 +1,7 @@
 'use strict';
 // BIII trust triangle — pure composition. Run: node test/trust.test.js
 const assert = require('node:assert');
-const { assessTriangle, standingVertex } = require('../lib/trust');
+const { assessTriangle, standingVertex, settlementVertex } = require('../lib/trust');
 
 let pass = 0, fail = 0;
 const t = (n, fn) => { try { fn(); pass++; console.log('  ✓ ' + n); } catch (e) { fail++; console.log('  ✗ ' + n + '\n      ' + (e && e.message)); } };
@@ -182,6 +182,67 @@ t('un sommet UNINFORMATIF compte comme non-lu, comme un sommet absent', () => {
   assert.match(r.incompleteNote, /carry no information/i);
   assert.match(r.incompleteNote, /without distinguishing this counterparty/i,
     'la note doit couvrir le cas « a repondu, mais sans rien distinguer », pas seulement « illisible »');
+});
+
+/* ── un rail que BIII ne sait pas temoigner (carte, virement, Mastercard Agent Pay) ──────────────── */
+
+t('★ un rail NON OBSERVABLE ne se lit pas « en attente »', () => {
+  /* `pending` porte une promesse: « rien vu POUR L'INSTANT, ca va arriver on-chain ». Vrai d'un virement
+   * USDC non confirme. FAUX d'une jambe carte: ca n'arrivera jamais, et BIII dirait « en attente » pour
+   * toujours a propos d'un paiement deja abouti ailleurs. Question posee le 2026-07-27 a propos d'Agent
+   * Pay for Machines, qui regle en cartes, comptes bancaires ET stablecoins. */
+  const v = settlementVertex({ offChain: true, rail: 'mastercard-agent-pay' });
+  assert.strictEqual(v.status, 'not_observable');
+  assert.strictEqual(v.rail, 'mastercard-agent-pay');
+  assert.match(v.reason, /cannot witness/i);
+  assert.match(v.reason, /NOT "pending"/, 'la difference avec pending doit etre dite, pas devinee');
+  assert.match(v.reason, /may well have completed/i,
+    'ne pas laisser entendre que le paiement a echoue: on ne sait pas, c est tout');
+});
+
+t('★ un rail non observable compte comme NON-LU, donc le triangle s avoue incomplet', () => {
+  const r = assessTriangle({
+    reputation: { decision: 'PROCEED', score: 80 },
+    standing: { paidMicro: '5000000' },
+    settlement: { offChain: true, rail: 'carte' },
+  });
+  assert.strictEqual(r.complete, false);
+  assert.deepStrictEqual(r.unqueriedVertices, ['settlement']);
+  assert.match(r.incompleteNote, /carry no information/i);
+});
+
+t('mais reputation et standing PORTENT encore — sinon BIII serait inutile hors chaine', () => {
+  /* La contrepartie: si un rail non observable rendait tout inutilisable, BIII ne servirait a rien devant
+   * une carte. Les deux autres sommets ne dependent pas de la chaine et continuent de decider. */
+  const r = assessTriangle({
+    reputation: { decision: 'PROCEED', score: 80 },
+    standing: { paidMicro: '5000000' },
+    settlement: { offChain: true, rail: 'carte' },
+  });
+  assert.strictEqual(r.payable, true, 'vetté a payer par reputation + standing');
+  assert.strictEqual(r.proven, false, 'mais JAMAIS prouve: on n a rien vu');
+  assert.notStrictEqual(r.trust, 'settled', '« settled » exige une preuve on-chain');
+});
+
+t('un drapeau sur la contrepartie l emporte, meme hors chaine', () => {
+  const r = assessTriangle({
+    reputation: { decision: 'BLOCK' },
+    standing: { paidMicro: '5000000' },
+    settlement: { offChain: true, rail: 'carte' },
+  });
+  assert.strictEqual(r.trust, 'unsafe');
+  assert.strictEqual(r.payable, false, 'le rail ne change rien a un blocage');
+});
+
+t('les quatre etats du sommet settlement sont distincts', () => {
+  const etats = [
+    settlementVertex({ paid: true, tier: 'confirmed' }).status,
+    settlementVertex({ paid: false, reason: 'wrong amount' }).status,
+    settlementVertex(null).status,
+    settlementVertex({ offChain: true }).status,
+  ];
+  assert.deepStrictEqual(etats, ['settled', 'failed', 'pending', 'not_observable']);
+  assert.strictEqual(new Set(etats).size, 4, 'quatre faits distincts, quatre valeurs');
 });
 
 t('uninformative n\'est jamais un vert et ne leve jamais le verdict', () => {
