@@ -85,6 +85,63 @@ t('un pourcentage illisible compte pour 0 au lieu de casser le calcul', () => {
   assert.ok(!Number.isNaN(r));
 });
 
+/* ════════════════════════════════════════════════════════════════════════════════════════════════════
+ * DES WALLETS QU'ON N'A PAS SU LIRE NE SONT PAS DES WALLETS QUI NE DETIENNENT RIEN.
+ *
+ * `num(h.percent) || 0` repliait une part ILLISIBLE sur zero, et zero est la valeur la plus rassurante
+ * que `topWalletShare` sache rendre. Mesure du 2026-07-28 AVANT correctif, via assessRugFields:
+ *
+ *     holders:[{is_contract:0}]  ->  topWalletPct: 0, flags: [], unknowns SANS 'holder distribution'
+ *
+ * soit, octet pour octet, la sortie d'un jeton dont la distribution a ete verifiee et va bien. Le lecteur
+ * ne pouvait pas distinguer « verifie » de « pas su lire » — une absence devenue affirmation.
+ *
+ * Les deux bornes sont epinglees ici. Un fail-closed qui rendrait `null` des qu'une part manque effacerait
+ * le zero LEGITIME (tous les holders sont des contrats: chaque part a bien ete lue) et les concentrations
+ * REELLEMENT faibles, et cesserait donc d'informer. Les deux cas rassurants sont donc testes a cote du cas
+ * hostile — sinon un sur-durcissement passerait pour un correctif. */
+t('des wallets dont AUCUNE part n\'est lisible rendent null (inconnu), jamais 0 (rassurant)', () => {
+  for (const part of [{}, { percent: 'n/a' }, { percent: '' }, { percent: null }, { percent: '  ' }]) {
+    const h = Object.assign({ is_contract: 0 }, part);
+    assert.strictEqual(R.topWalletShare({ holders: [h] }), null,
+      'part illisible ' + JSON.stringify(part) + ' -> inconnu, pas « aucune concentration »');
+  }
+});
+
+t('BORNE INVERSE: les zeros et les faibles concentrations REELS survivent au durcissement', () => {
+  /* Tous les holders sont des CONTRATS (pool, locker, bridge): chaque part a ete lue, aucune n'appartient
+   * a un portefeuille. C'est une REPONSE, et elle doit rester 0 — pas null. */
+  assert.strictEqual(R.topWalletShare({ holders: [{ percent: '0.9', is_contract: 1 }] }), 0,
+    'lu, aucun wallet detenteur -> 0 reste un vrai zero');
+  /* Une distribution reellement saine reste un CHIFFRE, sinon le signal ne dit plus rien de personne. */
+  assert.strictEqual(R.topWalletShare({ holders: [{ percent: '0.05' }, { percent: '0.03' }] }), 0.05);
+  /* Une seule ligne sale ne doit pas effacer un drapeau porte par une ligne propre. */
+  assert.strictEqual(R.topWalletShare({ holders: [{ percent: 'n/a' }, { percent: '0.90' }] }), 0.90);
+});
+
+t('PAR LE PRODUCTEUR: assessRugFields REPORTE la distribution comme inconnue au lieu de se taire', () => {
+  /* Le test qui compte: `topWalletShare` pourrait rendre null sans que personne ne le dise au lecteur.
+   * On passe donc par assessRugFields — le producteur du verdict — et on regarde ce qui est PUBLIE. */
+  const ligne = (holders) => ({ owner_address: '0x' + '0'.repeat(40), lp_holders: [{ percent: '1', is_locked: 1 }],
+    holder_count: '500', holders });
+
+  const illisible = R.assessRugFields(ligne([{ is_contract: 0 }]), null);
+  assert.strictEqual(illisible.topWalletPct, null, 'aucun chiffre de concentration n\'est invente');
+  assert.ok(illisible.unknowns.includes('holder distribution'),
+    'et le verdict DIT qu\'il ne sait pas — c\'est la difference entre un trou et une affirmation');
+
+  /* Le meme verdict, sur une distribution reellement mesuree et saine: aucun inconnu sur cet axe. */
+  const mesure = R.assessRugFields(ligne([{ percent: '0.05', is_contract: 0 }]), null);
+  assert.strictEqual(mesure.topWalletPct, 0.05);
+  assert.strictEqual(mesure.unknowns.includes('holder distribution'), false,
+    'une mesure reelle ne doit PAS etre rangee dans les inconnus');
+
+  /* Et un vrai gros portefeuille leve toujours son drapeau. */
+  const gros = R.assessRugFields(ligne([{ percent: '0.90', is_contract: 0 }]), null);
+  assert.strictEqual(gros.topWalletPct, 0.90);
+  assert.ok(gros.flags.some((f) => /one wallet holds/.test(f)), 'le drapeau de concentration tient encore');
+});
+
 t('ownerIsLive est exactement ownerState() === live, sur les trois etats', () => {
   const cas = [
     [{ owner_address: '0x' + 'a'.repeat(40) }, 'live', true],
