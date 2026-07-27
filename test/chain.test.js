@@ -50,6 +50,33 @@ const fakeRpc = (logs, head = '0x100') => async (url, init) => {
     assert.ok(await findPayment({ to: M, minMicro: '1', fetchImpl: fakeRpc(real) }), 'the same tx, not excluded → found');
   });
 
+  /* THE THIRD DIMENSION OF THE SAME FILTER. The test above covers `address`, and the recipient topic is
+   * covered elsewhere — but topic[0], the event SIGNATURE, was re-verified by verifyTxHash and never by
+   * findPayment. This file's own banner says "the till believes only Transfer logs"; until 2026-07-28 it
+   * believed any log the RPC handed back.
+   *
+   * The collision is not hypothetical. USDC's Approval(owner, spender, value) has the same topic arity
+   * and a uint256 `data`, so an approval naming the merchant produced a payment FACT worth its allowance
+   * — money "received" off an event that moves nothing. An approval costs an attacker nothing and is not
+   * even a transfer to reverse.
+   *
+   * Three signatures, one legitimate: the passing case has to be here too, or a fail-closed pushed one
+   * notch too far would read exactly like a fix. */
+  await t('findPayment re-verifies the event SIGNATURE, not just the token and the recipient', async () => {
+    const APPROVAL = '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925';
+    const log = (topic0) => [{ address: USDC, transactionHash: '0x' + '66'.repeat(32), blockNumber: '0xf0',
+      data: '0x' + (7_000_000).toString(16), topics: [topic0, pad('0x' + 'ee'.repeat(20)), pad(M)] }];
+    const trouve = (topic0) => findPayment({ to: M, minMicro: '1', fetchImpl: fakeRpc(log(topic0)) });
+
+    assert.equal(await trouve(APPROVAL), null, 'an Approval moves nothing and must not be stamped a payment');
+    assert.equal(await trouve('0x' + 'de'.repeat(32)), null, 'an arbitrary signature is not a Transfer either');
+    /* Sanity: the fixture differs from the passing one ONLY by topic[0]. Without this, the two rejections
+     * above could be passing for some unrelated reason in the fixture and prove nothing. */
+    const ok = await trouve(TRANSFER_TOPIC);
+    assert.ok(ok, 'a real Transfer, same fixture otherwise, is still found');
+    assert.equal(ok.valueMicro, '7000000');
+  });
+
   await t('verifyTxHash: retrieve a tx by hash → real USDC payment facts (the accounting proof), fail-closed', async () => {
     const TX = '0x' + '99'.repeat(32);
     // a fake RPC: eth_getTransactionReceipt returns a receipt with a USDC Transfer log; eth_blockNumber = head
