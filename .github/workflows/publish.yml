@@ -79,6 +79,33 @@ jobs:
             exit 1
           fi
 
+      # ══════════════════════════════════════════════════════════════════════════════════════
+      # LE JETON npm EXISTE-T-IL, AVANT de tenter quoi que ce soit — constate le 2026-07-27.
+      #
+      # Sur le tag v0.2.1, `npm publish` a echoue en ENEEDAUTH: le secret NPM_TOKEN n'est pas
+      # defini sur le depot, donc NODE_AUTH_TOKEN arrivait VIDE. L'echec a tue le job, et les
+      # quatre etapes suivantes — dont la publication au registre MCP, qui s'authentifie en OIDC
+      # et n'a AUCUN besoin de npm — ont ete « skipped ». Dans le journal ca ressemble a un saut
+      # deliberé, pas a un blocage.
+      #
+      # C'est le meme motif que celui decrit plus haut (npm bloque le registre pour une raison qui
+      # ne le concerne pas), avec une autre cause. Le correctif de ce matin rendait npm conditionnel
+      # a « deja publie » — il ne couvrait pas « npm ne peut pas s'authentifier du tout ».
+      #
+      # On echoue donc TOT et EXPLICITEMENT, en nommant ce qui manque. Pas de continue-on-error:
+      # sans npm la release ne peut pas aboutir, et le registre ne DOIT pas annoncer une version que
+      # npm ne sert pas — c'est le pire cas que la garde plus bas existe pour empecher.
+      # ══════════════════════════════════════════════════════════════════════════════════════
+      - name: le jeton npm est-il configure ?
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "::error::le secret NPM_TOKEN est absent du depot — npm publish echouerait en ENEEDAUTH et emporterait avec lui la publication au registre MCP, qui n'en a pourtant pas besoin (OIDC). Ajouter un token d'automatisation npm dans Settings → Secrets → Actions, ou publier a la main depuis une machine connectee (npm publish --access public)."
+            exit 1
+          fi
+          echo "NPM_TOKEN present"
+
       - name: npm — cette version est-elle deja publiee ?
         id: npmstate
         run: |
