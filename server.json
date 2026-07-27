@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.philpof102-svg/biii",
-  "description": "Safe-to-pay & token-genuineness verdicts on Base. Fail-closed, non-custodial: is a token the genuine issuer's or a look-alike? is a wallet known-bad? has the wallet that paid for a launch already killed one? Every verdict re-verifiable on-chain.",
+  "description": "Fail-closed safe-to-pay verdicts on Base: known-bad wallets, look-alike tokens, repeat rug funders.",
   "status": "active",
   "repository": {
     "url": "https://github.com/philpof102-svg/biii",

@@ -35,6 +35,12 @@ const EXCLUS = new Map([
     + 'cinquante fichiers avant lui ont deja tape des RPC — donc rouge pour une raison qui n\'est pas le code. '
     + 'Une suite instable entraine a ignorer le rouge, ce qui est pire que de ne pas avoir le test. Lance '
     + 'deliberement par `npm run test:chain`.'],
+  ['schema-drift.js',
+    'va chercher le schema du registre MCP EN DIRECT. Meme raison que e2e-real-chain: une dependance reseau '
+    + 'dans la suite la rend rouge pour des motifs qui ne sont pas le code. Son role est le contrepoids des '
+    + 'contraintes FIGEES dans server-json.test.js, qui vieillissent en silence — il compare le fige au reel '
+    + 'et sort en 1 s\'il y a derive. Lance par `npm run test:schema`, a faire tourner quand le registre '
+    + 'annonce une version de schema ou apres un 422 inattendu.'],
 ]);
 
 let pass = 0, fail = 0;
