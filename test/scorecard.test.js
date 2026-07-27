@@ -158,6 +158,28 @@ t('historical rug_ready calls still count as strong calls — the ledger is not 
   assert.equal(c.ofWhichStrong, 1);
 });
 
+console.log('\nthe watch reports its own blind hours:');
+t('a gap is counted, totalled, and named as a FLOOR', () => {
+  const c = scoreCalls([rug('high_risk', 20, 1)], NOW, { blackouts: [{ hours: 9.3 }, { hours: 3 }] });
+  assert.equal(c.watchGaps, 2);
+  assert.equal(c.hoursUnwatched, 12.3);
+  assert.equal(c.longestGapHours, 9.3);
+  assert.match(c.coverageNote, /FLOOR/);
+  assert.match(c.coverageNote, /cannot be recovered/i);
+});
+t('no gap says so explicitly rather than staying silent', () => {
+  // Silence would be indistinguishable from "we never checked", which is the failure being prevented.
+  const c = scoreCalls([rug('high_risk', 20, 1)], NOW);
+  assert.equal(c.watchGaps, 0);
+  assert.equal(c.hoursUnwatched, 0);
+  assert.match(c.coverageNote, /continuously watched/i);
+});
+t('a malformed gap entry does not silently count as zero hours', () => {
+  const c = scoreCalls([rug('high_risk', 20, 1)], NOW, { blackouts: [{ hours: 'n/a' }, { hours: 4 }] });
+  assert.equal(c.watchGaps, 2, 'the unreadable gap is still a gap — it happened, we just cannot size it');
+  assert.equal(c.hoursUnwatched, 4, 'and its hours are not invented');
+});
+
 console.log('\nthe founding signal reports whether it has ever fired:');
 t('armedPowersObserved counts the tokens where a power was actually fireable', () => {
   const armed = { ...rug('rug_ready', 5, 1), armedAtFirstSight: ['HONEYPOT — buys succeed, sells do not'] };

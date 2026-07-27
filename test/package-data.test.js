@@ -81,8 +81,21 @@ t('aucun etat d execution ne part dans le paquet', () => {
 });
 
 console.log('\nanti-derive: un nouveau fichier de donnees ne peut pas etre oublie');
-t('toute reference data/... du source est classee', () => {
-  // On balaie le source pour les chemins data construits via path.join(..., 'data', ...).
+t('toute reference data/... du CODE LIVRE est classee', () => {
+  /* PERIMETRE DERIVE DE `files`, PAS ECRIT EN DUR.
+   *
+   * Ce garde ne verifie pas tout le depot: il verifie ce que RECOIT un installateur. `hermes/` n'est pas
+   * livre, donc les fichiers de donnees que seul le radar lit (data/token-radar/blackouts.json) ne
+   * concernent pas le paquet — les exiger dedans gonflerait le tarball pour rien.
+   *
+   * Mais un perimetre ecrit en dur derive: le jour ou `hermes/` entre dans `files`, un balayage fige sur
+   * lib/+bin/ continuerait de dire vert en ayant cesse de couvrir le code livre. Il est donc LU depuis
+   * `files`, et suit tout seul. */
+  const shipped = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).files || [];
+  const dirs = shipped.filter((f) => f.endsWith('/')).map((f) => path.join(ROOT, f.replace(/\/$/, '')))
+    .filter((d) => { try { return fs.statSync(d).isDirectory(); } catch { return false; } });
+  assert.ok(dirs.length >= 2, 'sanity: au moins lib/ et bin/ devraient etre livres, vu ' + dirs.length);
+
   const files = [];
   const walk = (d) => {
     for (const it of fs.readdirSync(d, { withFileTypes: true })) {
@@ -91,8 +104,7 @@ t('toute reference data/... du source est classee', () => {
       if (it.isDirectory()) walk(p); else if (/\.c?js$/.test(it.name)) files.push(p);
     }
   };
-  walk(path.join(ROOT, 'lib'));
-  walk(path.join(ROOT, 'bin'));
+  for (const d of dirs) walk(d);
 
   const trouves = new Set();
   for (const f of files) {

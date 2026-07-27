@@ -30,6 +30,7 @@ const { traceFeeder, SIBLING_ALERT } = require('../../lib/feeder');
 const { vetMeme } = require('../../lib/meme');
 const { classifyB20 } = require('../../lib/b20');
 const { scoreCalls } = require('../../lib/scorecard');
+const GAP = require('../../lib/watch-gap');   // les heures ou personne ne regardait, ecrites au lieu d etre absorbees
 
 const DB_DIR = path.join(__dirname, '..', '..', 'data', 'token-radar');
 const TOKENS = path.join(DB_DIR, 'tokens.json');          // per-token state (the memory)
@@ -227,12 +228,44 @@ async function currentLiquidity(addrs) {
   return out;
 }
 
+/* Gaps in the watch, recorded as facts rather than absorbed in silence.
+ *
+ * On 2026-07-27 this radar had not run for 9.3 hours — the machine slept and the Hermes gateway restarted.
+ * Nothing anywhere said so. A launch that appeared AND died inside those nine hours was never seen, was never
+ * counted as a rug, and never will be: the harvest only shows pools that exist NOW.
+ *
+ * That makes the whole scorecard a FLOOR during a blackout, and a blackout reads exactly like a quiet market.
+ * It is the same trap this file already handles for a throttled API — "we could not look" is not "there was
+ * nothing to see" — applied to the asset itself instead of to one call.
+ *
+ * A gap is only recorded past MAX_QUIET_H, because the schedule is hourly and a late run is not a blackout. */
+const BLACKOUTS = path.join(DB_DIR, 'blackouts.json');
+
+/* The decision itself lives in lib/watch-gap.js, pure and tested — because a detector that stays silent
+ * one time too many puts the blackout back where it was: invisible. The rows that matter there are the
+ * ones where a plausible implementation says nothing (a first run, a clock moved backwards, a merely late
+ * run), and they are only checkable offline. This function is just the disk around it. */
+function recordBlackout(db, nowIso) {
+  const gap = GAP.detectGap(GAP.newestObservation(db), Date.parse(nowIso));
+  if (!gap) return null;
+  writeJSON(BLACKOUTS, GAP.appendGap(readJSON(BLACKOUTS, []), gap));
+  return gap;
+}
+
 (async () => {
   fs.mkdirSync(DB_DIR, { recursive: true });
   const db = readJSON(TOKENS, {});
   const now = new Date().toISOString();
+  const blackout = recordBlackout(db, now);
   const lines = [];
   let obsOut = '';
+
+  if (blackout) {
+    lines.push('🕳️ WATCH GAP: nothing was observed for ' + blackout.hours + 'h (' +
+      blackout.from.slice(11, 16) + 'Z → ' + blackout.to.slice(11, 16) + 'Z). Launches that appeared AND died ' +
+      'inside that window were never seen and can never be recovered — the harvest only shows pools that exist ' +
+      'now. Every count below is a FLOOR for that period, and a gap reads exactly like a quiet market.');
+  }
 
   // ---------- 3. LEARN FIRST: grade what we said about tokens we already track -------------------
   const tracked = Object.keys(db).filter((k) => db[k].outcome === 'live');
@@ -499,7 +532,8 @@ async function currentLiquidity(addrs) {
    * a row for each of the three ways this scorecard has actually lied about our own performance.
    *
    * `now` is passed in rather than read inside, which is what lets a test place a token at any age. */
-  const card = scoreCalls(all, now);
+  // The card carries the watch's own gaps: a count of rugs is only as complete as the hours it covers.
+  const card = scoreCalls(all, now, { blackouts: readJSON(BLACKOUTS, []) });
 
   writeJSON(TOKENS, db);
   writeJSON(CARD, card);
