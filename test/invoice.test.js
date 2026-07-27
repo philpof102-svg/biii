@@ -101,5 +101,52 @@ t('renderInvoice: a non-crypto human reads the bill (FR too), pay line is the EI
   assert.match(fr, /FACTURE/); assert.match(fr, /Échéance/);
 });
 
+/* ── « OVERDUE — PAST DUE, UNPAID » SUR UNE FACTURE PAYEE PAR CARTE ─────────────────────────────────
+ * Mesure du 2026-07-27, sur ce module: une facture Web2 echue depuis deux jours et reglee PAR CARTE
+ * ressortait en `overdue / past due, unpaid`. Le client avait paye. BIII avait regarde Base, n'y avait
+ * rien vu, et en avait conclu un impaye.
+ *
+ * C'est la sortie la plus lourde de cette famille dans tout le produit: ce n'est pas un score, c'est une
+ * phrase sur une PERSONNE, dans un outil pense pour « en personne + factures Web2 + agents ». Une facture
+ * reglee en especes, par virement ou par carte n'apparaitra jamais sur Base — l'absence de trace n'y est
+ * pas une information sur le client. */
+t('★ une facture sur un rail non lisible n est PAS declaree impayee', () => {
+  const hier = Date.now() - 48 * 3600 * 1000;
+  for (const rail of ['carte', 'sepa', 'especes', 'mastercard-agent-pay']) {
+    const r = I.invoiceStatus({ dueDateMs: hier, rail }, null, Date.now());
+    assert.strictEqual(r.status, 'not_observable', 'rail ' + rail);
+    assert.strictEqual(r.rail, rail, 'le rail doit revenir au lecteur');
+    assert.match(r.reason, /merchant's own records/i, 'dire OU se trouve la reponse');
+    assert.match(r.reason, /NOT "unpaid"/, 'la difference doit etre dite, pas devinee');
+    assert.ok(!/past due/.test(r.reason), 'aucune formulation d impaye ne doit subsister');
+  }
+});
+
+t('un rail INCONNU vaut non lisible, jamais on-chain (fail-closed sur le nom)', () => {
+  /* 'bse' pour 'base': se tromper dans ce sens dit « je ne peux pas voir ». Dans l autre, ca produit
+   * l accusation qu on vient de retirer. */
+  const r = I.invoiceStatus({ dueDateMs: Date.now() - 1000, rail: 'bse' }, null, Date.now());
+  assert.strictEqual(r.status, 'not_observable');
+});
+
+t('sans rail, ou sur Base, le cycle de vie ne bouge pas', () => {
+  /* La borne inverse: si tout devenait non lisible, le module perdrait la seule chose qu il sait prouver,
+   * et une vraie facture USDC impayee cesserait d etre signalee. */
+  const hier = Date.now() - 48 * 3600 * 1000;
+  for (const inv of [{ dueDateMs: hier }, { dueDateMs: hier, rail: 'base' }, { dueDateMs: hier, rail: 'BASE' }]) {
+    assert.strictEqual(I.invoiceStatus(inv, null, Date.now()).status, 'overdue', JSON.stringify(inv.rail));
+  }
+  assert.strictEqual(I.invoiceStatus({ dueDateMs: Date.now() + 9e6 }, null, Date.now()).status, 'issued');
+});
+
+t('une PREUVE on-chain l emporte sur le rail declare', () => {
+  /* La preuve bat la declaration: si quelqu un annonce « carte » mais paie en USDC et qu on peut le
+   * verifier, le fait gagne. Sinon une etiquette suffirait a masquer un reglement reel. */
+  const r = I.invoiceStatus({ dueDateMs: Date.now() - 1000, rail: 'carte' },
+    { paid: true, tier: 'confirmed', txHash: '0x' + 'a'.repeat(64) }, Date.now());
+  assert.strictEqual(r.status, 'settled');
+  assert.strictEqual(r.txHash, '0x' + 'a'.repeat(64));
+});
+
 console.log(`\n${pass} passed · ${fail} failed`);
 process.exit(fail ? 1 : 0);
