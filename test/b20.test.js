@@ -36,18 +36,20 @@ const NATIF = '0xb200000000000000000000602c95f70b5d3aea2d';
 const IMPOSTOR = '0xb200fb5839afa4d7761981143617c5799f063b7f';
 const ORDINAIRE = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913';   // USDC Base
 
-const code = (bytes) => async () => '0x' + 'ab'.repeat(bytes);
+const code = (bytes) => async () => '0x' + 'ab'.repeat(bytes);   // du code ORDINAIRE, jamais le marqueur
+const MARQUEUR = async () => '0xef';                              // le marqueur natif, exact
 const muet = async () => null;                                    // le RPC n'a pas repondu
 
 (async () => {
   console.log('b20: le prefixe est une revendication, le bytecode est la preuve');
 
   await t('un vrai natif — 1 octet de code — est reconnu, avec ses chiffres', async () => {
-    const r = await classifyB20('base', NATIF, { rpcImpl: code(1) });
+    const r = await classifyB20('base', NATIF, { rpcImpl: MARQUEUR });
     assert.equal(r.verdict, 'native_b20');
     assert.equal(r.isNativeB20, true);
     assert.equal(r.impostor, false);
     assert.equal(r.codeBytes, 1);
+    assert.equal(r.marker, '0xef', 'le marqueur exact doit etre rapporte');
     assert.equal(r.zeroRun, 18, 'la course de zeros du vrai layout doit etre rapportee');
   });
 
@@ -55,9 +57,11 @@ const muet = async () => null;                                    // le RPC n'a 
     /* C est le piege du module: un lecteur presse lit "native_b20" comme "authentique donc bon". Or
      * l emetteur d un B20 peut GELER et BRULER le solde d un detenteur au niveau du standard — une
      * capacite qu aucun ERC-20 n a et qu aucun scanner ERC-20 ne cherche. */
-    const r = await classifyB20('base', NATIF, { rpcImpl: code(1) });
+    const r = await classifyB20('base', NATIF, { rpcImpl: MARQUEUR });
     assert.match(r.reason, /freeze and burn/i, 'le pouvoir de gel/brulure doit etre dit');
-    assert.match(r.reason, /not visible to ERC-20 scanners/i, 'et le fait qu un scanner ordinaire l ignore');
+    assert.match(r.reason, /no ERC-20 scanner looks for/i, 'et le fait qu un scanner ordinaire l ignore');
+    assert.match(r.reason, /NOT the safe outcome/i, 'natif ne doit jamais se lire comme rassurant');
+    assert.match(r.reason, /EIP-3541/, 'la raison doit citer la regle qui rend le marqueur infalsifiable');
   });
 
   await t('un impostor — du vrai bytecode sous le prefixe — est demasque', async () => {
@@ -71,19 +75,39 @@ const muet = async () => null;                                    // le RPC n'a 
       'la raison doit dire ce que l impostor N A PAS, pas seulement qu il ment');
   });
 
-  console.log('\nla frontiere de taille, testee des deux cotes');
+  console.log('\nle marqueur est EXACT — la faille que le seuil laissait ouverte');
 
-  await t('exactement NATIVE_CODE_MAX octets reste natif; un de plus est un impostor', async () => {
-    const juste = await classifyB20('base', NATIF, { rpcImpl: code(NATIVE_CODE_MAX) });
-    assert.equal(juste.verdict, 'native_b20', NATIVE_CODE_MAX + ' octets doit rester natif (borne inclusive)');
-    const unDePlus = await classifyB20('base', NATIF, { rpcImpl: code(NATIVE_CODE_MAX + 1) });
-    assert.equal(unDePlus.verdict, 'prefix_impostor', (NATIVE_CODE_MAX + 1) + ' octets bascule');
+  await t('UN OCTET QUI N EST PAS 0xef est un impostor, pas un natif', async () => {
+    /* LA FAILLE CORRIGEE. Le test etait `codeBytes <= 32`, donc tout contrat de 32 octets ou moins a une
+     * adresse 0xb200 obtenue par force brute passait pour authentique. Demontre le 2026-07-27 contre le
+     * classifieur LIVRE: 0x00, 0xff et 32 octets de vrai code rendaient TOUS LES TROIS native_b20.
+     * Trois faux positifs sur quatre cas. */
+    for (const octet of ['0x00', '0xff', '0x60', '0xab']) {
+      const r = await classifyB20('base', NATIF, { rpcImpl: async () => octet });
+      assert.equal(r.verdict, 'prefix_impostor', octet + ' fait UN octet mais n est pas le marqueur');
+      assert.equal(r.isNativeB20, false);
+    }
   });
 
-  await t('zero octet de code est natif — un compte sans code n est pas un contrat ordinaire', async () => {
+  await t('32 octets de code ne peuvent plus passer pour natifs', async () => {
+    /* Trente-deux octets suffisent largement a un proxy minimal qui delegue vers de la logique arbitraire:
+     * l attaquant n a jamais eu besoin de contrefaire 0xEF, seulement de rester sous le seuil. */
+    const r = await classifyB20('base', NATIF, { rpcImpl: code(32) });
+    assert.equal(r.verdict, 'prefix_impostor');
+    assert.equal(r.codeBytes, 32);
+  });
+
+  await t('le marqueur est insensible a la casse — pas d echappatoire par 0xEF majuscule', async () => {
+    const maj = await classifyB20('base', NATIF, { rpcImpl: async () => '0xEF' });
+    assert.equal(maj.verdict, 'native_b20');
+  });
+
+  await t('un compte VIDE (0x) n est pas un natif — c est une adresse sans contrat', async () => {
+    /* Avant, 0 octet passait le seuil et rendait native_b20. Une adresse sans code n est pas un B20:
+     * c est une EOA, ou un contrat pas encore deploye. */
     const r = await classifyB20('base', NATIF, { rpcImpl: async () => '0x' });
     assert.equal(r.codeBytes, 0);
-    assert.equal(r.verdict, 'native_b20');
+    assert.equal(r.verdict, 'prefix_impostor', 'aucun code n est pas le marqueur');
   });
 
   console.log('\nfail-closed: ne pas avoir lu n est pas un verdict');
@@ -144,10 +168,10 @@ const muet = async () => null;                                    // le RPC n'a 
   await t('les deux discriminants concordent sur les deux temoins reels', async () => {
     /* Ils sont independants: la taille du code peut changer si le standard evolue, la forme de l adresse
      * non. Qu ils concordent sur les cas mesures est ce qui rend le verdict defendable. */
-    const n = await classifyB20('base', NATIF, { rpcImpl: code(1) });
-    assert.ok(n.codeBytes <= NATIVE_CODE_MAX && n.zeroRun > 10, 'natif: peu de code ET longue course de zeros');
+    const n = await classifyB20('base', NATIF, { rpcImpl: MARQUEUR });
+    assert.ok(n.marker === '0xef' && n.zeroRun > 10, 'natif: marqueur exact ET longue course de zeros');
     const i = await classifyB20('base', IMPOSTOR, { rpcImpl: code(4509) });
-    assert.ok(i.codeBytes > NATIVE_CODE_MAX && i.zeroRun === 0, 'impostor: du code ET aucune course de zeros');
+    assert.ok(i.marker !== '0xef' && i.zeroRun === 0, 'impostor: pas le marqueur ET aucune course de zeros');
   });
 
   await t('le prefixe attendu est bien 0xb200', async () => {
