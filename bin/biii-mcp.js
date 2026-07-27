@@ -321,11 +321,23 @@ async function callTool(name, a = {}) {
     // it is a SECOND service BIII does not control, so it is labeled ORACLE-REPORTED and shipped WITH its
     // EVIDENCE — the txHashes behind the number — so the reader RE-VERIFIES on Base instead of trusting a
     // node's bare figure. Use /why (number + evidence) not /credit (number alone). Fail-closed on absence.
-    let standing = null;        // the decision fed to assessTriangle: { paidMicro }
+    /* TROIS ISSUES, JAMAIS DEUX — corrige le 2026-07-27.
+     * Avant, `standing` restait `null` que la variable soit absente OU que le noeud ait echoue, et
+     * `standingVertex(null)` rendait « no proven history yet »: une AFFIRMATION sur la contrepartie alors
+     * qu'aucun appel n'avait ete fait. Le `catch {}` vide rendait meme une panne indiscernable d'une
+     * absence de configuration. On distingue desormais, et chaque cas porte SA raison. */
+    let standing = null;        // the decision fed to assessTriangle: { paidMicro } | { unqueried, reason }
     let standingLens = null;    // the auditable display lens (re-verifiable, never merged into reputation)
-    if (process.env.BIII_LAWBOR_URL) {
+    if (!process.env.BIII_LAWBOR_URL) {
+      standing = { unqueried: true,
+        reason: 'BIII_LAWBOR_URL is not set, so the LAWBOR node was never asked. This vertex is missing on '
+          + 'OUR side and says nothing about the counterparty.' };
+    } else {
       try {
         const r = await fetch(`${process.env.BIII_LAWBOR_URL.replace(/\/$/, '')}/why?of=${encodeURIComponent(cp)}`, { signal: AbortSignal.timeout(8000) });
+        if (!r.ok) {
+          standing = { unqueried: true, reason: 'the LAWBOR node answered HTTP ' + r.status + ' — unread, not empty' };
+        }
         if (r.ok) {
           const j = await r.json();
           const directMicro = String(j.directMicro || '0');
@@ -337,7 +349,12 @@ async function callTool(name, a = {}) {
             disclosure: 'ORACLE-REPORTED by the LAWBOR node (BIII does not control it) — its viewer-relative view. RE-VERIFY each txHash on Base: a number without its evidence is not proof. Never merged into reputation.',
           };
         }
-      } catch {}
+      } catch (e) {
+        /* Un catch VIDE transformait une panne reseau en « aucun historique ». La raison est desormais
+         * portee jusqu'au verdict: le lecteur voit qu'on n'a pas pu lire, pas qu'il n'y avait rien. */
+        standing = { unqueried: true,
+          reason: 'the LAWBOR node could not be reached (' + (e && e.name ? e.name : 'error') + ') — unread, not empty' };
+      }
     }
     // vertex 3 — settlement (on-chain), only if an amount is being checked
     let settlement = null;
