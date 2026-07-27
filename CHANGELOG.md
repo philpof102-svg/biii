@@ -1,6 +1,19 @@
 # Changelog
 
-## 0.2.0 — 2026-07-27
+## 0.2.1 — 2026-07-27
+
+Same contents as the 0.2.0 entry below — the number moved for a release-plumbing reason, not a code one.
+
+**0.2.0 was never usable as a version.** A `v0.2.0` tag already existed on `origin`, pointing at an older
+commit whose `package.json` declared `0.1.0`. Nothing in the publish workflow compared the tag name to the
+package version, so that run published **0.1.0 under a tag announcing 0.2.0** — which is why npm sat at
+0.1.0 while the repo believed a 0.2.0 had shipped. A pushed tag cannot be re-pointed without rewriting
+public history, so the clean exit is a new number.
+
+The workflow now **refuses to publish when the tag, `package.json` and `server.json` disagree**, so this
+cannot recur by inattention.
+
+## 0.2.0 — never published (tag collision, see above)
 
 A minor bump rather than a patch, because several of these **change what a verdict says**. If you pin
 `biii-mcp`, read this before upgrading: calls that used to return one answer now return another, and in

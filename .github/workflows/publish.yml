@@ -51,6 +51,34 @@ jobs:
       # Corrige en rendant l'etape npm CONDITIONNELLE a l'etat reel du registre npm, au lieu de
       # la laisser echouer. Pas de continue-on-error : ca avalerait aussi les vraies pannes npm.
       # ══════════════════════════════════════════════════════════════════════════════════════
+      # ══════════════════════════════════════════════════════════════════════════════════════
+      # LE TAG DOIT DIRE LA MEME CHOSE QUE package.json — constate le 2026-07-27.
+      #
+      # `v0.2.0` existait deja sur origin, pose sur un commit dont package.json declarait 0.1.0.
+      # Rien ne comparait les deux: l'etape ci-dessous lit la version dans package.json et ignore
+      # le nom du tag. Le workflow a donc tourne sur un tag "v0.2.0" en publiant 0.1.0 — et npm
+      # est reste a 0.1.0 pendant que le depot croyait avoir sorti une 0.2.0.
+      #
+      # Ce n'est pas rattrapable apres coup: un tag pousse ne se re-pointe pas sans reecrire de
+      # l'histoire publique. La seule sortie propre est un nouveau numero. Cette garde empeche la
+      # prochaine occurrence, au lieu de compter sur l'attention de celui qui tague.
+      # ══════════════════════════════════════════════════════════════════════════════════════
+      - name: le tag correspond-il a la version du paquet ?
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          PKG=$(node -p "require('./package.json').version")
+          SRV=$(node -p "require('./server.json').version")
+          echo "tag=$TAG  package.json=$PKG  server.json=$SRV"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::tag v$TAG mais package.json dit $PKG — on publierait $PKG sous une etiquette qui annonce $TAG. Corriger la version AVANT de taguer."
+            exit 1
+          fi
+          if [ "$SRV" != "$PKG" ]; then
+            echo "::error::server.json dit $SRV et package.json dit $PKG — le registre MCP annoncerait une version que npm ne sert pas."
+            exit 1
+          fi
+
       - name: npm — cette version est-elle deja publiee ?
         id: npmstate
         run: |
