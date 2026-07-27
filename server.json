@@ -7,13 +7,13 @@
     "url": "https://github.com/philpof102-svg/biii",
     "source": "github"
   },
-  "version": "0.1.0",
+  "version": "0.2.0",
   "_publishing_note": "The `packages` entry below was REMOVED once, deliberately, because `biii-mcp` did not exist on npm and submitting this file would have created a registry entry pointing at nothing — a manifest true in its shape and false at install time. It is restored because the package NOW EXISTS: biii-mcp@0.1.0 was published 2026-07-26T23:08Z and verified the only way that counts, by installing it FROM THE REGISTRY into an empty project and calling a tool (till_funder_history answered funder_has_killed, 25 of 29, 243 tokens in its bundled database). Two things keep it honest from here. (1) ORDERING: .github/workflows/publish.yml runs `npm publish` BEFORE `mcp-publisher`, so a failed publish fails the job and the registry never sees a phantom — if you ever submit BY HAND, check that `npm view biii-mcp@0.1.0` resolves first, because doing it out of order removes the only protection. (2) The version here must name a version that EXISTS: it read 0.2.1 for a few minutes while 0.1.0 was the published one, which is exactly the phantom this note exists to prevent, in miniature. Bump both files together at release time, never ahead of it. Also re-run scripts/listing-manifest.js before any submission: it reads the RUNNING server rather than this file and exits non-zero on deploy drift. Note: tag v0.2.0 exists upstream pointing at an old 13-tool commit, so it misdescribes today s 29 — do not reuse it.",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "biii-mcp",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "transport": {
         "type": "stdio"
       }
