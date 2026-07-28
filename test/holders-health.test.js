@@ -79,6 +79,47 @@ t('les pourcentages du top 10 se rapportent au total observe, et somment a la co
     'la somme des parts du top 10 EST la concentration du top 10, sinon l une des deux ment');
 });
 
+/* ── LA VARIANCE NULLE S'ETAIT REFUGIEE DANS UNE SOUS-POPULATION ──────────────────────────────────
+ * Le denominateur corrige plus haut a rendu la concentration variable — verifie. Mais mesure du
+ * 2026-07-28, sur N porteurs a parts STRICTEMENT EGALES (la distribution la plus saine possible):
+ *
+ *    1 -> 100 %    5 -> 100 %    10 -> 100 %  |  11 -> 90 %    20 -> 50 %    101 -> 9 %
+ *
+ * Sous onze porteurs le ratio vaut 100 par CONSTRUCTION: le top 10 est tout le monde. Le chiffre reste
+ * vrai, mais il ne discrimine plus — et cette sous-population n'est pas rare, puisque les soldes sont
+ * reconstruits sur une fenetre de blocs bornee.
+ *
+ * ⚠️ Mon premier correctif annulait le ratio sous onze porteurs et cassait cinq cas existants. L'un
+ * d'eux tranchait deja: « un porteur unique EST le top 10 ». Il avait raison — a UN porteur, 100 % est
+ * vrai ET informatif. Seul le cas voisin (dix porteurs egaux) trompe. Le chiffre reste donc calcule et
+ * le score inchange; on ajoute sa PORTEE. */
+
+t('★ le ratio ne DISCRIMINE pas sous onze porteurs, et le dit', () => {
+  const dixEgaux = computeHealthMetrics(plats(10, 100));
+  assert.strictEqual(dixEgaux.top10Concentration, 100, 'le chiffre reste vrai: le top 10 est tout le monde');
+  assert.strictEqual(dixEgaux.concentrationDiscriminating, false);
+  assert.match(dixEgaux.concentrationNote, /does not DISCRIMINATE/);
+  assert.match(dixEgaux.concentrationNote, /perfectly even split/, 'la note doit dire POURQUOI, pas seulement QUE');
+});
+
+t('LES DEUX BORNES: a partir de onze porteurs le ratio discrimine, sans note', () => {
+  /* Une reserve permanente apprend a l ignorer. Elle doit disparaitre des qu elle cesse d etre vraie. */
+  const onzeEgaux = computeHealthMetrics(plats(11, 100));
+  assert.strictEqual(onzeEgaux.concentrationDiscriminating, true);
+  assert.strictEqual(onzeEgaux.concentrationNote, null);
+  assert.ok(onzeEgaux.top10Concentration < 100, 'vu ' + onzeEgaux.top10Concentration + ' % — il bouge enfin');
+});
+
+t('★ LA DETECTION N EST PAS DESARMEE: une vraie baleine parmi vingt porteurs sort toujours', () => {
+  /* Le controle qui compte: ajouter une reserve ne doit pas eteindre le signal qu on vient chercher.
+   * Ici la concentration EST mesurable (vingt porteurs) et elle est reelle. */
+  const baleine = computeHealthMetrics([mint(adr(1), 1000000), ...plats(19, 1).slice(0)]);
+  assert.strictEqual(baleine.concentrationDiscriminating, true, 'vingt porteurs: le ratio separe');
+  assert.ok(baleine.top10Concentration > 90, 'vu ' + baleine.top10Concentration + ' %');
+  assert.strictEqual(baleine.rugScore, 100);
+  assert.strictEqual(baleine.concentrationNote, null, 'rien a excuser: la mesure a eu lieu');
+});
+
 t('rugScore couvre reellement son intervalle — il valait 80 ou 100 partout', () => {
   const scores = [
     computeHealthMetrics(plats(500, 100)).rugScore,          // plat, beaucoup de porteurs
