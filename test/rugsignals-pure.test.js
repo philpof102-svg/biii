@@ -259,6 +259,66 @@ t('★ le verdict ne se DEGRADE pas: les drapeaux reellement lus survivent au ch
  * (« aucun harnais synchrone ne pilote de test async »). C'est aussi ce qui rendait MUETTE la mutation du
  * coeur: le seul cas qui traversait `simulateTrade` n'assertait rien. */
 
+/* ════════════════════════════════════════════════════════════════════════════════════════════════════
+ * `clean` SORTAIT SUR ONZE POUVOIRS JAMAIS RAPPORTES.
+ *
+ * `is_honeypot` et `sell_tax` declarent leur absence dans `unknowns`; les cinq autres pieges non gardes
+ * et les sept pouvoirs gardes ne le faisaient pas. `yes(undefined)` etant faux, « ce champ n'a pas ete
+ * rapporte » se lisait « ce danger a ete verifie et il est absent ». Mesure du 2026-07-28:
+ *
+ *   tous les champs rapportes surs  ->  clean, unknowns ['holder count']
+ *   ONZE champs de danger ABSENTS   ->  clean, unknowns ['holder count']     IDENTIQUES
+ *
+ * Parmi les absents: selfdestruct, is_proxy, is_mintable, cannot_sell_all. Et la DISCLOSURE du module
+ * promet mot pour mot le contraire: « missing data reads as unknown, never clean ».
+ *
+ * FREQUENCE NON MESURABLE, et c'est dit: l'endpoint batch de GoPlus ne rend que les tokens qu'il connait
+ * (1 rendu sur 18 demandes), donc l'echantillon reste a n=1 — et sur celui-la les 13 champs sont
+ * presents. Le correctif ne depend donc pas de cette frequence: il est un NO-OP exact sur un
+ * enregistrement complet, et ne mord que sur les partiels. Le cas « no-op » ci-dessous est la moitie
+ * qui compte le plus. */
+const COMPLET = () => ({
+  owner_address: '0x' + '0'.repeat(40), is_honeypot: '0', sell_tax: '0', buy_tax: '0',
+  lp_holders: [{ percent: '1', is_locked: 1, tag: 'lock' }], holders: [{ percent: '0.01', is_contract: 0 }],
+  cannot_sell_all: '0', selfdestruct: '0', external_call: '0', cannot_buy: '0', is_mintable: '0',
+  transfer_pausable: '0', is_blacklisted: '0', slippage_modifiable: '0',
+  personal_slippage_modifiable: '0', is_proxy: '0', trading_cooldown: '0',
+});
+
+t('★ NO-OP: un enregistrement COMPLET rend exactement ce qu il rendait', () => {
+  /* La moitie qui compte le plus. Si ce cas bouge, le correctif n est plus calibration-independant et
+   * degrade des verdicts corrects — c est l ecueil du fail-closed pousse trop loin. */
+  const a = R.assessRugFields(COMPLET(), null);
+  assert.strictEqual(a.verdict, 'clean');
+  assert.deepStrictEqual(a.unknowns, ['holder count'], 'aucun inconnu ajoute quand tout est rapporte');
+});
+
+t('★ UN SEUL champ de danger non rapporte suffit a retirer le « clean »', () => {
+  const r = COMPLET(); delete r.selfdestruct;
+  const a = R.assessRugFields(r, null);
+  assert.strictEqual(a.verdict, 'unknown', 'on ne certifie pas un pouvoir jamais lu');
+  assert.ok(a.unknowns.some((u) => /selfdestruct/.test(u)), 'et on NOMME le champ manquant');
+});
+
+t('★ les champs manquants sont COMPTES, pas replies sur une mention vague', () => {
+  const r = COMPLET(); for (const c of ['cannot_sell_all', 'selfdestruct', 'is_mintable', 'is_proxy']) delete r[c];
+  const a = R.assessRugFields(r, null);
+  assert.ok(a.unknowns.some((u) => /^4 danger field\(s\) not reported/.test(u)),
+    'le NOMBRE doit voyager: « il en manque » et « il en manque onze » ne se reparent pas pareil');
+});
+
+t('★ LES DEUX BORNES: l escalade gardee tire toujours, proprietaire vivant', () => {
+  /* Le durcissement ne doit pas manger le signal. Et le controle inverse: sous ownership RENONCEE les
+   * memes pouvoirs restent desamorces — c est la premisse du module, elle ne bouge pas. */
+  const vivant = { ...COMPLET(), owner_address: '0x' + 'ab'.repeat(20) };
+  assert.strictEqual(R.assessRugFields({ ...vivant, is_mintable: '1' }, null).verdict, 'rug_ready');
+  assert.strictEqual(R.assessRugFields({ ...vivant, is_proxy: '1' }, null).verdict, 'rug_ready');
+  assert.strictEqual(R.assessRugFields({ ...COMPLET(), is_mintable: '1' }, null).verdict, 'clean',
+    'ownership renoncee: le pouvoir existe mais personne ne peut le tirer');
+  /* selfdestruct n est PAS garde par l ownership: il arme quoi qu il arrive. */
+  assert.strictEqual(R.assessRugFields({ ...COMPLET(), selfdestruct: '1' }, null).verdict, 'rug_ready');
+});
+
 t('assessFromSimulationOnly ne rend JAMAIS clean — balaye sur 200+ combinaisons', () => {
   /* L invariant central du chemin fresh-launch. Balaye plutot que teste sur trois cas, parce qu une
    * branche clean ajoutee par megarde se cacherait justement dans la combinaison qu on n aurait pas ecrite. */
