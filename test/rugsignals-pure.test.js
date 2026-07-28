@@ -61,6 +61,58 @@ t('is_locked accepte les trois formes que GoPlus renvoie', () => {
   }
 });
 
+/* ════════════════════════════════════════════════════════════════════════════════════════════════════
+ * LE MEME `|| 0` COTE LP, MAIS IL FABRIQUE UNE ACCUSATION.
+ *
+ * `topWalletShare` a ete corrige le 2026-07-28 (bloc plus bas); `lpLockedShare` gardait la meme forme.
+ * Une part illisible sur un detenteur VERROUILLE contribuait 0 a la somme. Mesure du meme jour, par le
+ * PRODUCTEUR (assessRugFields en entier), quatre entrees:
+ *
+ *   LP verrouille, part lisible   -> lpLockedPct 1,    aucun drapeau
+ *   LP verrouille, part ILLISIBLE -> lpLockedPct 0  +  « only 0% of liquidity is locked or burned —
+ *   LP verrouille, part vide      -> lpLockedPct 0  +    the deployer can withdraw the pool at will »
+ *   LP reellement NON verrouille  -> lpLockedPct 0  +  la MEME phrase
+ *
+ * Les trois derniers sortaient IDENTIQUES octet pour octet. C'est le miroir du defaut de feeder.js: la
+ * une lecture manquee devenait une innocence, ici elle devient une accusation nommee sur un tiers — et
+ * « pool withdrawable » est un trait publie par what-survives (16 % des rugges, 7 % des vivants), donc
+ * un faux positif pollue un chiffre.
+ *
+ * Le chemin `null` etait deja cable en aval (`unknowns.push('LP lock status')`): il manquait seulement a
+ * la fonction de savoir le rendre. */
+
+t('★ des detenteurs LP verrouilles dont AUCUNE part n est lisible rendent null, pas 0', () => {
+  assert.equal(R.lpLockedShare({ lp_holders: [{ is_locked: 1, tag: 'lock' }] }), null, 'part absente');
+  assert.equal(R.lpLockedShare({ lp_holders: [{ percent: '', is_locked: 1, tag: 'lock' }] }), null, 'part vide');
+  assert.equal(R.lpLockedShare({ lp_holders: [{ tag: 'burn' }] }), null, 'brule mais part illisible');
+});
+
+t('★ BORNE INVERSE: un pool REELLEMENT ouvert declenche toujours l accusation', () => {
+  /* Le durcissement ne doit pas eteindre le drapeau qu on vient chercher. Ici tout a ete lu et rien
+   * n est verrouille: 0 est une REPONSE, pas un silence. */
+  assert.equal(R.lpLockedShare({ lp_holders: [{ percent: '1', is_locked: 0, tag: '' }] }), 0);
+  const r = R.assessRugFields({ owner_address: '0x' + '0'.repeat(40), holders: [],
+    lp_holders: [{ percent: '1', is_locked: 0, tag: '' }] }, null);
+  assert.ok(r.flags.some((f) => /locked or burned/i.test(f)), 'le vrai cas doit encore accuser');
+});
+
+t('★ PAR LE PRODUCTEUR: une part verrouillee illisible se DECLARE inconnue au lieu d accuser', () => {
+  /* Par assessRugFields, pas par la fonction seule: c est la sortie que le radar enregistre. */
+  const illisible = R.assessRugFields({ owner_address: '0x' + '0'.repeat(40), holders: [],
+    lp_holders: [{ is_locked: 1, tag: 'lock' }] }, null);
+  assert.equal(illisible.lpLockedPct, null);
+  assert.ok(illisible.unknowns.some((u) => /LP lock status/i.test(u)), 'l inconnu doit etre DIT');
+  assert.ok(!illisible.flags.some((f) => /locked or burned/i.test(f)), 'et surtout: aucune accusation');
+});
+
+t('LES DEUX BORNES: une part verrouillee LISIBLE reste comptee normalement', () => {
+  assert.equal(R.lpLockedShare({ lp_holders: [{ percent: '0.6', is_locked: 1 }, { percent: '0.4', is_locked: 1 }] }), 1);
+  /* TROU CONNU ET ECRIT, non couvert, identique a celui du voisin: une part verrouillee sur deux
+   * illisible rend un PLANCHER (0.6) sans dire qu il en est un, et ce plancher peut passer sous le
+   * seuil. Tout jeter des qu une ligne est sale supprimerait des drapeaux REELS portes par les autres. */
+  assert.equal(R.lpLockedShare({ lp_holders: [{ percent: '0.6', is_locked: 1 }, { is_locked: 1 }] }), 0.6);
+});
+
 t('topWalletShare rend null sans donnee, et 0 si tous les holders sont des CONTRATS', () => {
   assert.equal(R.topWalletShare({}), null, 'champ absent -> inconnu');
   assert.equal(R.topWalletShare({ holders: [] }), null, 'vide -> inconnu');
