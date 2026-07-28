@@ -187,5 +187,103 @@ t('un chemin inexistant ne fait pas passer le scan pour propre en silence', () =
   assert.equal(r.complete, false, '...mais `complete` doit dire FAUX pour qu on ne s y fie pas');
 });
 
+/* ── findVaults : « aucun coffre » et « je n'ai rien pu lire » sortaient IDENTIQUES ─────────────────
+ * Cette fonction dit ou se trouve le materiel de cle d'une personne — sur cette machine elle en compte 8,
+ * et c'est le chiffre qui figure dans la note d'exposition. Trois `catch { continue; }` la rendaient
+ * muette sur ce qu'elle ne voyait pas: un dossier navigateur VERROUILLE (navigateur ouvert, permission
+ * refusee) etait saute exactement comme un navigateur non installe, et le tableau rendu etait VIDE.
+ *
+ * Sur cette question un sous-comptage silencieux EST un faux feu vert: on annonce moins de coffres qu'il
+ * n'y en a, et le lecteur en conclut qu'il a moins a proteger.
+ *
+ * ⚠️ `deps` est ce qui rend ces cas possibles: sans lui la fonction ne lit que le vrai disque, ce qui
+ * explique qu'elle n'ait ete nommee dans aucun test. Les cas ci-dessous ne touchent AUCUN fichier reel. */
+const EST_COFFRE = /Local Extension Settings/;
+const dirent = (n) => ({ name: n, isDirectory: () => true });
+/* ⚠️ Premier jet de ce bouchon: il ne rendait des entrees de repertoire que pour les chemins finissant
+ * par « User Data », donc les bases mac/linux recevaient des chaines et la sonde plantait. L'erreur etait
+ * dans la SONDE. On discrimine donc sur « est-ce un dossier de coffre ? », jamais sur un nom d'OS. */
+const disque = (mode) => ({
+  home: '/faux',
+  fs: {
+    existsSync: (p) => {
+      if (mode === 'existsSync-jette' && !EST_COFFRE.test(p)) throw new Error('EPERM');
+      return true;
+    },
+    readdirSync: (p) => {
+      if (EST_COFFRE.test(p)) {
+        if (mode === 'coffre-verrouille') { const e = new Error('x'); e.code = 'EACCES'; throw e; }
+        return ['000001.log', 'MANIFEST-000002'];
+      }
+      if (mode === 'base-verrouillee') { const e = new Error('x'); e.code = 'EPERM'; throw e; }
+      return [dirent('Default')];
+    },
+    statSync: (p) => {
+      if (mode === 'stat-rate' && /000001/.test(p)) throw new Error('EBUSY');
+      return { size: 1000 };
+    },
+  },
+});
+const lire = (mode) => {
+  const r = K.findVaults({ deps: disque(mode) });
+  return { r, lisibles: r.filter((x) => !x.unreadable), illisibles: r.filter((x) => x.unreadable) };
+};
+
+const ok = lire('ok');
+const baseKO = lire('base-verrouillee');
+const coffreKO = lire('coffre-verrouille');
+const statKO = lire('stat-rate');
+
+t('un dossier navigateur VERROUILLE ne disparait plus en silence', () => {
+  /* Le coeur du correctif: avant, ce cas rendait un tableau VIDE — indiscernable d'une machine sans
+   * aucun navigateur installe. */
+  assert.ok(baseKO.r.length > 0, 'un verrou ne doit pas produire un resultat vide');
+  assert.strictEqual(baseKO.lisibles.length, 0);
+  assert.strictEqual(baseKO.illisibles.length, baseKO.r.length);
+  assert.match(baseKO.illisibles[0].unreadable, /UNCOUNTED, not absent/);
+});
+
+t('un coffre dont un fichier ne se mesure pas rend null, PAS une taille partielle', () => {
+  const v = statKO.r.find((x) => x.wallet);
+  assert.strictEqual(v.bytes, null);
+  /* Avant: la somme des fichiers lisibles, presentee comme la taille totale — et 0 si tout etait
+   * verrouille, c'est-a-dire « coffre vide ». */
+  assert.notStrictEqual(v.bytes, 0);
+  assert.match(v.unreadable, /unknown rather than small/);
+});
+
+t('un coffre verrouille est signale, pas saute', () => {
+  assert.ok(coffreKO.r.length > 0);
+  assert.strictEqual(coffreKO.lisibles.length, 0);
+  assert.match(coffreKO.illisibles[0].unreadable, /could not be listed/);
+});
+
+t('le chemin qui INFORME n a pas ete avale par le durcissement', () => {
+  /* Les deux bornes: un durcissement qui rend tout « illisible » n'informe plus. */
+  assert.ok(ok.lisibles.length > 0, 'un disque lisible doit produire des coffres lisibles');
+  assert.strictEqual(ok.illisibles.length, 0);
+  assert.strictEqual(ok.lisibles[0].bytes, 2000, 'deux fichiers de 1000 octets');
+  assert.strictEqual(ok.lisibles[0].files, 2);
+});
+
+t('les quatre situations sont DISTINGUABLES deux a deux', () => {
+  /* Sans ce cas, aplatir deux modes l un sur l autre resterait vert tant qu ils ne se croisent pas. */
+  const signature = (x) => x.r.length + ':' + x.lisibles.length + ':' + x.illisibles.length;
+  const vues = new Set([ok, baseKO, coffreKO, statKO].map(signature));
+  assert.strictEqual(vues.size, 3, 'ok / base-verrouillee / (coffre|stat) doivent se distinguer');
+  /* coffre-verrouille et stat-rate ont la meme forme; c'est la RAISON qui les separe. */
+  assert.notStrictEqual(coffreKO.illisibles[0].unreadable, statKO.illisibles[0].unreadable);
+});
+
+t('la vraie machine reste lisible — non-regression', () => {
+  /* Le seul cas qui touche le disque reel, en LECTURE SEULE et sans rien afficher de sensible. */
+  const reel = K.findVaults();
+  assert.ok(Array.isArray(reel));
+  for (const v of reel) {
+    assert.ok(typeof v.bytes === 'number' || v.bytes === null, 'bytes est un nombre ou null, jamais autre chose');
+    if (v.bytes === null) assert.ok(v.unreadable, 'une taille nulle DOIT porter sa raison');
+  }
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
