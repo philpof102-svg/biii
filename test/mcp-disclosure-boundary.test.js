@@ -113,6 +113,57 @@ const BAC = path.join(os.tmpdir(), 'biii-mcp-frontiere-' + process.pid);
     assert.strictEqual(fs.existsSync(BAC), false);
   });
 
+  /* ── LA MEME ENTREE, LE MEME REFUS, SUR TOUS LES OUTILS ────────────────────────────────────────
+   * `till_trust` refusait deja une adresse malformee; les autres outils prenant une adresse ne le
+   * faisaient pas. Mesure du 2026-07-28 via le VRAI handler, meme entree `0x123`:
+   *
+   *   till_trust -> REFUS   |   till_vet_merchant -> VERDICT   |   till_rug_powers -> VERDICT
+   *
+   * Et le plus couteux n'etait pas l'absence de refus. `till_vet_merchant` envoyait la chaine a
+   * l'oracle, recevait un HTTP 400, et le rendait comme « oracle unreachable (HTTP 400) — treat the
+   * merchant as UNKNOWN ». Deux causes OPPOSEES sur un meme message: « mon entree est invalide » et
+   * « le service est tombe ». La difference est actionnable, et un agent qui a fait une faute de frappe
+   * etait invite a reessayer une panne qui n'existait pas. */
+  const OUTILS_ADRESSE = [['till_trust', 'counterparty'], ['till_vet_merchant', 'address'],
+    ['till_rug_powers', 'address'], ['till_launch_funder', 'address']];
+  const MALFORMEES = ['0x123', '', 'pas-une-adresse', '0x' + 'g'.repeat(40), '0x' + 'a'.repeat(41), null];
+
+  for (const [outil, champ] of OUTILS_ADRESSE) {
+    const refus = [];
+    for (const bad of MALFORMEES) {
+      let r; try { r = await callTool(outil, { [champ]: bad }); } catch (e) { r = { jete: e.message }; }
+      refus.push({ bad, r });
+    }
+    await t('★ ' + outil + ' refuse TOUTE adresse malformee, sans composer de verdict', () => {
+      for (const { bad, r } of refus) {
+        assert.ok(r && r.error, JSON.stringify(bad) + ' doit etre refuse, vu: ' + JSON.stringify(r).slice(0, 80));
+        assert.match(r.error, /must be a 0x Base address/i, JSON.stringify(bad));
+        /* Le point qui compte pour l'appelant: savoir si c'est SON entree ou NOTRE service. */
+        assert.match(r.error, /REJECTED INPUT, not a service outage/i, JSON.stringify(bad));
+        assert.ok(!r.decision && !r.trust && !r.verdict, 'aucun verdict ne doit accompagner un refus');
+      }
+    });
+  }
+
+  /* BORNE INVERSE: le durcissement ne doit pas refuser une adresse VALIDE, y compris checksummee. */
+  const VALIDE = '0x' + 'a'.repeat(40);
+  const CHECKSUM = '0x' + 'aA'.repeat(20);
+  const acceptes = [];
+  for (const [outil, champ] of OUTILS_ADRESSE) {
+    for (const forme of [VALIDE, CHECKSUM]) {
+      let r; try { r = await callTool(outil, { [champ]: forme }); } catch (e) { r = { jete: e.message }; }
+      acceptes.push({ outil, forme, r });
+    }
+  }
+  await t('LES DEUX BORNES: une adresse valide (meme checksummee) n est JAMAIS refusee par le garde', () => {
+    for (const { outil, forme, r } of acceptes) {
+      const refusParGarde = r && r.error && /REJECTED INPUT/.test(r.error);
+      assert.ok(!refusParGarde, outil + ' a refuse ' + forme + ' — le garde mange une entree legitime');
+      /* Une erreur METIER reste permise ici (hors ligne, adresse inexistante): ce qu'on interdit, c'est
+       * que le GARDE la rejette. Confondre les deux m'a fait lire une regression qui n'existait pas. */
+    }
+  });
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })().catch((e) => {

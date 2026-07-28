@@ -267,8 +267,44 @@ const TOOLS = [
       funder: { type: 'string', description: 'the wallet that PAID for the launch — get it from till_launch_funder, which traces deployer→funder on chain. Omit it and the honest answer is that this check has nothing to say.' } }, required: [] } },
 ];
 
+/**
+ * exigeAdresse — LA MEME ENTREE, LE MEME REFUS, SUR TOUS LES OUTILS.
+ *
+ * `till_trust` a ete durci (ligne ~315) pour refuser une adresse malformee au lieu de composer un
+ * triangle dessus, et son commentaire pose la regle: le meme refus sur les deux surfaces. Les autres
+ * outils prenant une adresse n'ont pas ete amenes avec. Mesure du 2026-07-28, meme entree `0x123`:
+ *
+ *   till_trust        -> REFUS, aucun verdict
+ *   till_vet_merchant -> VERDICT
+ *   till_rug_powers   -> VERDICT
+ *
+ * Et le plus couteux n'est pas l'absence de refus, c'est ce que devient l'erreur. `till_vet_merchant`
+ * envoyait la chaine a l'oracle, recevait un HTTP 400, et le rapportait ainsi:
+ *
+ *   « oracle unreachable (HTTP 400) — treat the merchant as UNKNOWN, not as safe »
+ *
+ * Deux causes OPPOSEES aplaties sur un meme message: « mon entree est invalide » et « le service est
+ * tombe ». La difference est actionnable — corriger l'adresse, ou reessayer plus tard — et un agent qui
+ * a fait une faute de frappe est informe d'une panne, donc il peut reessayer indefiniment. Au passage,
+ * une chaine arbitraire partait vers un service tiers.
+ *
+ * Meme forme que `till_trust`: on minuscule (une adresse checksummee est valide), on ne TRIM pas — on ne
+ * devine pas ce que l'appelant voulait dire.
+ */
+const ADRESSE_BASE = /^0x[0-9a-f]{40}$/;
+function exigeAdresse(brut, champ = 'address') {
+  const adr = String(brut || '').toLowerCase();
+  if (!ADRESSE_BASE.test(adr)) {
+    return { error: champ + ' must be a 0x Base address (40 hex) — no verdict is composed for a '
+      + 'malformed one, and nothing is sent to the oracle. This is a REJECTED INPUT, not a service '
+      + 'outage: re-send a valid address rather than retrying.', got: String(brut ?? '').slice(0, 40) };
+  }
+  return { adresse: adr };
+}
+
 async function callTool(name, a = {}) {
   if (name === 'till_vet_merchant') {
+    const g = exigeAdresse(a.address); if (g.error) return g;
     // DECENTRALIZED floor FIRST: a locally-known-bad address is refused with zero network, even if the
     // oracle is slow/down — the block cannot vanish with the service (the SPOF this closes).
     const local = screenAddress(a.address, KNOWN_BAD);
@@ -313,8 +349,12 @@ async function callTool(name, a = {}) {
      * Le pont d'identite ne perd rien: till_resolve est un outil distinct, et sa propre description dit
      * de passer a till_trust l'ADRESSE resolue. Le schema de ce parametre dit deja « 0x address ». */
     if (!/^0x[0-9a-f]{40}$/.test(cp)) {
+      /* La DISTINCTION est commune a tous les outils (voir `exigeAdresse`): un appelant doit pouvoir
+       * separer « mon entree est invalide » de « le service est tombe », sinon il reessaie une panne qui
+       * n'existe pas. Le conseil, lui, reste propre a cet outil. */
       return { error: 'counterparty must be a 0x Base address (40 hex) — no verdict is composed for a '
-        + 'malformed identifier. Resolve an npub/did:key with till_resolve first, then pass the bound '
+        + 'malformed identifier. This is a REJECTED INPUT, not a service outage: fix the value rather '
+        + 'than retrying. Resolve an npub/did:key with till_resolve first, then pass the bound '
         + 'address here (resolving is not trusting).' };
     }
     // vertex 1 — reputation, shown as TWO LENSES kept SEPARATE (LAWBOR's discipline, verbatim): the LOCAL
@@ -514,10 +554,12 @@ async function callTool(name, a = {}) {
     return { ...result, note: 'ADVISORY. genuine = one contract dominates liquidity (>3x runner-up); ambiguous = top-2 tied (never certified); re-verify on DexScreener/Basescan.' };
   }
   if (name === 'till_rug_powers') {
+    const g = exigeAdresse(a.address); if (g.error) return g;
     const v = await scanRugOne(a.chain || 'base', a.address);
     return { ...v, note: 'ADVISORY, fail-closed. "clean" means no rug power was found that anyone can still fire — NOT a promise the price holds or the team is honest. Owner-gated dangers are scored only while an owner exists; missing data reads as unknown, never clean.' };
   }
   if (name === 'till_launch_funder') {
+    const g = exigeAdresse(a.address); if (g.error) return g;
     const f = await traceFeeder(a.chain || 'base', a.address);
     if (!f || !f.ok) return { error: (f && f.reason) || 'could not trace the funding of this launch' };
     return f;
