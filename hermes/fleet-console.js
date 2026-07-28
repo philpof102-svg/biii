@@ -55,12 +55,19 @@ const sh = (cmd, args, timeout = 15000) => new Promise((r) =>
 let cache = { t: 0, data: null };
 async function gather() {
   if (Date.now() - cache.t < 8000 && cache.data) return cache.data;
-  const [gw, cron, mcp, biii, node] = await Promise.all([
+  /* L'EXECUTANT SE MESURE A CE QU'IL A ECRIT, PAS A CE QUE L'ORDONNANCEUR PROMET. `biii-nuit-dig` est la
+   * seule brique de la flotte qui MODIFIE le code (les autres surveillent, proposent, ou vendent). Son
+   * etat de planification n'est pas lisible depuis ce processus, et de toute facon un cron qui se
+   * declenche sans rien produire est pire qu'un cron eteint: on lit donc le depot, qui est la sortie.
+   * Le chemin vient de __dirname (ce fichier vit dans biii/hermes/), jamais d'un chemin devine. */
+  const REPO = path.join(__dirname, '..');
+  const [gw, cron, mcp, biii, node, commit] = await Promise.all([
     sh('bash', ['-lc', "pgrep -f 'hermes gateway run' >/dev/null && echo running || echo stopped"]),
     sh(HERMES, ['cron', 'list']),
     sh(HERMES, ['mcp', 'list']),
     sh('bash', ['-lc', "curl -s -o /dev/null -w '%{http_code}' -m 7 https://biii-production.up.railway.app/health || echo 000"]),
     sh('bash', ['-lc', "curl -s -o /dev/null -w '%{http_code}' -m 7 -X POST https://biii-production.up.railway.app/x402/vet-asset -H 'content-type: application/json' -d '{\"address\":\"0x1234\"}' || echo 000"]),
+    sh('git', ['-C', REPO, 'log', '-1', '--format=%cI']),
   ]);
   const nextRun = (cron.match(/Next run:\s*([0-9T:.\+\-]+)/) || [])[1] || null;
   const watchActive = /biii-watch[\s\S]*?\[active\]|\[active\][\s\S]*?biii-watch/i.test(cron) || /biii-watch/.test(cron);
@@ -72,6 +79,9 @@ async function gather() {
     toolsets,
     biiiHealth: biii.trim().slice(-3),
     x402: node.trim().slice(-3),
+    /* `null` si la lecture git a echoue — jamais une date inventee, et jamais « maintenant ». La carte
+     * affichera « non lu » plutot qu'une fraicheur rassurante qui n'a pas ete mesuree. */
+    lastCommit: /^\d{4}-\d{2}-\d{2}T/.test(commit.trim()) ? commit.trim() : null,
   };
   cache = { t: Date.now(), data };
   return data;
@@ -182,7 +192,18 @@ async function tick(){let d;try{d=await (await fetch('/api/fleet')).json()}catch
   {st:hUp?'up':'down',state:hUp?'working':'down',loc:'Railway',name:'biii · vente',role:'Verdicts safe-to-pay payants sur Base (x402) → wallet',facts:[['/health',hUp?'200':d.biiiHealth,hUp?'ok':'bad'],['POST /x402/vet-asset',xUp?'402 · $0.25':d.x402,xUp?'ok':'bad'],['payTo','0xa6cf…f5d4']]},
   {st:gwUp?'up':'down',state:gwUp?'working':'stopped',loc:'WSL local',name:'hermes · gateway',role:'Le cerveau local — scheduler + agents à la demande',facts:[['gateway',gwUp?'running':'stopped',gwUp?'ok':'bad'],['toolsets',(d.toolsets||[]).join('·')||'—'],['#',String((d.toolsets||[]).length)]]},
   {st:d.watchActive?'sched':'off',state:d.watchActive?'scheduled':'off',loc:'cron',name:'biii-watch · sentinelle',role:'Scan trust de Base, sans clé, $0',facts:[['next run',d.cronNext?d.cronNext.slice(11,16):'—','wait'],['cadence','every 30m'],['clé/dépense','0 / 0','ok']]},
-  {st:'up',state:'working',loc:'Railway',name:'biii-node · monitor+analyste',role:'Surveille + propose, read-only (worker, pas d\\'HTTP local)',facts:[['guard','on','ok'],['watchdog','biii-watch/30m'],['modèles','hy3·kimi·grok']]},
+  /* ⚠️ CETTE CARTE ETAIT VERTE EN DUR (st:'up', state:'working') alors que gather() ne lit RIEN a son
+   * sujet — worker Railway sans HTTP local, donc non sondable d'ici. Le tableau AFFIRMAIT un etat qu'il
+   * n'avait jamais mesure, sur l'ecran qui sert justement a juger la flotte. Gris + « non mesuré » ne
+   * dit pas qu'il est tombe: il dit qu'on ne sait pas, ce qui est vrai.
+   * (NB: pas de backticks dans ces commentaires — ce bloc vit DANS un template literal.) */
+  {st:'off',state:'déclaré · non mesuré',loc:'Railway',name:'biii-node · monitor+analyste',role:'Surveille + propose, read-only (worker sans HTTP local — non sondable d\\'ici)',facts:[['sonde','aucune',''],['guard','read-only (déclaré)'],['modèles','hy3·kimi·grok']]},
+  /* L'EXECUTANT — le seul de la flotte qui ECRIT. Sa fraicheur est mesuree sur le depot (sa sortie),
+   * pas sur la promesse de l'ordonnanceur: un cron qui tire sans rien produire est pire qu'un cron eteint. */
+  {st:d.lastCommit?'sched':'off',state:d.lastCommit?'scheduled':'non lu',loc:'cron 2×/nuit',name:'biii-nuit-dig · exécutant',role:'Mesure, corrige, teste, commit, push — le seul qui MODIFIE le code',facts:[
+    ['dernier commit',d.lastCommit?(new Date(d.lastCommit).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})):'non lu',d.lastCommit?'ok':'bad'],
+    ['cadence','02:00 · 05:00'],
+    ['interdit','deploy · publish · fonds','wait']]},
   {st:'pend',state:'pending',loc:'GitHub',name:'buzz-fix · PR #2416',role:'Fix fenêtre Windows (2 harnesses) — attend Block',facts:[['CI · DCO','green','ok'],['état','mergeable','wait']]},
   {st:(d.toolsets||[]).includes('gitlawb')?'up':'off',state:(d.toolsets||[]).includes('gitlawb')?'working':'idle',loc:'toolset',name:'gl · gitlawb',role:'DID/git — actif si présent dans les toolsets',facts:[['état',(d.toolsets||[]).includes('gitlawb')?'connecté':'parked',(d.toolsets||[]).includes('gitlawb')?'ok':'']]},
  ];
