@@ -94,6 +94,75 @@ function req(server, path) {
     assert.deepStrictEqual(viaVet, direct, 'the REST surface and the lib return the SAME classifier verdict');
   });
 
+  /* ── « PAS INSTALLÉ » ET « INSTALLÉ MAIS CASSÉ » N'APPELLENT PAS LA MÊME RÉPARATION ────────────────
+   * `try { TC = require('trust-core') } catch { try { … } catch { TC = null } }` — deux `catch` qui
+   * avalaient la raison. Mesure du 2026-07-28, resolve bouchonné:
+   *
+   *   present -> classifier: objet
+   *   absent  -> classifier: null      INDISCERNABLES
+   *   casse   -> classifier: null
+   *
+   * Et la doc du module annonce « trust-core absent ⇒ classifier:null (disclosed) »: la divulgation
+   * affirmait donc ABSENT y compris quand la vérité était PRÉSENT-MAIS-CASSÉ. C'est le moteur de
+   * jugement local — un déploiement partiel ou une copie vendorée corrompue dégradait chaque verdict
+   * local en silence, sous une phrase qui disait « déploiement léger, rien à faire ».
+   *
+   * Le resolve est bouchonné via `Module._load`: AUCUN fichier du dépôt n'est modifié, et le cache de
+   * `vet.js` est vidé entre les cas pour que chacun reparte du vrai chemin de chargement. */
+  const Module = require('node:module');
+  const chargerAvec = (mode) => {
+    const vrai = Module._load;
+    Module._load = function (req) {
+      if (/trust-core/.test(req)) {
+        if (mode === 'absent') { const e = new Error("Cannot find module '" + req + "'"); e.code = 'MODULE_NOT_FOUND'; throw e; }
+        if (mode === 'casse') { throw new SyntaxError('Unexpected token in trust-core/index.js'); }
+      }
+      return vrai.apply(this, arguments);
+    };
+    try {
+      for (const k of Object.keys(require.cache)) if (/lib[\\/]vet\.js$/.test(k)) delete require.cache[k];
+      return require('../lib/vet.js');
+    } finally {
+      Module._load = vrai;
+      for (const k of Object.keys(require.cache)) if (/lib[\\/]vet\.js$/.test(k)) delete require.cache[k];
+    }
+  };
+  const ADR = '0x' + '1'.repeat(40);
+
+  await t('un trust-core CASSÉ ne se déclare pas « pas installé »', () => {
+    const casse = chargerAvec('casse').vetLocal(ADR);
+    assert.strictEqual(casse.classifierSource, 'unloadable');
+    assert.match(casse.classifierNote, /IS present but failed to load/);
+    /* Le message d'erreur voyage: un « ça ne marche pas » sans raison se répare au hasard. */
+    assert.match(casse.classifierNote, /SyntaxError/);
+    assert.doesNotMatch(casse.classifierNote, /normal lean deployment/);
+  });
+
+  await t('un trust-core ABSENT reste un état normal, dit comme tel', () => {
+    const absent = chargerAvec('absent').vetLocal(ADR);
+    assert.strictEqual(absent.classifierSource, 'absent');
+    assert.match(absent.classifierNote, /normal lean deployment, not a fault/);
+  });
+
+  await t('les trois états sont DISTINGUABLES', () => {
+    /* Sans ce cas, aplatir deux états l'un sur l'autre resterait vert tant qu'ils ne se croisent pas. */
+    const sig = (r) => String(r.classifierSource) + ':' + (r.classifier === null);
+    const vus = new Set(['present', 'absent', 'casse'].map((m) => sig(chargerAvec(m).vetLocal(ADR))));
+    assert.strictEqual(vus.size, 3);
+  });
+
+  await t('LES DEUX BORNES: la sécurité ne dépend pas de trust-core', () => {
+    /* Le BLOCK par le crible est indépendant — c'est la propriété que ce fichier promet, et un
+     * durcissement de la divulgation ne doit pas y toucher. */
+    for (const m of ['present', 'absent', 'casse']) {
+      const r = chargerAvec(m).vetLocal(ADR);
+      assert.strictEqual(typeof r.screen.blocked, 'boolean', m + ': le crible répond toujours');
+      assert.ok(r.disclosure, m + ': la divulgation du plancher reste émise');
+    }
+    /* Et le cas nominal ne porte AUCUNE note parasite. */
+    assert.strictEqual(chargerAvec('present').vetLocal(ADR).classifierNote, undefined);
+  });
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })();
