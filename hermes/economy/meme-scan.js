@@ -86,6 +86,10 @@ if (require.main === module) (async () => {
     /* `unknown` est un statut DOCUMENTE de vetMeme (« market data unavailable »), pas une surprise. Le
      * confondre avec un statut inconnu ferait passer une panne de donnee pour un bug de notre cote. */
     else if (v.status === 'unknown') lines.push(`⚠️ boosted ${symbol} [${chain}]: market data unavailable — NOT scanned, which is not "nothing found".`);
+    /* `not_a_candidate`: l'adresse promue ne porte pas ce symbole dans les paires lues. Ce n'est PAS une
+     * usurpation — c'est une incohérence entre le boost et le marché, et elle mérite un œil sans mériter
+     * une accusation. */
+    else if (v.status === 'not_a_candidate') lines.push(`? boosted ${symbol} [${chain}]: the promoted address does not carry this symbol in the pairs read — mismatch, NOT an impersonation claim.`);
     /* Sans ce dernier cas, un statut inconnu ne produisait AUCUNE ligne: le token etait compte comme
      * examine et ne disait rien, ce qui se lit « rien a signaler ». Un etat qu'on ne sait pas nommer
      * doit s'annoncer, pas se taire. */

@@ -257,6 +257,65 @@ t('LES DEUX BORNES: sans aucun illisible, AUCUNE reserve n est emise', () => {
   assert.strictEqual(c.every((x) => typeof x.liquidityUsd === 'number'), true);
 });
 
+/* ── (E) UNE FAUTE DE FRAPPE RECEVAIT UNE ACCUSATION D'USURPATION ──────────────────────────────────
+ * Toute adresse qui n'etait pas `top` tombait sur `impersonation`. Mesure du 2026-07-28, meme jeu de
+ * paires:
+ *
+ *   le contrat dominant  -> genuine
+ *   un sosie reel        -> impersonation
+ *   '0x123'              -> impersonation      IDENTIQUE au sosie, octet pour octet
+ *   'pas-une-adresse'    -> impersonation
+ *
+ * L'accusation EST le produit de cet outil, et elle sortait sur une chaine qui n'est pas une adresse.
+ * Deux etats de plus, parce que trois choses tres differentes etaient confondues:
+ *   malformee                       -> `unknown`, entree rejetee, RIEN n'est affirme
+ *   jamais vue sous ce symbole      -> `not_a_candidate`, absence de donnee, pas une prise
+ *   vue sous ce symbole, pas la top -> `impersonation`, la vraie accusation — CONSERVEE */
+const pAdr = (adr, liq) => ({ chainId: 'base', baseToken: { address: adr, symbol: 'X', name: 'X' },
+  liquidity: { usd: liq }, volume: { h24: 1 }, pairCreatedAt: 1 });
+const DOM = '0x' + '11'.repeat(20), SOSIE = '0x' + '22'.repeat(20);
+const PETIT = '0x' + '33'.repeat(20), JAMAIS_VU = '0x' + '99'.repeat(20);
+const marche = async () => ({ pairs: [pAdr(DOM, 900000), pAdr(SOSIE, 20000), pAdr(PETIT, 500)] });
+
+t('★ une adresse MALFORMEE n est accusee de rien', async () => {
+  for (const bad of ['0x123', 'pas-une-adresse', '0x' + 'g'.repeat(40)]) {
+    const r = await vetMeme({ symbol: 'X', chainId: 'base', address: bad, fetchImpl: marche });
+    assert.strictEqual(r.status, 'unknown', bad + ' ne doit pas etre traite comme un usurpateur');
+    assert.match(r.reason, /REJECTED INPUT, not a finding/i);
+    assert.doesNotMatch(r.reason, /NOT the dominant contract/i);
+  }
+});
+
+t('★ une adresse JAMAIS VUE sous ce symbole n est pas un sosie, c est une absence', async () => {
+  const r = await vetMeme({ symbol: 'X', chainId: 'base', address: JAMAIS_VU, fetchImpl: marche });
+  assert.strictEqual(r.status, 'not_a_candidate');
+  assert.match(r.reason, /NOT alleged to be a look-alike/i);
+  assert.match(r.reason, /never saw it under this symbol/i, 'dire ce qu on sait, pas ce qu on suppose');
+});
+
+t('★ LES DEUX BORNES: le vrai sosie reste accuse, MEME sous le plancher de liquidite', async () => {
+  /* La prise qu on ne veut surtout pas perdre. `cands` precede le filtre de credibilite, donc un sosie
+   * minuscule — le profil typique d un piege frais — est toujours attrape. */
+  const credible = await vetMeme({ symbol: 'X', chainId: 'base', address: SOSIE, fetchImpl: marche });
+  const minuscule = await vetMeme({ symbol: 'X', chainId: 'base', address: PETIT, fetchImpl: marche });
+  assert.strictEqual(credible.status, 'impersonation');
+  assert.strictEqual(minuscule.status, 'impersonation', 'sous le plancher, mais il PORTE le symbole');
+  /* Et le contrat vise voyage avec le verdict, pour que l accusation soit verifiable. */
+  assert.strictEqual(String(minuscule.thisContract.address).toLowerCase(), PETIT);
+});
+
+t('LES DEUX BORNES: le contrat dominant reste certifie', async () => {
+  const r = await vetMeme({ symbol: 'X', chainId: 'base', address: DOM, fetchImpl: marche });
+  assert.strictEqual(r.status, 'genuine');
+});
+
+t('★ les quatre issues sont DISTINGUABLES (temoin d instrument)', async () => {
+  const st = [];
+  for (const adr of [DOM, SOSIE, JAMAIS_VU, '0x123'])
+    st.push((await vetMeme({ symbol: 'X', chainId: 'base', address: adr, fetchImpl: marche })).status);
+  assert.strictEqual(new Set(st).size, 4, 'vu: ' + JSON.stringify(st));
+});
+
 t('une chaine inconnue ne certifie rien — elle abstient', async () => {
   const r = await vetMeme({ symbol: 'DEGEN', chainId: 'chaine-imaginaire', fetchImpl: faussesPaires(PAIRES) });
   assert.notStrictEqual(r.status, 'genuine', 'jamais de certification sur une chaine qu on n a pas su lire');
