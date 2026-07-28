@@ -34,6 +34,11 @@ const DATA_PATHS = [
   'data/token-radar/tokens.json',
   'data/token-radar/scorecard.json',
   'data/agent-watch/registry.json',
+  /* Ajoute le 2026-07-28 APRES lecture du contenu: un tableau de 631 octets, deux enregistrements de
+   * TROUS D'OBSERVATION (from/to/hours/note) — aucune cle, aucune adresse, aucun secret. Il appartient au
+   * meme lot que `tokens.json`: un chiffre tire d'observations ne veut rien dire sans la trace des
+   * periodes ou l'on ne regardait pas. Son absence de cette liste bloquait TOUT le committeur. */
+  'data/token-radar/blackouts.json',
 ];
 
 const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
@@ -53,6 +58,12 @@ function refuse(why) {
   process.exit(1);
 }
 
+/* Exporte AVANT le flux, et le flux ne s'execute qu'en lancement direct. Un `return` au niveau module est
+ * legal en CommonJS (le module est enveloppe dans une fonction), donc requerir ce fichier depuis un test
+ * ne lance AUCUNE commande git — ce qui est la seule facon de tester un committeur sans en devenir un. */
+module.exports = { classer, DATA_PATHS };
+if (require.main !== module) return;
+
 // ── 1. is the tree in a state an unattended script may act on? ─────────────────
 let branch;
 try { branch = git('rev-parse', '--abbrev-ref', 'HEAD'); } catch (e) { refuse('not a git tree here (' + e.message + ')'); }
@@ -65,10 +76,45 @@ if (staged) refuse('something is already staged, so someone is mid-commit:\n    
 const dirty = gitRaw('status', '--porcelain').split('\n').filter((l) => l.length > 3)
   .map((l) => ({ code: l.slice(0, 2), file: l.slice(3).replace(/^"|"$/g, '').replace(/\r$/, '') }));
 const tracked = dirty.filter((d) => !d.code.includes('?'));
-const foreign = tracked.filter((d) => !DATA_PATHS.includes(d.file));
-if (foreign.length) {
-  refuse('modified files outside the data paths — that is code, and code gets reviewed, not swept:\n         '
-    + foreign.map((f) => f.code + ' ' + f.file).join('\n         '));
+/**
+ * classer — trie les fichiers modifies en trois: du CODE, une nouvelle DONNEE hors liste, et ce qu'on a
+ * le droit de commiter. Extrait pur, parce que ce script n'exportait rien et qu'aucun test ne pouvait
+ * l'atteindre — le meme « lecteur qui n'existe pas » corrige ailleurs aujourd'hui.
+ */
+function classer(modifies, dataPaths) {
+  const horsListe = modifies.filter((d) => !dataPaths.includes(d.file));
+  return {
+    duCode: horsListe.filter((f) => !String(f.file).startsWith('data/')),
+    nouvellesDonnees: horsListe.filter((f) => String(f.file).startsWith('data/')),
+    aCommiter: modifies.filter((d) => dataPaths.includes(d.file)).map((d) => d.file),
+  };
+}
+
+/* ⚠️ UN SEUL MESSAGE POUR DEUX SITUATIONS OPPOSEES, ET LA DIFFERENCE EST CE QU'IL FAUT FAIRE.
+ * Mesure du 2026-07-28: le committeur refusait en disant « modified files outside the data paths — that
+ * is code » en listant `data/token-radar/blackouts.json`. Ce fichier n'est ni du code ni hors de `data/`:
+ * c'est un QUATRIEME fichier de donnees que le radar s'est mis a ecrire, absent de la liste blanche.
+ *
+ * Le garde avait raison de refuser — une liste EXPLICITE sans joker est precisement ce qui empeche un
+ * fichier que personne n'a voulu publier de partir avec le lot. C'est le message qui etait faux, et le
+ * cout est reel: la base d'observations n'atteignait plus git. Au moment de la mesure, 609 lignes en base
+ * contre 437 dans le dernier commit — 172 observations bloquees, et le blocage etait PERMANENT tant que
+ * la liste n'etait pas mise a jour.
+ *
+ * On separe donc les deux, parce qu'elles n'appellent pas le meme geste:
+ *   - sous `data/` mais hors liste  -> un nouveau fichier de donnees est apparu: l'AJOUTER volontairement
+ *   - hors `data/`                  -> c'est du code, et le code se relit, il ne se balaie pas */
+const { duCode, nouvellesDonnees } = classer(tracked, DATA_PATHS);
+if (duCode.length || nouvellesDonnees.length) {
+  const liste = (xs) => xs.map((f) => f.code + ' ' + f.file).join('\n         ');
+  refuse([
+    duCode.length ? 'modified files OUTSIDE data/ — that is code, and code gets reviewed, not swept:\n         ' + liste(duCode) : '',
+    nouvellesDonnees.length ? 'data file(s) under data/ that are NOT on the explicit allow-list:\n         '
+      + liste(nouvellesDonnees)
+      + '\n         This is not code and not an intruder — the radar started writing a file nobody added to'
+      + '\n         DATA_PATHS. Look at it, then add it there DELIBERATELY. Until you do, the observation'
+      + '\n         database stops reaching git entirely, and nothing else will say so.' : '',
+  ].filter(Boolean).join('\n\n       '));
 }
 
 const changed = tracked.filter((d) => DATA_PATHS.includes(d.file)).map((d) => d.file);
