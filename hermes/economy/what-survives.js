@@ -48,13 +48,30 @@ const holdersOf = (t) => {
 const pct = (n, d) => d ? Math.round((n / d) * 100) + '%' : '—';
 const med = (xs) => { const a = xs.filter((x) => x != null).sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : null; };
 
+/* Un trait peut rendre `null` = PAS MESURÉ sur cette ligne. Ces lignes sortent du dénominateur au lieu
+ * d'être comptées comme un « non » — un jugement non résolu n'est ni juste ni faux, et le compter faux
+ * dilue exactement le signal qu'on cherche. Le nombre d'exclus est IMPRIMÉ: un taux sur 40 lignes et le
+ * même taux sur 570 ne se lisent pas pareil, et cacher le dénominateur est la façon habituelle de faire
+ * passer le second pour le premier.
+ *
+ * ⚠️ `typeof xs[0] === 'boolean'` ne testait QUE le premier élément. Dès qu'un trait rend `null`, une
+ * colonne dont la première ligne n'est pas mesurée bascule dans la branche NUMÉRIQUE et calcule une
+ * médiane de booléens. Le type était trop pauvre à la frontière: on détecte désormais sur l'ensemble. */
 function compare(label, fn, fmt = (v) => String(v)) {
   const d = dead.map(fn), a = alive.map(fn);
-  const both = [d, a].map((xs) => typeof xs[0] === 'boolean'
-    ? pct(xs.filter(Boolean).length, xs.length)
-    : fmt(med(xs)));
+  const estBool = [...d, ...a].some((v) => typeof v === 'boolean');
+  /* Les exclus sont comptés PAR COLONNE, pas additionnés. Sur ce corpus, 61 % des ruggés ont un
+   * financement tracé contre 50 % des vivants: un total unique (« 248 non mesurés ») aurait caché
+   * précisément l'asymétrie qui décide si les deux taux sont comparables entre eux. */
+  const omis = [];
+  const both = [d, a].map((xs) => {
+    const lus = xs.filter((v) => v != null);
+    omis.push(xs.length - lus.length);
+    return estBool ? pct(lus.filter(Boolean).length, lus.length) : fmt(med(lus));
+  });
   const mark = both[0] !== both[1] ? ' ←' : '';
-  console.log('  ' + label.padEnd(34) + String(both[0]).padStart(10) + '   ' + String(both[1]).padStart(10) + mark);
+  console.log('  ' + label.padEnd(34) + String(both[0]).padStart(10) + '   ' + String(both[1]).padStart(10) + mark
+    + (omis[0] + omis[1] ? '   (non mesurés — R:' + omis[0] + ' A:' + omis[1] + ', hors dénominateur)' : ''));
 }
 
 console.log('== what separates the ' + alive.length + ' survivors from the ' + dead.length + ' that died ==\n');
@@ -67,8 +84,23 @@ compare('pool withdrawable', (t) => liveFlags(t).some((f) => /liquidity is locke
 compare('too few holders flagged', (t) => liveFlags(t).some((f) => /only \d+ holders/i.test(f)));
 compare('holder count when known', (t) => holdersOf(t));
 compare('had NO security data at all', (t) => t.firstVerdict === 'unknown');
-compare('deployer identifiable', (t) => !!t.deployer);
-compare('funded by a launch factory', (t) => (t.siblingCount || 0) >= 5);
+/* ⚠️ CE N'EST PAS UN TRAIT DU TOKEN, C'EST NOTRE COUVERTURE. `t.deployer` n'est renseigné que si le
+ * traceur a tourné et abouti. Vérifié le 2026-07-28 sur les 570 lignes: `!!t.deployer` et
+ * « siblingCount est un nombre » coïncident sur 570/570, zéro divergence — les deux disent « on a tracé
+ * cette ligne ». Affiché parmi les traits avec le marqueur « ← », il se lisait « les rugs ont plus
+ * souvent un déployeur identifiable (61 % vs 50 %) », alors que l'énoncé vrai est « on a réussi à tracer
+ * 61 % des rugs et 50 % des survivants ». Même nombre, autre sujet — et c'est le dénominateur de la
+ * ligne « launch factory » juste en dessous, donc il se lit AVEC elle, pas comme un résultat. */
+compare('[couverture] financement tracé', (t) => !!t.deployer);
+/* `(t.siblingCount || 0) >= 5` comptait comme « pas financé par une usine » TROIS choses distinctes:
+ * un financeur réellement solitaire, un balayage que l'explorateur a refusé cette nuit-là, et un token
+ * dont le financement n'a jamais été tracé du tout. Les deux derniers ne sont pas des observations —
+ * c'est le biais de survivant que nos propres notes signalaient déjà dans le bucket « unknown ». */
+compare('funded by a launch factory', (t) => {
+  if (t.siblingsRead === false) return null;                  // lecture tentée et manquée
+  if (typeof t.siblingCount !== 'number') return null;         // financement jamais tracé
+  return t.siblingCount >= 5;
+});
 compare('deployer wallet was single-use', (t) => t.freshDeployer === true);
 compare('found via paid promotion', (t) => t.source === 'boosted');
 

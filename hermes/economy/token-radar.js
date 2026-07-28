@@ -477,6 +477,12 @@ function recordBlackout(db, nowIso) {
     if (!f || !f.ok || !f.funder) continue;
     db[c.addr].deployer = f.deployer; db[c.addr].funder = f.funder;
     db[c.addr].siblingCount = f.siblingCount; db[c.addr].freshDeployer = f.freshDeployer;
+    /* `siblingCount` vaut desormais `null` quand l'explorateur n'a pas repondu sur l'historique du
+     * financeur (au lieu de `0`, qui se lisait « verifie, il n'a paye personne »). On PERSISTE le fait,
+     * parce que l'annotation survit a la panne: sans ce drapeau, une nuit de rate-limit laisse en base des
+     * lignes indiscernables d'un financeur reellement solitaire, et c'est ce que relit le tableau
+     * `what-survives`. */
+    db[c.addr].siblingsRead = f.siblingsRead !== false;
 
     /* KEEP THE SHARP NUMBERS, NOT ONLY THE BLUNT ONE.
      *
@@ -502,7 +508,10 @@ function recordBlackout(db, nowIso) {
     db[c.addr].identicalAmountEth = f.identicalAmount;
     db[c.addr].fundedEth = f.fundedEth;
     // `siblingCount` is a FLOOR, not a count, whenever the funder's history did not fit on one page.
-    db[c.addr].siblingCountCensored = !!f.morePages || f.siblingCount >= 50;
+    // Et un balayage QUI N'A PAS EU LIEU est le cas le plus censure de tous: avec `siblingCount: null`,
+    // `!!null || null >= 50` rendait `false`, c'est-a-dire « ce compte est exact et complet » — l'inverse
+    // exact de la verite, affirme au moment ou on en sait le moins.
+    db[c.addr].siblingCountCensored = f.siblingsRead === false || !!f.morePages || f.siblingCount >= 50;
     if (f.identicalAmountSiblings >= SIBLING_ALERT || f.siblingCount >= SIBLING_ALERT) clusters.push({ ...c, f });
 
     // The one rule this session that survived its own backtest. Measured over 62 tokens with funding data:

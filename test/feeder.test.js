@@ -205,6 +205,71 @@ t('la pagination des fratries est divulguee', async () => {
   assert.strictEqual(r.morePages, true, 'un comptage partiel presente comme total serait faux');
 });
 
+/* ── (F) UN BALAYAGE DE FRATRIE QUI ECHOUE N'EST PAS UN FINANCEUR PROPRE ──────────────────────────
+ * `getJSON` resout `null` sur erreur reseau ET sur corps non-parsable — il ne rejette jamais. Le
+ * troisieme appel (l'historique sortant du financeur) retombait donc sur `[]`, et le module rendait
+ * `ok: true`, financeur nomme, `siblingCount: 0`, `morePages: false`, et la phrase « single funder, no
+ * repeated pattern on this page ». Mesure du 2026-07-28, trois cas OPPOSES:
+ *
+ *   usine (26 wallets)     -> siblingCount 26
+ *   vide  (vraiment aucun) -> siblingCount 0    IDENTIQUES octet pour octet, `pattern` compris
+ *   panne (429/502)        -> siblingCount 0
+ *
+ * Le compteur seul serait deja mauvais; la phrase publiee ATTESTAIT l'absence du signal a partir d'une
+ * lecture qui n'a pas eu lieu. Et « le financeur a paye 20+ portefeuilles » est l'une des deux conditions
+ * qui, dans nos donnees, precedent 85 % des rugs — une nuit de rate-limit annotait chaque lancement comme
+ * finance par un dormeur solitaire, et l'annotation est ecrite en base: la lecture manquee survit a la
+ * panne.
+ *
+ * Le bouchon `explorateur` ne peut PAS produire ce cas (`m.sortant || { items: [] }` rattrape le null),
+ * ce qui est precisement pourquoi il n'etait pas couvert. On tape donc `traceFeeder` avec un fetch dedie. */
+const explorateurMuetSurFratrie = async (url) => {
+  if (/\/transactions\/0x/.test(url)) return { timestamp: '2026-01-01T12:00:00Z' };
+  if (url.includes('/transactions?filter=to')) return BASE_ENTRANT;
+  if (url.includes('/transactions?filter=from')) return null;          // 429 / 502 / corps non-parsable
+  if (url.includes('/addresses/')) return { creator_address_hash: '0xDEPLOYEUR', creation_transaction_hash: '0xcreation' };
+  return null;
+};
+
+t('★ une fratrie NON LUE rend null, jamais zero', async () => {
+  const r = await traceFeeder('base', '0xTOKEN', { fetchImpl: explorateurMuetSurFratrie });
+  assert.strictEqual(r.siblingsRead, false, 'le fait que la lecture ait echoue doit VOYAGER');
+  assert.strictEqual(r.siblingCount, null, '0 se lirait « verifie, ce financeur n a paye personne »');
+  /* `identicalAmountSiblings` gouverne l AUTRE moitie du drapeau industriel et tombait a 0 par le meme
+   * chemin — corriger un seul des deux compteurs aurait laisse la porte ouverte. */
+  assert.strictEqual(r.identicalAmountSiblings, null);
+  assert.strictEqual(r.morePages, null, 'on ne sait pas s il y avait d autres pages: on ne l a pas lu');
+});
+
+t('★ la PHRASE publiee n atteste pas une absence qu on n a pas mesuree', async () => {
+  const r = await traceFeeder('base', '0xTOKEN', { fetchImpl: explorateurMuetSurFratrie });
+  assert.match(r.pattern, /could NOT be read/i);
+  assert.match(r.pattern, /NOT "no siblings found"/i, 'la phrase doit REFUSER la lecture innocente');
+  assert.doesNotMatch(r.pattern, /no repeated pattern/i);
+});
+
+t('LES DEUX BORNES: un financeur VRAIMENT vide dit toujours exactement ce qu il disait', async () => {
+  /* Sans ce cas, on aurait pu rendre `null` partout et perdre la distinction dans l autre sens: un
+   * financeur reellement sans fratrie est une VRAIE mesure, et elle doit rester lisible comme telle. */
+  const vide = await tracer({ sortant: { items: [] } });
+  assert.strictEqual(vide.siblingsRead, true);
+  assert.strictEqual(vide.siblingCount, 0, 'lu-et-vide reste 0, pas null');
+  assert.strictEqual(vide.identicalAmountSiblings, 0);
+  assert.strictEqual(vide.morePages, false);
+  assert.match(vide.pattern, /no repeated pattern/i);
+});
+
+t('★ les trois etats sont DISTINGUABLES (temoin d instrument)', async () => {
+  /* Le controle qui manquait la premiere fois: sans un cas a signal FORT, une sonde qui rend la meme
+   * chose partout se lit comme « rien a signaler » au lieu de « l instrument est mort ». */
+  const sig = (r) => JSON.stringify([r.siblingsRead, r.siblingCount, r.identicalAmountSiblings, r.pattern]);
+  const usine = await tracer({ sortant: { items: Array.from({ length: 26 }, (_, i) => sortie('0xW' + i, 15.02)) } });
+  const vide = await tracer({ sortant: { items: [] } });
+  const panne = await traceFeeder('base', '0xTOKEN', { fetchImpl: explorateurMuetSurFratrie });
+  assert.strictEqual(new Set([sig(usine), sig(vide), sig(panne)]).size, 3);
+  assert.strictEqual(usine.siblingCount, 26, 'temoin: le cas a signal fort doit vraiment porter le signal');
+});
+
 t('la note ne dit JAMAIS fraude — structure seulement', async () => {
   /* La regle qui gouverne tout ce module: on-chain prouve qui a paye qui, jamais pourquoi. Un launchpad
    * et une fabrique a rugs sont indiscernables depuis ce graphe. */
