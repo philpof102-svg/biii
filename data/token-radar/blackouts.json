@@ -5,5 +5,10 @@
     "hours": 9.3,
     "reconstructed": true,
     "note": "Measured, not detected: the gap detector did not exist yet when this happened. The machine slept and the Hermes gateway restarted (gateway.start jumped from 2026-07-25T17:22Z to 2026-07-27T08:47Z). Recorded by hand because leaving it out would have let the scorecard claim a continuously watched period over hours we know it was blind — the exact silence the detector was built to end. Every later entry is detected live by lib/watch-gap.js."
+  },
+  {
+    "from": "2026-07-27T22:07:20.680Z",
+    "to": "2026-07-28T00:09:41.541Z",
+    "hours": 2
   }
 ]
