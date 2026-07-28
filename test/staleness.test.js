@@ -52,6 +52,47 @@ const LIST = (asOf) => ({ asOf, sources: ['OFAC SDN (0xB10C)'], addresses: ['0x'
     assert.match(m.disclosure, /age unknown/);
   });
 
+  /* ⚠️ AUCUNE LISTE CHARGEE NE DOIT SE DIRE « CURRENT ».
+   * `stale` valait `ageDays != null && ageDays > STALE_DAYS`, donc `false` quand `asOf` manque — ce qui
+   * est exactement le cas d'un plancher jamais charge. Mesure du 2026-07-28:
+   * `screenMeta(loadScreen(null))` rendait `{count:0, asOf:null, stale:false}`. Publie tel quel sur
+   * `/radar` (surface PUBLIQUE), ca donne « 0 adresses, non perime »: a jour ET vide. Et `vet.js:73`
+   * traduit ce booleen en toutes lettres par « current ».
+   *
+   * La divulgation textuelle, elle, disait deja « UNAVAILABLE » — c'est le champ MACHINE qui mentait, et
+   * c'est lui que les deux surfaces consomment. */
+  await t('AUCUNE liste chargee ne se declare non perimee', () => {
+    const m = screenMeta(loadScreen(null));
+    assert.equal(m.available, false);
+    assert.equal(m.stale, true, 'une non-lecture n\'est pas une fraicheur');
+    /* La phrase que vet.js en tire ne doit plus dire « current ». */
+    assert.equal(m.stale ? 'STALE — re-run the ingest' : 'current', 'STALE — re-run the ingest');
+  });
+
+  /* ⚠️ LA BORNE INVERSE, et c'est un test existant qui me l'a apprise. Mon premier jet incluait aussi
+   * `ageDays == null`, ce qui faisait rougir le cas « a list with no asOf » ci-dessus — dont le
+   * commentaire tranche explicitement: « unknown age is not asserted stale ». Une liste CHARGEE mais non
+   * datee est utilisable, et la declarer perimee affirme aussi quelque chose qu'on ignore. L'arbitrage
+   * de l'auteur est respecte; seul le fail-open sans ambiguite est corrige. */
+  await t('une liste CHARGEE mais non datee reste non perimee — l arbitrage d origine tient', () => {
+    const m = screenMeta({ sources: [], addresses: ['0x' + 'b1'.repeat(20)] });
+    assert.equal(m.available, true);
+    assert.equal(m.ageDays, null);
+    assert.equal(m.stale, false, 'chargee sans date != jamais chargee');
+  });
+
+  await t('les trois etats sont DISTINGUABLES', () => {
+    /* Sans ce cas, aplatir deux etats l un sur l autre resterait vert tant qu ils ne se croisent pas. */
+    const sig = (m) => String(m.available) + ':' + String(m.ageDays == null) + ':' + String(m.stale);
+    const vus = new Set([
+      sig(screenMeta(loadScreen(null))),                                        // pas de liste
+      sig(screenMeta({ sources: [], addresses: ['0x' + 'b1'.repeat(20)] })),     // chargee, non datee
+      sig(screenMeta(loadScreen(JSON.parse(require('node:fs').readFileSync(
+        require('node:path').join(__dirname, '..', 'data', 'known-bad.json'), 'utf8'))))),  // chargee, datee
+    ]);
+    assert.equal(vus.size, 3, 'trois situations opposees doivent produire trois signatures distinctes');
+  });
+
   await t('the SHIPPED floor exposes its real freshness (loads, dated, N addresses)', () => {
     const fs = require('node:fs'), path = require('node:path');
     const data = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'known-bad.json'), 'utf8'));
