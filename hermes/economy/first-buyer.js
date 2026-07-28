@@ -54,17 +54,34 @@ const low = (s) => String(s || '').toLowerCase();
  *   { ok:false, reason:'no_lp_event' }   on a lu, et il n'y a pas de creation de pool reperable
  *   { ok:false, reason:'unread' }        on n'a PAS pu lire. Ce n'est pas "pas d'acheteur".
  */
-async function firstBuyOf(token, deployer) {
+async function firstBuyOf(token, deployer, { fetchImpl } = {}) {
+  /* Couture d injection, meme idiome que traceFeeder(chain, addr, { fetchImpl }): sans elle la fonction
+   * etait EXPORTEE mais intestable — un lecteur possible qui n existait pas. */
+  const lire = fetchImpl || getJSON;
   const url = EXP + '/api?module=account&action=tokentx&contractaddress=' + token + '&sort=asc&page=1&offset=30';
-  const res = await getJSON(url);
+  const res = await lire(url);
   if (!res || res.status !== '1' || !Array.isArray(res.result)) return { ok: false, reason: 'unread' };
   const txs = res.result;
   if (!txs.length) return { ok: false, reason: 'unread' };   // succes VIDE: pas une donnee tant qu'on n'a rien lu
 
   /* Ancre = la creation du pool. Reperee par la methode quand elle est lisible, sinon par le fait que le
    * deployeur envoie des tokens a une adresse qui devient ensuite l'emetteur des swaps. */
+  /* ⚠️ L'ANCRE ETAIT LUE OU DEVINEE, ET RIEN NE DISAIT LAQUELLE.
+   * `lpBlock` sort d'ici, et `blocksAfterLp` — le seul signal que ce fichier produit — se mesure depuis
+   * cette origine. Deux resolutions tres differentes y menaient sans laisser de marque:
+   *   - `addliquidity` LU dans le nom de methode: l'ancre est l'evenement qu'on croit;
+   *   - le repli « premiere transaction du deployeur »: c'est une HEURISTIQUE, et si l'explorateur ne
+   *     decode aucun `functionName`, la premiere recherche echoue TOUJOURS et tout le corpus bascule sur
+   *     le repli, systematiquement et en silence.
+   * Deux epistemologies aplaties sur un meme nombre. On enregistre desormais laquelle a servi, pour
+   * pouvoir DEMANDER a la donnee si la queue lente (20-27 blocs, 6 cas sur 65 au 2026-07-28) est un
+   * signal ou un artefact de l'ancre — question qu'elle ne pouvait pas entendre. */
+  let ancre = 'addliquidity_lu';
   let lpIdx = txs.findIndex((t) => /addliquidity/i.test(String(t.functionName || '')));
-  if (lpIdx < 0 && deployer) lpIdx = txs.findIndex((t) => low(t.from) === low(deployer));
+  if (lpIdx < 0 && deployer) {
+    lpIdx = txs.findIndex((t) => low(t.from) === low(deployer));
+    ancre = 'deployeur_devine';
+  }
   if (lpIdx < 0) return { ok: false, reason: 'no_lp_event' };
 
   const pool = low(txs[lpIdx].to);
@@ -116,7 +133,7 @@ async function firstBuyOf(token, deployer) {
   voie = 'pool_sortant';
 
   /* LE POINT DE TOUT LE FICHIER: le destinataire du log n'est pas l'acheteur. On va chercher le signataire. */
-  const tx = await getJSON(EXP + '/api/v2/transactions/' + buy.hash);
+  const tx = await lire(EXP + '/api/v2/transactions/' + buy.hash);
   if (!tx || !tx.from || !tx.from.hash) {
     return { ok: false, reason: 'tx_unread', pool, lpBlock, logRecipient: low(buy.to), buyHash: buy.hash };
   }
@@ -158,10 +175,22 @@ async function firstBuyOf(token, deployer) {
     buyTarget: low(tx.to && tx.to.hash),
     buyTargetName: (tx.to && tx.to.name) || null,
     pool, lpBlock,
+    /* D'ou l'ancre vient: `blocksAfterLp` ne veut pas dire la meme chose selon qu'on a LU la creation du
+     * pool ou qu'on l'a DEVINEE. Absent sur les lignes ecrites avant le 2026-07-28 — un correctif de
+     * divulgation ne reecrit pas l'arriere. */
+    ancre,
     buyBlock: Number(buy.blockNumber),
     blocksAfterLp: Number(buy.blockNumber) - lpBlock,
     buyHash: buy.hash,
     firstBuyer: low(tx.from.hash),
+    /* ⚠️ CE CHAMP NE PEUT PRATIQUEMENT PAS VARIER, et se lisait comme une verification. `tx.from` est le
+     * SIGNATAIRE: sur une transaction standard c'est un EOA par construction, donc `false` n'est pas une
+     * observation, c'est une tautologie. Mesure du 2026-07-28: 0 sur 65, variance nulle.
+     * On le garde pour deux raisons: EIP-7702 permet desormais a un EOA de porter du code, donc le champ
+     * peut devenir informatif — et le jour ou il passe a `true`, on veut le voir. Mais la vraie question
+     * « est-ce qu'un CONTRAT a achete » porte sur le destinataire, que ce fichier enregistre deja a part
+     * (`logRecipient`, `recipientDiffersFromSigner`: 59 sur 65 different — la premisse du fichier, validee
+     * bruyamment par la mesure). */
     buyerIsContract: !!(tx.from.is_contract),
     logRecipient: low(buy.to),
     // Un ecart entre les deux est exactement le piege que ce fichier existe pour eviter; on le garde
