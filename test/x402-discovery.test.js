@@ -3,9 +3,30 @@
 // Run: node test/x402-discovery.test.js
 const assert = require('node:assert');
 const http = require('node:http');
-// isolate the anti-replay consumed-store to a temp file (fresh per run) so paid tests don't pollute data/
-// or fail on re-run — and MUST be set before requiring the server (STORE is bound at module load).
-process.env.BIII_X402_CONSUMED = require('node:path').join(require('node:os').tmpdir(), 'biii-x402-disc-' + process.pid + '.json');
+/* Isolate the anti-replay consumed-store so paid tests don't pollute data/ — MUST be set before requiring
+ * the server (STORE is bound at module load).
+ *
+ * ⚠️ « fresh per run » ETAIT FAUX: le chemin etait `biii-x402-disc-<process.pid>.json`, et un PID se
+ * RECYCLE. Rien ne supprimait le fichier — 219 exemplaires trainaient dans le tmpdir au moment de la
+ * mesure. Quand un run heritait du PID d'un run precedent, il rouvrait un store contenant deja GOODTX, la
+ * garde anti-rejeu repondait 409, et DEUX cas payes tombaient.
+ *
+ * Mesure: 1 echec sur 15 lancements a froid, puis reproduit a l'identique en forcant un nom FIXE —
+ * run 1 « 5 passed · 0 failed », run 2 « 3 passed · 2 failed », les memes deux cas. Ce n'etait donc pas
+ * un alea de port ni de timing.
+ *
+ * Ca comptait au-dela de ce fichier: `npm test` chaine en `&&`, donc ce rouge intermittent coupait la
+ * suite au 38e fichier sur 73 et rendait un total PARTIEL (295 au lieu de 839). Une porte qui rougit pour
+ * une raison qui n'est pas le code entraine a relancer jusqu'au vert, ce qui est exactement la facon dont
+ * un vrai rouge finit par passer inapercu — la raison meme pour laquelle suite-coverage.test.js exclut
+ * deja e2e-real-chain et schema-drift de la suite.
+ *
+ * `mkdtempSync` rend un dossier dont l'unicite est garantie par l'OS, pas par un compteur reutilisable, et
+ * il est supprime a la sortie: plus de collision ET plus de fuite. */
+const fs = require('node:fs');
+const CONSUMED_DIR = fs.mkdtempSync(require('node:path').join(require('node:os').tmpdir(), 'biii-x402-disc-'));
+process.env.BIII_X402_CONSUMED = require('node:path').join(CONSUMED_DIR, 'consumed.json');
+process.on('exit', () => { try { fs.rmSync(CONSUMED_DIR, { recursive: true, force: true }); } catch {} });
 const { build } = require('../lib/server');
 const T = require('../lib/till');
 
