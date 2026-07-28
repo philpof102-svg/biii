@@ -210,6 +210,55 @@ t('ownerIsLive est exactement ownerState() === live, sur les trois etats', () =>
 
 console.log('\nsimulation seule: "ca se vend" n est pas "c est sur"');
 
+/* ════════════════════════════════════════════════════════════════════════════════════════════════════
+ * « LES VENTES PASSENT EN CE MOMENT » SORTAIT D'UNE VENTE DONT LE VERDICT N'AVAIT PAS ETE RENDU.
+ *
+ * `simulateTrade` gardait `if (isHoneypot === undefined && sellTax === undefined) return {ok:false}` —
+ * il fallait que les DEUX manquent. Si le service rendait une taxe sans verdict honeypot, on passait, et
+ * `honeypot: !!undefined` valait `false`. Mesure du 2026-07-28 PAR LE PRODUCTEUR (`scanRug`, GoPlus
+ * aveugle, donc le chemin de repli des lancements frais):
+ *
+ *   isHoneypot: false, taxes lues -> caution, « sells go through right now (simulated, 2% sell tax) »
+ *   isHoneypot ABSENT, taxes lues -> caution, LA MEME PHRASE
+ *
+ * Cette phrase est la seule chose qu'un acheteur lit avant d'engager, et c'est la seule question qui
+ * compte: est-ce que je pourrai ressortir ? On l'affirmait sur un champ jamais rendu, dans la population
+ * exacte ou vivent les honeypots. `null` reste falsy — on n'accuse toujours pas — mais on cesse
+ * d'absoudre. */
+
+t('★ un verdict honeypot NON RENDU ne devient pas « on peut vendre »', () => {
+  const r = R.assessFromSimulationOnly({ ok: true, honeypot: null, sellTax: 2, buyTax: 1 });
+  assert.doesNotMatch(r.reason, /sells go through/i, 'la promesse doit disparaitre');
+  assert.match(r.reason, /NO honeypot verdict/i);
+  assert.match(r.reason, /not "you can sell it"/i, 'et le dire explicitement, pas seulement l omettre');
+  assert.ok(r.unknowns.includes('honeypot verdict'), 'l inconnu doit etre LISTE, pas seulement raconte');
+});
+
+t('★ LES DEUX BORNES: un verdict RENDU garde exactement son sens, dans les deux sens', () => {
+  /* Le durcissement ne doit ni eteindre l accusation ni supprimer l information reelle. */
+  const nonHoneypot = R.assessFromSimulationOnly({ ok: true, honeypot: false, sellTax: 2 });
+  assert.match(nonHoneypot.reason, /sells go through right now/i, 'une vraie lecture negative reste dite');
+  assert.ok(!nonHoneypot.unknowns.includes('honeypot verdict'));
+
+  const honeypot = R.assessFromSimulationOnly({ ok: true, honeypot: true, sellTax: 2, reason: 'cannot sell' });
+  assert.equal(honeypot.verdict, 'rug_ready');
+  assert.equal(honeypot.armed.length, 1);
+});
+
+t('★ le verdict ne se DEGRADE pas: les drapeaux reellement lus survivent au champ manquant', () => {
+  /* Jeter les drapeaux parce qu un champ manque serait un fail-closed qui n informe plus. Une taxe
+   * fatale reste ARMEE meme sans verdict honeypot — elle a ete lue, elle. */
+  const fatal = R.assessFromSimulationOnly({ ok: true, honeypot: null, sellTax: 99 });
+  assert.equal(fatal.verdict, 'rug_ready', 'une taxe de vente fatale se suffit a elle-meme');
+  assert.ok(fatal.armed.length >= 1);
+});
+
+/* Le cas PAR LE PRODUCTEUR vit plus bas, dans la section asynchrone: le harnais `t()` de ce fichier est
+ * SYNCHRONE (`try { fn() }`, sans await), donc un corps `async` y serait une promesse creee puis jetee —
+ * un test qui ne peut pas echouer. Ecrit ici d'abord par reflexe, et attrape par le meta-test du depot
+ * (« aucun harnais synchrone ne pilote de test async »). C'est aussi ce qui rendait MUETTE la mutation du
+ * coeur: le seul cas qui traversait `simulateTrade` n'assertait rien. */
+
 t('assessFromSimulationOnly ne rend JAMAIS clean — balaye sur 200+ combinaisons', () => {
   /* L invariant central du chemin fresh-launch. Balaye plutot que teste sur trois cas, parce qu une
    * branche clean ajoutee par megarde se cacherait justement dans la combinaison qu on n aurait pas ecrite. */
@@ -349,6 +398,32 @@ const adr = (n) => '0x' + String(n).padStart(40, '0');
   const quarante = await demander(40);
   const centVingt = await demander(120);
   const compte = (r, v) => Object.values(r).filter((x) => x.verdict === v).length;
+
+  /* ── LES QUATRE ETATS DE SIMULATION, PAR LE VRAI CHEMIN ────────────────────────────────────────
+   * `await` ici, assertion synchrone dans `t()`: c'est la seule forme qui echoue vraiment dans ce
+   * fichier. Le cas traverse `simulateTrade`, que rien n'atteignait — il n'est pas exporte. */
+  const UN = adr(1);
+  const sonde = (hp) => async (url) => (/honeypot/i.test(url) ? hp : { code: 1, result: {} });
+  const simCas = [
+    { honeypotResult: { isHoneypot: true, honeypotReason: 'cannot sell' }, simulationResult: { sellTax: 2 } },
+    { honeypotResult: { isHoneypot: false }, simulationResult: { sellTax: 2 } },
+    { simulationResult: { sellTax: 2 } },                       // verdict honeypot ABSENT
+    { token: { totalHolders: 5 } },                             // les deux champs absents
+  ];
+  const simSigs = [];
+  for (const c of simCas) simSigs.push((await R.scanRug('base', [UN], { fetchImpl: sonde(c) }))[UN]);
+
+  t('★ PAR LE PRODUCTEUR: les quatre etats de simulation sont DISTINGUABLES', () => {
+    const sigs = simSigs.map((a) => a.verdict + '|' + a.reason);
+    assert.strictEqual(new Set(sigs).size, 4, 'deux etats identiques en sortie sont deux etats confondus');
+  });
+
+  t('★ PAR LE PRODUCTEUR: un verdict honeypot absent ne promet pas qu on peut vendre', () => {
+    const absent = simSigs[2], negatif = simSigs[1];
+    assert.match(negatif.reason, /sells go through right now/i, 'temoin: la vraie lecture negative le dit');
+    assert.doesNotMatch(absent.reason, /sells go through/i, 'et l absence de lecture ne le dit PAS');
+    assert.match(absent.reason, /NO honeypot verdict/i);
+  });
 
   t('40 adresses rendent 40 verdicts, pas 20', () => {
     assert.strictEqual(Object.keys(quarante.r).length, 40);
