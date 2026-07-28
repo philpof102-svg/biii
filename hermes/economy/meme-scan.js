@@ -16,31 +16,74 @@ function getJSON(url) {
 }
 
 // The FRESH surface: tokens being paid-boosted RIGHT NOW (promotion = where impersonation scams live).
-async function boostedTokens(limit = 12) {
-  const boosts = await getJSON('https://api.dexscreener.com/token-boosts/latest/v1');
-  const pick = (Array.isArray(boosts) ? boosts : []).filter((b) => CHAINS.includes(b.chainId)).slice(0, limit);
+/* ⚠️ UNE RECOLTE QUI N'A PAS EU LIEU RENDAIT UNE COCHE VERTE.
+ * `getJSON` resout `null` sur erreur reseau ET sur corps non-parsable. `Array.isArray(null)` etant faux,
+ * la liste retombait a `[]`, et le titre imprimait:
+ *
+ *   ✓ meme-watch harvest: 0 boosted tokens scanned, no impersonation/ambiguity among the promoted ones.
+ *
+ * Une coche verte et une phrase rassurante sur une liste jamais lue. C'est le pire endroit possible pour
+ * ce defaut: la sortie est un ✓ que personne ne relit.
+ *
+ * Et la seconde requete — celle qui donne le symbole — pouvait echouer token par token: ces tokens
+ * disparaissaient de `out`, donc le denominateur affiche etait deja plus petit que la realite, sans le
+ * dire. Trois etats desormais separes: liste NON LUE, tokens perdus au resolvage, tokens retenus. */
+async function boostedTokens(limit = 12, lire = getJSON) {
+  const boosts = await lire('https://api.dexscreener.com/token-boosts/latest/v1');
+  if (!Array.isArray(boosts)) return { tokens: [], harvestRead: false, dropped: 0, picked: 0 };
+  const pick = boosts.filter((b) => CHAINS.includes(b.chainId)).slice(0, limit);
   const out = [];
+  let dropped = 0;
   for (const b of pick) {
-    const t = await getJSON('https://api.dexscreener.com/latest/dex/tokens/' + b.tokenAddress);
+    const t = await lire('https://api.dexscreener.com/latest/dex/tokens/' + b.tokenAddress);
     const sym = t && t.pairs && t.pairs[0] && t.pairs[0].baseToken && t.pairs[0].baseToken.symbol;
     if (sym) out.push({ symbol: sym.toUpperCase(), address: b.tokenAddress, chain: b.chainId });
+    else dropped++;
   }
-  return out;
+  return { tokens: out, harvestRead: true, dropped, picked: pick.length };
 }
 
-(async () => {
-  const boosted = await boostedTokens();
+/**
+ * summarise — le titre. Extrait pur, parce que c'est la phrase que quelqu'un lira sans lire le reste, et
+ * que rien ne l'epinglait. Un ✓ doit dire de combien de tokens il parle, et se taire quand il n'en a
+ * examine aucun.
+ */
+function summarise({ alerts, examined, harvestRead, dropped = 0, skipped = 0, picked = 0 }) {
+  if (!harvestRead) return '⚠️ meme-watch harvest: the boost list could NOT be read — nothing was scanned, '
+    + 'which is not the same as nothing found.';
+  if (alerts) return '🚩 meme-watch harvest: ' + alerts + ' FRESH trap(s) among ' + examined
+    + ' boosted token(s) examined — aping the wrong contract = total loss.';
+  const manques = [];
+  if (dropped) manques.push(dropped + ' had no readable symbol');
+  if (skipped) manques.push(skipped + ' could not be vetted');
+  if (!examined) return '⚠️ meme-watch harvest: the boost list was read (' + picked + ' candidate(s)) but '
+    + 'NOT ONE could be examined' + (manques.length ? ' — ' + manques.join(', ') : '') + '. No verdict.';
+  return '✓ meme-watch harvest: ' + examined + ' boosted token(s) examined, no impersonation/ambiguity '
+    + 'among them' + (manques.length ? ' — but ' + manques.join(', ') + ', so this is PARTIAL' : '') + '.';
+}
+
+module.exports = { boostedTokens, summarise };
+
+if (require.main === module) (async () => {
+  const recolte = await boostedTokens();
+  const boosted = recolte.tokens;
   const lines = [];
-  let alerts = 0;
+  let alerts = 0, skipped = 0, examined = 0;
 
   // 1) FRESH harvest — is each promoted contract actually the real one for its symbol?
   for (const { symbol, address, chain } of boosted) {
-    let v; try { v = await vetMeme({ symbol, chainId: chain, address }); } catch { continue; }
+    /* Un `continue` muet retirait le token du travail sans le retirer du COMPTE annonce. */
+    let v; try { v = await vetMeme({ symbol, chainId: chain, address }); } catch { skipped++; continue; }
+    examined++;
     const n = (v.candidates || []).length;
     if (v.status === 'impersonation') { alerts++; lines.push(`🚩 BOOSTED ${symbol} [${chain}] ${address.slice(0, 10)}…: IMPERSONATION — the promoted contract is NOT the dominant one. Paid-boost trap.`); }
     else if (v.status === 'ambiguous') { alerts++; lines.push(`🚩 BOOSTED ${symbol} [${chain}]: AMBIGUOUS — ${n} contracts, no clear real one (verify holders before aping).`); }
     else if (v.status === 'genuine') lines.push(`· boosted ${symbol} [${chain}]: promoted = the dominant contract${n > 1 ? ' (' + (n - 1) + ' look-alike(s) exist)' : ''}.`);
     else if (v.status === 'thin') lines.push(`· boosted ${symbol} [${chain}]: thin liquidity — nothing credible.`);
+    /* Sans ce dernier cas, un statut inconnu ne produisait AUCUNE ligne: le token etait compte comme
+     * examine et ne disait rien, ce qui se lit « rien a signaler ». Un etat qu'on ne sait pas nommer
+     * doit s'annoncer, pas se taire. */
+    else lines.push(`? boosted ${symbol} [${chain}]: unrecognised status "${v.status}" — NOT a clean read.`);
   }
 
   // 2) SEED watch — well-known memes, so a fresh fake on a big name still gets caught.
@@ -51,8 +94,7 @@ async function boostedTokens(limit = 12) {
     else if (v.status === 'genuine' && n > 1 && v.canonical) lines.push(`  ~ ${sym}: real = ${v.canonical.chain}:${v.canonical.address.slice(0, 8)}… · ${n - 1} look-alike(s).`);
   }
 
-  console.log(alerts
-    ? `🚩 meme-watch harvest: ${alerts} FRESH trap(s) among ${boosted.length} boosted tokens — aping the wrong contract = total loss.`
-    : `✓ meme-watch harvest: ${boosted.length} boosted tokens scanned, no impersonation/ambiguity among the promoted ones.`);
+  console.log(summarise({ alerts, examined, harvestRead: recolte.harvestRead,
+    dropped: recolte.dropped, skipped, picked: recolte.picked }));
   for (const l of lines) console.log('  ' + l);
 })();
