@@ -226,6 +226,81 @@ const PAYE = '0x' + '1'.repeat(40);
    * d'informer. La divulgation remplace le refus; c'est un choix, il est donc epingle. */
   check('non-crible n\'est PAS traite comme known-bad', nonCrible.payment.knownBad, false);
 
+  /* ── UNE LISTE D'OUTILS NON LUE N'EST PAS UNE LISTE VIDE ──────────────────────────────────────────
+   *
+   * Mesure du 2026-07-28: `tools/list` qui meurt et `tools/list` qui rend `[]` sortaient du MEME verdict
+   * 'answers' avec la MEME phrase, octet pour octet — « exposes 0 tool(s). None asks for key material...
+   * No tool names a value-moving action at all. » Trois affirmations sur des outils jamais vus.
+   *
+   * Le transport est stubbe, pas la logique: les cas passent par `vetAgent()`, le vrai producteur, qui
+   * fait reellement tourner introspectHttp -> auditTools -> assemblage du verdict. Un objet `{tools:null}`
+   * ecrit a la main n'aurait prouve que ma propre capacite a ecrire `null`.
+   *
+   * ⚠️ Le stub appelle `cb(res)` AVANT d'emettre sur `res`. Premier jet: les evenements partaient d'abord,
+   * le consommateur attachait ses listeners apres, et la promesse ne se resolvait jamais — la sonde
+   * n'affichait RIEN. Une sortie vide etait l'instrument, pas le sujet. */
+  const https = require('node:https');
+  const { EventEmitter } = require('node:events');
+  const vraiRequest = https.request;
+  const stubTransport = ({ initStatus = 200, listDies = false, tools = [] }) => {
+    https.request = (opts, cb) => {
+      const req = new EventEmitter();
+      req.destroy = () => {};
+      req.end = (data) => {
+        const rpc = JSON.parse(data);
+        if (rpc.method === 'tools/list' && listDies) { setImmediate(() => req.emit('error', new Error('socket hang up'))); return; }
+        const res = new EventEmitter();
+        res.statusCode = rpc.method === 'initialize' ? initStatus : 200;
+        setImmediate(() => {
+          cb(res);                                    // listeners attaches ICI...
+          setImmediate(() => {                        // ... les evenements seulement ensuite
+            res.emit('data', rpc.method === 'initialize'
+              ? JSON.stringify({ jsonrpc: '2.0', id: 1, result: { serverInfo: { name: 'stub', version: '1' } } })
+              : JSON.stringify({ jsonrpc: '2.0', id: 2, result: { tools } }));
+            res.emit('end');
+          });
+        });
+      };
+      return req;
+    };
+  };
+  const URL_STUB = 'https://stub.invalid/mcp';
+  try {
+    process.stdout.write('\nsurface non lue vs surface vide — la porte doit DISTINGUER:\n');
+
+    stubTransport({ listDies: true });
+    const nonLu = await vetAgent({ url: URL_STUB });
+    stubTransport({ tools: [] });
+    const vide = await vetAgent({ url: URL_STUB });
+    /* Un outil qui n'expose AUCUNE surface de paiement: la liste est lue, non vide, et le verdict passant
+     * reste passant. C'est la borne rassurante — sans elle, un fail-closed trop large passerait ce test. */
+    stubTransport({ tools: [{ name: 'get_price', description: 'read a price', inputSchema: { properties: { symbol: { type: 'string' } } } }] });
+    const lu = await vetAgent({ url: URL_STUB });
+    stubTransport({ initStatus: 401 });
+    const gate = await vetAgent({ url: URL_STUB });
+
+    check('tools/list mort -> unauditable, PAS le verdict passant', nonLu.verdict, 'unauditable');
+    check('liste vide LUE -> reste answers', vide.verdict, 'answers');
+    check('liste non vide LUE -> reste answers', lu.verdict, 'answers');
+    check('le compte d\'outils lu est reel, pas un zero par defaut', lu.surface.toolCount, 1);
+
+    /* Le coeur du defaut: les deux phrases etaient identiques. Elles doivent maintenant differer. */
+    check('non lu et vide ne disent PLUS la meme phrase', nonLu.reason === vide.reason, false);
+    check('« exposes 0 tool(s) » ne s\'ecrit que si on a compte', nonLu.reason.includes('exposes 0 tool(s)'), false);
+    check('rien n\'affirme sur les outils non lus', nonLu.reason.includes('None asks for key material'), false);
+    check('la sortie NOMME la lecture ratee', nonLu.reason.includes('COULD NOT BE READ'), true);
+    check('la surface non lue reste null, jamais un objet vide', nonLu.surface, null);
+    /* Le cas vide, lui, doit continuer d'AFFIRMER — il a le droit, il a lu. */
+    check('la liste vide, elle, affirme legitimement', vide.reason.includes('None asks for key material'), true);
+
+    /* DEUX causes d'`unauditable` (gate 401 / liste illisible) partagent le verdict mais pas la raison:
+     * un verdict qui fusionne deux pannes distinctes redevient un signal a variance nulle. */
+    check('401 -> unauditable aussi', gate.verdict, 'unauditable');
+    check('mais la raison distingue les deux causes', gate.reason === nonLu.reason, false);
+  } finally {
+    https.request = vraiRequest;
+  }
+
   /* Le bilan porte le NOMBRE de cas atteints, pas seulement le nombre d'echecs: c'est ce chiffre qui aurait
    * signale les onze assertions sautees, et c'est lui que l'agregateur (`npm run test:total`) additionne. */
   process.stdout.write(`\n${lances - failed} passed, ${failed} failed\n`);
