@@ -17,6 +17,67 @@ const artifact = (addrs, asOf, sources) => {
 
 console.log('BIII floor publish + trustless adoption (verify the hash, never trust the source):');
 
+/* ════════════════════════════════════════════════════════════════════════════════════════════════════
+ * ASKING FOR THE STRONGEST CHECK AND SILENTLY GETTING THE WEAKEST ONE.
+ *
+ * The old guard was `if (expectedFingerprint && expectedFingerprint !== claimed)`. A FALSY pin — an empty
+ * string, or the `undefined` of a misspelled environment variable — skipped the comparison entirely and
+ * returned `valid: true`, with nothing in the result saying the pin had not been used.
+ *
+ * No caller in this repo passes a pin, so it was not reachable here. But `verifyFloor` is EXPORTED and
+ * documented as THE trustless adoption check for a third-party node. An operator writing
+ * `{ expectedFingerprint: process.env.PINNED_FLOOR }` with the variable unset would adopt any
+ * well-formed floor from a hostile mirror while believing it was pinned. That is the only place in the
+ * codebase where this pattern costs the adoption of hostile data.
+ *
+ * `null` stays an EXPLICIT opt-out (it was the documented default). A present key with `undefined` is a
+ * pin that was requested and did not arrive — it refuses. I wrote `!== undefined` on the first pass,
+ * which reopened the exact hole this block exists to close; caught by running the archetypal case. */
+
+t('★ an EMPTY pin refuses instead of downgrading to the weaker check', () => {
+  const a = artifact([A, B], '2026-07-28', ['OFAC (MIT)']);
+  const r = verifyFloor(a, { expectedFingerprint: '' });
+  assert.equal(r.valid, false);
+  assert.match(r.reason, /empty or not a string/i);
+  assert.match(r.reason, /rather than silently downgrading/i);
+});
+
+t('★ THE ARCHETYPAL CASE: an unset env var is a requested pin that did not arrive', () => {
+  const a = artifact([A, B], '2026-07-28', ['OFAC (MIT)']);
+  const r = verifyFloor(a, { expectedFingerprint: process.env.BIII_PIN_THAT_DOES_NOT_EXIST });
+  assert.equal(r.valid, false, 'this is the shape a misspelled variable produces, and it must not adopt');
+});
+
+t('BOTH BOUNDS: omitting the pin, or opting out with null, still verifies the content hash', () => {
+  /* The in-repo publisher calls verifyFloor(artifact) with no options at all — that path must be
+   * untouched, or a hardening breaks the one consumer it was meant to protect. */
+  const a = artifact([A, B], '2026-07-28', ['OFAC (MIT)']);
+  assert.equal(verifyFloor(a).valid, true);
+  assert.equal(verifyFloor(a, {}).valid, true);
+  assert.equal(verifyFloor(a, { expectedFingerprint: null }).valid, true, 'null = explicit opt-out');
+});
+
+t('★ `checksRun` says which checks ACTUALLY ran — a valid:true is not one claim but two', () => {
+  /* Without it, a valid:true obtained WITHOUT a pin is indistinguishable from one obtained WITH — and
+   * that is the whole difference between "these bytes are self-consistent" and "these bytes are the
+   * ones I meant to adopt". */
+  const a = artifact([A, B], '2026-07-28', ['OFAC (MIT)']);
+  const sans = verifyFloor(a);
+  const avec = verifyFloor(a, { expectedFingerprint: a.fingerprint });
+  assert.deepStrictEqual(sans.checksRun, ['content-hash']);
+  assert.deepStrictEqual(avec.checksRun, ['content-hash', 'pinned-fingerprint']);
+  assert.match(sans.reason, /NOT that they are the floor you meant to adopt/i);
+  assert.doesNotMatch(avec.reason, /NOT that they are the floor/i, 'pas de reserve quand elle est fausse');
+});
+
+t('a WRONG pin still refuses, and says the pin is what refused it', () => {
+  const a = artifact([A, B], '2026-07-28', ['OFAC (MIT)']);
+  const r = verifyFloor(a, { expectedFingerprint: 'sha256:' + '0'.repeat(64) });
+  assert.equal(r.valid, false);
+  assert.match(r.reason, /expected\/pinned value/i);
+  assert.deepStrictEqual(r.checksRun, ['content-hash', 'pinned-fingerprint']);
+});
+
 t('a well-formed artifact self-verifies → safe to adopt', () => {
   const r = verifyFloor(artifact([A, B, C], '2026-07-21', ['OFAC (MIT)']));
   assert.equal(r.valid, true);
