@@ -134,7 +134,22 @@ function normalize(items) {
 }
 
 /** PURE core: fold one-or-more source pulls into the known-bad.json shape. Dedup, partial cap, sorted. */
-function buildKnownBad(pulls, { asOf, sources }) {
+/* ⚠️ `sourcesFailed` EST LOAD-BEARING, pas de la décoration.
+ * Mesure du 2026-07-28, `fetchImpl` bouchonné :
+ *
+ *   toutes vivantes   -> 26 adresses, asOf=aujourd'hui, stale=false
+ *   OFAC tombée       ->  1 adresse,  asOf=aujourd'hui, stale=false
+ *   les deux tombées  ->  1 adresse,  asOf=aujourd'hui, stale=false
+ *
+ * Une panne réseau pendant l'ingestion réduisait le plancher aux seules trouvailles first-party, le
+ * datait d'AUJOURD'HUI, et il se déclarait NON PÉRIMÉ. Or c'est ce plancher qui porte le BLOCK local
+ * décisif : il perdait 96 % de son contenu en s'annonçant frais.
+ *
+ * Le delta était bien imprimé — bruyamment, et c'était l'intention — mais un cron nocturne ne lit pas
+ * stdout. Le fichier écrit, lui, ne portait aucune trace de l'échec : `sources` rétrécissait sans que
+ * rien ne dise POURQUOI, et un consommateur ne peut pas distinguer « cette source n'est plus utilisée »
+ * de « cette source n'a pas répondu cette nuit ». Le témoin existait sans lecteur. */
+function buildKnownBad(pulls, { asOf, sources, sourcesFailed }) {
   const set = new Set(); let rejectedTotal = 0;
   for (const p of pulls) {
     const { kept, rejected } = normalize(p.items);
@@ -146,6 +161,10 @@ function buildKnownBad(pulls, { asOf, sources }) {
     asOf: asOf || null,
     note: 'Bundled snapshot of PUBLIC known-bad addresses, built by scripts/biii-known-bad-ingest.js. The node screens against this LOCALLY — no hosted oracle needed for the hard block. Re-verifiable against the named sources. Absence of an entry is NOT a clean verdict.',
     sources: sources || [],
+    /* Vide = toutes les sources ont répondu. Non vide = ce plancher est PARTIEL, et `asOf` date sa
+     * construction, pas sa complétude. Un consommateur qui lit `sources` seul ne peut pas faire la
+     * différence entre une source retirée du design et une source tombée cette nuit. */
+    sourcesFailed: sourcesFailed || [],
     addresses: [...set].sort(),
     _rejected: rejectedTotal,
   };
@@ -214,12 +233,37 @@ async function ingest(fetchImpl, { includeGpl = false, timeoutMs = 25000 } = {})
   report[OWN_FINDINGS.id] = { seen: OWN_FINDINGS.items.length, rejected: 0, error: null };
 
   const okSources = chosen.filter((s) => !report[s.id].error).map((s) => s.id).concat(OWN_FINDINGS.id);
-  return { data: buildKnownBad(pulls, { asOf: isoDay(), sources: okSources }), report };
+  const failedSources = chosen.filter((s) => report[s.id].error)
+    .map((s) => ({ id: s.id, error: String(report[s.id].error).slice(0, 120) }));
+  return { data: buildKnownBad(pulls, { asOf: isoDay(), sources: okSources, sourcesFailed: failedSources }), report };
 }
 
 function isoDay() { return new Date().toISOString().slice(0, 10); }
 
-module.exports = { buildKnownBad, normalize, parseOfac, parseEthLabels, parseCsv, cleanAddr, maliciousReason, hasLegitContext, ingest, MIT_SOURCES, GPL_SOURCE, OWN_FINDINGS, KNOWN_SAFE_CONTRACTS };
+/**
+ * shouldRefuseWrite — LE GARDE MACHINE, extrait du bloc CLI pour être testable.
+ *
+ * ⚠️ Il vivait dans `if (require.main === module)`, donc aucun test ne pouvait l'atteindre — et une
+ * branche inatteignable est une branche non prouvée. C'est la règle que ce dépôt applique à ses propres
+ * exports depuis ce matin ; elle vaut aussi pour un garde de script.
+ *
+ * DEUX conditions, et il faut les deux. Une source en échec SANS perte d'adresses s'écrit (les sources se
+ * recouvrent, la redondance a fait son travail). Une perte d'adresses SANS échec réseau s'écrit aussi :
+ * c'est le retrait amont légitime — un faux positif corrigé chez la source — et le propager est
+ * précisément ce que ce script doit faire. C'est leur CONJONCTION qui est suspecte : on a perdu des
+ * adresses ET on sait qu'on n'a pas tout lu.
+ *
+ * Sans le premier test, on refuserait des retraits légitimes et l'opérateur apprendrait à passer
+ * `--force` par réflexe — un garde qu'on contourne machinalement ne garde plus rien.
+ */
+function shouldRefuseWrite({ data, delta, force = false } = {}) {
+  const echecs = (data && data.sourcesFailed) || [];
+  const perdues = (delta && delta.lost) ? delta.lost.length : 0;
+  const refuse = echecs.length > 0 && perdues > 0 && !force;
+  return { refuse, sourcesFailed: echecs.length, lost: perdues, forced: !!force };
+}
+
+module.exports = { buildKnownBad, shouldRefuseWrite, normalize, parseOfac, parseEthLabels, parseCsv, cleanAddr, maliciousReason, hasLegitContext, ingest, MIT_SOURCES, GPL_SOURCE, OWN_FINDINGS, KNOWN_SAFE_CONTRACTS };
 
 // ── run as a maintainer script ──────────────────────────────────────────────────────────────────
 if (require.main === module) {
@@ -257,6 +301,30 @@ if (require.main === module) {
         delta = { was: before.size, lost, gained };
       }
     } catch { /* unreadable previous file: report no delta rather than a wrong one */ }
+
+    /* ⚠️ LE GARDE MACHINE. Le delta ci-dessous est imprimé bruyamment depuis l'origine, et c'était la
+     * bonne intention — mais un cron nocturne ne lit pas stdout. Il ne voit que le fichier et le code de
+     * sortie. Un témoin sans lecteur ne protège personne.
+     *
+     * Écraser un plancher de 811 adresses par un plancher d'UNE parce que le réseau est tombé n'est pas
+     * une mise à jour, c'est une perte. On refuse donc d'écrire quand DEUX conditions sont réunies : une
+     * source a échoué ET le plancher rétrécirait. Une source en échec sans perte d'adresses reste écrite
+     * (redondance entre sources), et une perte SANS échec réseau reste écrite aussi — c'est le retrait
+     * amont légitime que ce script a raison de propager.
+     *
+     * `--force` existe pour le cas où l'opérateur a vu le delta et l'assume. Il est explicite : personne
+     * ne le tape par accident. */
+    const { refuse } = shouldRefuseWrite({ data, delta, force: process.argv.includes('--force') });
+    if (refuse) {
+      console.error(`[known-bad] REFUS D'ÉCRIRE — ${data.sourcesFailed.length} source(s) en échec ET ${delta.lost.length} adresse(s) perdue(s).`);
+      for (const s of data.sourcesFailed) console.error(`[known-bad]   ÉCHEC ${s.id} — ${s.error}`);
+      console.error(`[known-bad] Le plancher existant (${delta.was} adresses) est CONSERVÉ. Un réseau qui tombe ne doit pas`);
+      console.error('[known-bad] rétrécir le plancher qui porte le BLOCK local. Relancez plus tard, ou --force si vous assumez.');
+      process.exit(2);
+    }
+    if (data.sourcesFailed.length) {
+      console.warn(`[known-bad] ⚠ ${data.sourcesFailed.length} source(s) en échec, mais aucune adresse perdue — écriture, avec sourcesFailed dans le fichier.`);
+    }
 
     fs.writeFileSync(outPath, JSON.stringify(data, null, 2) + '\n');
     console.log(`[known-bad] wrote ${data.addresses.length} addresses to ${path.relative(process.cwd(), outPath)} (asOf ${data.asOf}, ${rejected} rejected)`);

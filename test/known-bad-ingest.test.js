@@ -82,6 +82,74 @@ const BAD = A('a1'), DRAINER = A('b1'), LEGIT = A('c1'), SAFE = '0x833589fcd6edb
     assert.equal(scamSnifferHit, true, 'included only when explicitly opted in');
   });
 
+  /* ── UN RÉSEAU QUI TOMBE NE DOIT PAS RÉTRÉCIR LE PLANCHER ──────────────────────────────────────────
+   * Mesure du 2026-07-28, `fetchImpl` bouchonné, sources aux corps réalistes :
+   *
+   *   toutes vivantes   -> 26 adresses, asOf=aujourd'hui, stale=false
+   *   OFAC tombée       ->  1 adresse,  asOf=aujourd'hui, stale=false
+   *   les deux tombées  ->  1 adresse,  asOf=aujourd'hui, stale=false
+   *
+   * Le plancher perdait 96 % de son contenu EN SE DÉCLARANT FRAIS. C'est lui qui porte le BLOCK local
+   * décisif : un « pas sur la liste » sortait alors d'une liste qui n'avait presque pas été lue.
+   *
+   * Le delta était déjà imprimé bruyamment — c'était la bonne intention — mais un cron nocturne ne lit
+   * pas stdout : il ne voit que le fichier et le code de sortie. Le témoin existait sans lecteur.
+   *
+   * ⚠️ Mon premier jet de sonde a rendu la MÊME sortie sur quatre entrées opposées. Variance nulle =
+   * l'instrument, pas le sujet : `ingest(fetchImpl, opts)` prend son fetch en PREMIER ARGUMENT
+   * positionnel, et je passais un objet. Trois tentatives avant de lire la signature. */
+  const ADRS = Array.from({ length: 40 }, (_, i) => '0x' + String(i + 1).padStart(40, '0'));
+  const corps = (u) => (/ofac/.test(u) ? ADRS.slice(0, 25).join('\n')
+    : /eth-labels/.test(u) ? JSON.stringify(ADRS.slice(25, 40).map((a) => ({ address: a, name: 'phishing hack' })))
+      : '[]');
+  const reseau = (tombees) => async (u) => {
+    if (tombees.some((x) => u.includes(x))) throw new Error('HTTP 503');
+    return { ok: true, status: 200, text: async () => corps(u) };
+  };
+
+  await t('le fichier écrit PORTE la trace des sources tombées', async () => {
+    const vivant = await K.ingest(reseau([]));
+    const casse = await K.ingest(reseau(['ofac']));
+    assert.deepStrictEqual(vivant.data.sourcesFailed, [], 'aucun échec ⇒ liste vide');
+    assert.strictEqual(casse.data.sourcesFailed.length, 1);
+    assert.match(casse.data.sourcesFailed[0].error, /503/, 'la RAISON voyage, pas seulement le fait');
+    /* Le point qui rendait l'échec invisible: `sources` rétrécit dans les deux cas, donc un lecteur ne
+     * pouvait pas distinguer « source retirée du design » de « source tombée cette nuit ». */
+    assert.ok(casse.data.sources.length < vivant.data.sources.length);
+  });
+
+  await t('le plancher rétrécit VRAIMENT quand une source tombe — le cas est réel', async () => {
+    const vivant = await K.ingest(reseau([]));
+    const casse = await K.ingest(reseau(['ofac', 'eth-labels']));
+    assert.ok(vivant.data.addresses.length > 20, 'sanity: le cas nominal doit produire un vrai plancher');
+    assert.ok(casse.data.addresses.length < vivant.data.addresses.length / 5,
+      'sans les sources, il ne reste que les trouvailles first-party');
+  });
+
+  await t('LE GARDE: échec réseau ET perte d\'adresses ⇒ refus d\'écrire', () => {
+    const r = K.shouldRefuseWrite({ data: { sourcesFailed: [{ id: 'ofac' }] }, delta: { lost: ['0x1'] } });
+    assert.strictEqual(r.refuse, true);
+  });
+
+  await t('LES DEUX BORNES: un retrait amont LÉGITIME s\'écrit toujours', () => {
+    /* Sans ce cas, on refuserait des retraits corrects et l'opérateur apprendrait à passer `--force` par
+     * réflexe — un garde qu'on contourne machinalement ne garde plus rien. */
+    assert.strictEqual(K.shouldRefuseWrite({ data: { sourcesFailed: [] }, delta: { lost: ['0x1', '0x2'] } }).refuse,
+      false, 'perte SANS panne = correction amont, on la propage');
+    assert.strictEqual(K.shouldRefuseWrite({ data: { sourcesFailed: [{ id: 'a' }] }, delta: { lost: [] } }).refuse,
+      false, 'panne SANS perte = la redondance a fait son travail');
+    assert.strictEqual(K.shouldRefuseWrite({ data: { sourcesFailed: [] }, delta: null }).refuse,
+      false, 'premier run, aucun delta');
+  });
+
+  await t('--force reste possible, et il est explicite', () => {
+    const sans = K.shouldRefuseWrite({ data: { sourcesFailed: [{ id: 'a' }] }, delta: { lost: ['0x1'] }, force: false });
+    const avec = K.shouldRefuseWrite({ data: { sourcesFailed: [{ id: 'a' }] }, delta: { lost: ['0x1'] }, force: true });
+    assert.strictEqual(sans.refuse, true);
+    assert.strictEqual(avec.refuse, false);
+    assert.strictEqual(avec.forced, true, 'le forçage est rapporté, pas silencieux');
+  });
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })();
