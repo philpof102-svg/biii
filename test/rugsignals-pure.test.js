@@ -265,5 +265,84 @@ t('ownerState=unknown ne DEFUSE jamais un drapeau', () => {
   assert.notEqual(absent.verdict, 'clean', 'et le resultat ne peut pas lire comme propre');
 });
 
-console.log('\n' + pass + ' passed, ' + fail + ' failed');
-process.exit(fail ? 1 : 0);
+/* ── scanRug : UN PLAFOND QUI NE SE DIT PAS DEGUISE UN TROU EN ABSTENTION ───────────────────────────
+ * `.slice(0, 20)` tronquait la liste sans un mot, alors que l'appelant de production
+ * (`hermes/economy/token-radar.js`) envoie MAX_NEW=40 en documentant « 2 GoPlus batches of 20 » — il
+ * croyait donc que cette fonction decoupait. Mesure du 2026-07-28: 40 envoyes rendaient 20 verdicts, et
+ * les 20 adresses restantes n'avaient meme pas de cle dans la sortie.
+ *
+ * Le cout etait REEL. Le recolteur coalesce un verdict manquant, donc un jeton jamais scanne entrait en
+ * base habille en ABSTENTION. Sur la base de production: 7 lignes portaient l'empreinte
+ * `reason: 'no verdict'` parmi 152 `unknown`. Aucune n'avait rugue — donc aucun rug manque, et c'est la
+ * moitie du resultat qu'il faut publier aussi — mais la scorecard decrit `abstained` comme « les rugs
+ * qu'on avait qualifies d'unknown », ce que ces sept-la n'etaient pas.
+ *
+ * ⚠️ Le harnais `t` de ce fichier est SYNCHRONE: on calcule par `await` AVANT et on assertit sur les
+ * valeurs. Un `t('...', async () => ...)` ne pourrait jamais echouer. */
+const adr = (n) => '0x' + String(n).padStart(40, '0');
+
+(async () => {
+  let lots = 0;
+  const faux = async (url) => {
+    if ((String(url).match(/0x/g) || []).length > 1) lots++;
+    return { ok: true, json: async () => ({ result: {} }) };
+  };
+  const demander = async (n) => {
+    lots = 0;
+    const r = await R.scanRug('base', Array.from({ length: n }, (_, i) => adr(i + 1)), { fetchImpl: faux });
+    return { r, lots };
+  };
+
+  const vingt = await demander(20);
+  const quarante = await demander(40);
+  const centVingt = await demander(120);
+  const compte = (r, v) => Object.values(r).filter((x) => x.verdict === v).length;
+
+  t('40 adresses rendent 40 verdicts, pas 20', () => {
+    assert.strictEqual(Object.keys(quarante.r).length, 40);
+    /* Le 21e existait deja dans la demande; il doit exister dans la reponse. */
+    assert.ok(adr(21) in quarante.r, 'la 21e adresse doit avoir une cle');
+    assert.strictEqual(compte(quarante.r, 'not_scanned'), 0, 'sous le plafond, rien n\'est refuse');
+  });
+
+  t('la liste est DECOUPEE en lots de 20, pas tronquee', () => {
+    /* C'est ce que le commentaire de token-radar affirmait depuis toujours: « 2 GoPlus batches of 20 ». */
+    assert.strictEqual(vingt.lots, 1);
+    assert.strictEqual(quarante.lots, 2);
+  });
+
+  t('au-dela du plafond dur, l adresse EXISTE et se declare non scannee', () => {
+    assert.strictEqual(Object.keys(centVingt.r).length, 120, 'aucune adresse ne disparait');
+    assert.strictEqual(compte(centVingt.r, 'not_scanned'), 20);
+    const refuse = centVingt.r[adr(120)];
+    assert.strictEqual(refuse.verdict, 'not_scanned');
+    /* ⚠️ `not_scanned` doit rester DISTINCT d'`unknown`: « je n'ai pas regarde » n'est pas « j'ai
+     * regarde et je ne sais pas ». C'est toute la faute qu'on repare. */
+    assert.notStrictEqual(refuse.verdict, 'unknown');
+    assert.match(refuse.reason, /NEVER examined/);
+    assert.match(refuse.reason, /Not an abstention|not an abstention/);
+  });
+
+  t('le plafond n avale jamais un scan qui aurait pu se faire', () => {
+    /* Les deux bornes: un plafond pousse trop bas couperait ce qu'on sait traiter. */
+    assert.strictEqual(compte(centVingt.r, 'not_scanned') + 100, 120);
+    assert.strictEqual(centVingt.lots, 5, '100 adresses = 5 lots de 20');
+  });
+
+  const horsChaine = await R.scanRug('chaine-inexistante', [adr(1)], { fetchImpl: faux });
+  t('une chaine non couverte reste unknown, PAS not_scanned', () => {
+    /* Ces deux-la ne doivent pas se confondre non plus: une chaine non cablee est une REPONSE — on sait
+     * pourquoi on ne peut rien dire — alors que `not_scanned` veut dire qu'on n'a meme pas demande. */
+    assert.strictEqual(horsChaine[adr(1)].verdict, 'unknown');
+    assert.notStrictEqual(horsChaine[adr(1)].verdict, 'not_scanned');
+  });
+
+  console.log('\n' + pass + ' passed, ' + fail + ' failed');
+  process.exit(fail ? 1 : 0);
+})().catch((e) => {
+  /* Sans ce filet, une promesse rejetee tuerait le processus AVANT le bilan — et l'agregateur compte les
+   * bilans. Un fichier sans bilan doit crier, pas disparaitre. */
+  console.log('  FAIL harnais async: ' + (e && e.message));
+  console.log('\n' + pass + ' passed, ' + (fail + 1) + ' failed');
+  process.exit(1);
+});

@@ -366,7 +366,19 @@ function recordBlackout(db, nowIso) {
     (priorBySym[t.sym] = priorBySym[t.sym] || []).push(t);
   }
   for (const c of toJudge) {
-    const v = verdicts[c.addr] || { verdict: 'unknown', reason: 'no verdict', armed: [], flags: [] };
+    /* ⚠️ CE REPLI DEGUISAIT UN TROU DE COUVERTURE EN ABSTENTION. `scanRug` tronquait sa liste a 20 sans
+     * le dire, alors que MAX_NEW vaut 40 et que le commentaire ci-dessus annonce « 2 batches of 20 ». La
+     * seconde moitie n'avait donc aucune cle dans `verdicts`, et ce `||` l'enregistrait en base comme
+     * `unknown` — c'est-a-dire comme si le scanner avait regarde puis s'etait abstenu. Mesure du
+     * 2026-07-28 sur cette base: 7 lignes portaient l'empreinte `reason: 'no verdict'` sur 152 `unknown`.
+     * Aucune n'avait rugue, donc aucun rug manque, mais la scorecard decrit `abstained` comme « les rugs
+     * qu'on avait qualifies d'unknown », ce que ces sept-la n'etaient pas.
+     *
+     * scanRug decoupe desormais correctement et nomme `not_scanned` ce qu'il refuse. Ce repli reste comme
+     * garde-fou, mais il ne ment plus: si jamais il se declenche, la ligne dira qu'on n'a PAS regarde. */
+    const v = verdicts[c.addr] || { verdict: 'not_scanned',
+      reason: 'the scanner returned no entry for this address — it was NEVER examined. Not an abstention.',
+      armed: [], flags: [] };
     db[c.addr] = { sym: c.sym, chain: CHAIN, source: c.source, firstSeen: now, lastSeen: now,
       firstVerdict: v.verdict, firstReason: v.reason, armedAtFirstSight: v.armed, flagsAtFirstSight: v.flags,
       /* THE BASIS OF THE CALL, frozen at the moment it was made.
