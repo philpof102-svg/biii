@@ -81,5 +81,72 @@ const out24 = JSON.stringify(scanText(V24.split(' ').map((w, i) => `${i + 1}. ${
 check('nor for a 24-word vertical list', /abandon|art\b/.test(out24), false);
 check('valid lengths are the five the standard defines', VALID_LENGTHS.join(','), '12,15,18,21,24');
 
+/* ── scanPaths: LA PORTEE VOULUE N'EST PAS UNE COUVERTURE PERDUE ────────────────────────────────────
+ * `scanPaths` etait exportee et nommee dans aucun test. Son `complete` valait `totalSkipped === 0`, ce
+ * qui additionnait deux choses opposees: les images qu'on ne SAIT PAS lire (exclusion voulue, connue
+ * d'avance) et ce qui a BLOQUE une lecture prevue. Mesure du 2026-07-28, deux jeux opposes:
+ *
+ *   dossier propre + 2 images            -> complete: false
+ *   le meme + un chemin qui n'existe pas -> complete: false     IDENTIQUE
+ *
+ * Comme tout dossier Documents reel contient des images, le drapeau valait false 100 % du temps: un
+ * chiffre qui ne change jamais n'observe pas, il affirme. Et la divulgation du module renvoyait le
+ * lecteur vers ce champ precisement — « Check `skipped` and `complete` ».
+ *
+ * Les fixtures sont creees puis SUPPRIMEES: deux fois cette semaine des artefacts de test ont pollue de
+ * vrais repertoires de donnees. On ne scanne jamais les vrais dossiers de l'utilisateur ici. */
+const os = require('node:os');
+const fsx = require('node:fs');
+const px = require('node:path');
+const { scanPaths, defaultPaths } = require('../lib/seedscan');
+
+const bac = px.join(os.tmpdir(), 'biii-seedscan-test-' + process.pid + '-' + lances);
+fsx.mkdirSync(bac, { recursive: true });
+fsx.writeFileSync(px.join(bac, 'notes.txt'), 'du texte parfaitement ordinaire, sans phrase.');
+fsx.writeFileSync(px.join(bac, 'photo.png'), 'pas vraiment une image');
+const idx = loadWordlist();
+
+try {
+  process.stdout.write('\nscanPaths — portee voulue vs couverture perdue:\n');
+
+  const propre = scanPaths([bac], idx);
+  const avecAbsent = scanPaths([bac, px.join(bac, 'dossier-inexistant')], idx);
+  const bloque = scanPaths([bac], idx, { maxFiles: 0 });
+
+  /* Une exclusion VOULUE ne doit pas faire tomber le drapeau de couverture. */
+  check('des images non lisibles par conception laissent complete a vrai', propre.complete, true);
+  /* Une lecture EMPECHEE, elle, doit le faire tomber. Sans ce cas oppose, mettre complete a `true` en dur
+   * passerait au vert. */
+  check('un plafond atteint fait tomber complete', bloque.complete, false);
+  check('  ... et le dit en toutes lettres', /^reduced/.test(bloque.coverage), true);
+
+  /* Le fait est toujours COMPTE, il a juste change de case: le retirer serait remplacer un faux negatif
+   * par un silence. */
+  check('les fichiers non textuels restent comptes', propre.skipped.notTextual >= 1, true);
+  check('  ... et nommes dans le texte', /non-textual file\(s\) were never readable by design/.test(propre.coverage), true);
+
+  /* `absent` est distinct d'`unreadable`: rien a lire n'est pas une lecture refusee. Sur cette machine,
+   * 2 des 6 chemins par defaut n'existent pas — ils comptaient comme « illisibles ». */
+  check('un chemin inexistant compte comme absent, pas illisible', avecAbsent.skipped.absent, 1);
+  check('  ... et n est PAS compte comme illisible', avecAbsent.skipped.unreadable, 0);
+  check('  ... et le texte le distingue du cas sans chemin absent',
+    propre.coverage !== avecAbsent.coverage, true);
+
+  /* ⚠️ Le cas qui verrouille la correction: deux entrees OPPOSEES doivent donner deux drapeaux opposes.
+   * Avant, elles rendaient toutes les deux false. */
+  check('portee-voulue et lecture-bloquee ne rendent plus le meme drapeau',
+    propre.complete !== bloque.complete, true);
+
+  /* La divulgation doit pointer vers le champ qui informe, sinon elle envoie lire un champ muet. */
+  check('la divulgation renvoie vers `coverage`', /Read `coverage`/.test(propre.disclosure), true);
+
+  /* defaultPaths ne doit pas inventer: ce sont des chemins, pas une promesse qu'ils existent. */
+  check('defaultPaths rend des chemins absolus', defaultPaths().every((p) => px.isAbsolute(p)), true);
+} finally {
+  fsx.rmSync(bac, { recursive: true, force: true });
+  /* Le nettoyage est VERIFIE, pas suppose: un rmSync qui echoue en silence laisse la fixture sur disque. */
+  check('la fixture de test a bien ete supprimee', fsx.existsSync(bac), false);
+}
+
 process.stdout.write(`\n${lances - failed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);
