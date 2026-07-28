@@ -196,6 +196,72 @@ const sortant = (eth) => ({ to: { hash: '0x' + 'ff'.repeat(20) }, value: ETH(eth
     assert.ok(FUNNEL_RATIO > 0 && FUNNEL_RATIO < 1, 'une part, pas un multiple');
   });
 
+  /* ── « THE CHAIN SHOWS NOTHING CONCLUSIVE » SUR UNE CHAINE JAMAIS LUE ──────────────────────────
+   * Mesure du 2026-07-28, trois etats tres differents, verdict IDENTIQUE octet pour octet:
+   *
+   *   adresse valide, explorateur injoignable -> unverified, « the chain shows nothing conclusive »
+   *   adresse MALFORMEE                       -> unverified, la MEME phrase
+   *   AUCUNE adresse fournie                  -> unverified, la MEME phrase
+   *
+   * Dans deux cas sur trois aucune lecture n'a eu lieu. La detection de fraude par les DEMANDES est le
+   * coeur de cet outil et elle etait intacte; c'est la moitie qui parle de la CHAINE qui affirmait. */
+  /* On REUTILISE les aides du fichier (`explorateur`, `ADDR`, `entrant`). Les redeclarer en `const` ici
+   * masquait la fonction du module et mettait en zone morte les six tests ecrits AVANT ce bloc — six
+   * rouges instantanes, tous causes par mon ajout et aucun par le sujet. */
+  const ADR = ADDR;
+  const muet = async () => null;
+
+  const lu = await assessRecoveryOffer({ address: ADR, fetchImpl: explorateur({}) });
+  const illisible = await assessRecoveryOffer({ address: ADR, fetchImpl: muet });
+  const malformee = await assessRecoveryOffer({ address: '0x123', fetchImpl: explorateur({}) });
+  const sansAdresse = await assessRecoveryOffer({ fetchImpl: explorateur({}) });
+
+  await t('★ les quatre etats de lecture de chaine sont DISTINGUABLES', async () => {
+    const sigs = [lu, illisible, malformee, sansAdresse].map((r) => r.chainRead + '|' + r.reason);
+    assert.strictEqual(new Set(sigs).size, 4, 'vu: ' + JSON.stringify([lu, illisible, malformee, sansAdresse].map((r) => r.chainRead)));
+  });
+
+  await t('★ une chaine NON LUE ne dit pas « nothing conclusive »', async () => {
+    assert.strictEqual(illisible.chainRead, 'unreadable');
+    assert.match(illisible.reason, /COULD NOT BE READ/i);
+    assert.doesNotMatch(illisible.reason, /shows nothing conclusive/i);
+    /* Et une couche plus bas: les compteurs ne doivent pas se lire comme une mesure. */
+    assert.match(illisible.chainEvidence.note, /not a measurement/i);
+  });
+
+  await t('★ une adresse malformee dit qu AUCUNE verification n etait possible', async () => {
+    assert.strictEqual(malformee.chainRead, 'invalid_address');
+    assert.match(malformee.reason, /not a 0x address/i);
+  });
+
+  await t('★ sans adresse, on dit qu on n a rien cherche', async () => {
+    assert.strictEqual(sansAdresse.chainRead, 'not_attempted');
+    assert.match(sansAdresse.reason, /NO CHAIN CHECK WAS RUN/i);
+  });
+
+  await t('LES DEUX BORNES: une chaine REELLEMENT lue et vide garde sa phrase', async () => {
+    assert.strictEqual(lu.chainRead, 'read');
+    assert.match(lu.reason, /shows nothing conclusive/i, 'lu-et-vide est une VRAIE mesure');
+    assert.match(lu.chainEvidence.note, /Absence of a pattern is NOT evidence of legitimacy/i);
+  });
+
+  /* `await` HORS de `t()`, assertion synchrone dedans — la forme du fichier, et la seule qui echoue
+   * vraiment. Ecrit `await` dans le callback au premier jet: le parseur l'a refuse, ce qui vaut mieux
+   * qu'un harnais qui l'aurait avale en silence. */
+  const entonnoir = await assessRecoveryOffer({ address: ADR,
+    fetchImpl: explorateur({ ins: Array.from({ length: MANY_SENDERS }, (_, i) => entrant("0x" + String(i).repeat(40), 1)), outs: [sortant(0.01)] }) });
+  const seed = await assessRecoveryOffer({ address: ADR, asksForSeedOrKey: true, fetchImpl: explorateur({}) });
+  const seedAveugle = await assessRecoveryOffer({ address: ADR, asksForSeedOrKey: true, fetchImpl: muet });
+
+  await t('★ LES DEUX BORNES: les deux PRISES tirent toujours', async () => {
+    /* Le durcissement ne doit eteindre ni l entonnoir ni la demande fatale — ce sont les deux seules
+     * choses que cet outil sait affirmer. */
+    assert.strictEqual(entonnoir.verdict, 'high_risk');
+    assert.strictEqual(seed.verdict, 'fraud');
+    /* Et une demande fatale reste fatale meme quand la chaine est illisible: elle n en depend pas. */
+    assert.strictEqual(seedAveugle.verdict, 'fraud');
+  });
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })();
