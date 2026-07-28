@@ -246,6 +246,65 @@ t('persist:false n ecrit rien sur le disque', async () => {
   assert.strictEqual(readState('base', OWNER, dir), null, 'aucun etat ne doit avoir ete ecrit');
 });
 
+/* ── judgeCounterparty: UN CHAMP ABSENT N'EST PAS UN CHAMP A `false` ────────────────────────────────
+ * `judgeCounterparty` etait exportee et nommee dans aucun test. Elle etait pourtant deja soignee sur ce
+ * qu'elle ne pouvait pas lire — crible indisponible, explorateur muet — puis `if (info.is_contract)`
+ * confondait « l'explorateur dit non » et « l'explorateur n'a rien dit ». Mesure du 2026-07-28, meme
+ * `lireJson` injecte :
+ *
+ *   {is_contract:false} -> « a plain wallet, not a contract »
+ *   {}                  -> « a plain wallet, not a contract »   IDENTIQUE, severite null
+ *
+ * Une reponse 200 a la forme changee faisait AFFIRMER la nature d'une adresse que personne n'avait
+ * mesuree, et c'est la lecture RASSURANTE qui sortait. La prudence du module s'arretait a la frontiere
+ * du corps de reponse.
+ *
+ * Ces cas passent par la vraie fonction avec `lireJson` injecte: pas de reseau, et surtout pas d'objet
+ * de sortie fabrique a la main — un test qui construit sa propre reponse ne prouve pas qu'elle existe. */
+const { judgeCounterparty } = require('../lib/wallet-watch.js');
+const CP = '0x' + '1'.repeat(40);
+const juge = (rep) => judgeCounterparty('http://explorateur.invalid', CP, async () => rep);
+/* Les notes du crible known-bad dependent du plancher present sur la machine: on ne garde que ce que ce
+ * cas mesure. Sans ce filtre, l'assertion basculerait selon data/known-bad.json — un test instable. */
+const surLaNature = (r) => r.notes.filter((n) => !/known-bad/.test(n)).join(' | ');
+
+t('une reponse SANS le champ ne dit pas « portefeuille simple »', async () => {
+  const vide = await juge({});
+  const vrai = await juge({ is_contract: false });
+  assert.match(surLaNature(vrai), /a plain wallet, not a contract/);
+  /* ⚠️ Le coeur du correctif: ces deux phrases doivent DIFFERER. Elles etaient identiques au mot pres. */
+  assert.notStrictEqual(surLaNature(vide), surLaNature(vrai));
+  assert.doesNotMatch(surLaNature(vide), /a plain wallet, not a contract/);
+  assert.match(surLaNature(vide), /did not say whether this address is a contract/);
+});
+
+t('un contrat sans `is_verified` n\'est pas declare NON VERIFIE', async () => {
+  const absent = await juge({ is_contract: true });
+  const faux = await juge({ is_contract: true, is_verified: false });
+  assert.match(surLaNature(faux), /UNVERIFIED contract/);
+  assert.doesNotMatch(surLaNature(absent), /UNVERIFIED contract/);
+  assert.match(surLaNature(absent), /did not say whether its source is verified/);
+  /* « Je n'ai pas pu lire » n'escalade PAS: c'est une lacune de notre cote, pas un fait sur le contrat.
+   * Escalader ici serait l'erreur symetrique de celle qu'on corrige. */
+  assert.strictEqual((await juge({ is_contract: true })).severity, null);
+  assert.strictEqual((await juge({ is_contract: true, is_verified: false })).severity, 'medium');
+});
+
+t('le chemin qui INFORME n\'a pas ete avale par le durcissement', async () => {
+  /* Les deux bornes: un fail-closed qui ne dit plus rien de vrai n'est pas un correctif. */
+  assert.match(surLaNature(await juge({ is_contract: true, is_verified: true, name: 'USDC' })),
+    /verified contract \(USDC\)/);
+  assert.strictEqual((await juge({ is_scam: true, is_contract: false })).severity, 'high');
+});
+
+t('un explorateur muet reste distinct d\'une reponse vide', async () => {
+  const muet = await juge(null);
+  const vide = await juge({});
+  assert.match(surLaNature(muet), /the explorer did not answer/);
+  /* Trois etats, pas deux: pas de reponse ≠ reponse illisible ≠ reponse qui dit non. */
+  assert.notStrictEqual(surLaNature(muet), surLaNature(vide));
+});
+
 (async () => {
   for (const [nom, fn] of files) {
     try { await fn(); pass++; console.log('  ok   ' + nom); }
