@@ -177,6 +177,86 @@ t('la couche 2 (holders-health) est bien invoquee quand le canonical est sur Bas
   assert.ok(r.health, 'et son resultat doit voyager avec le verdict');
 });
 
+/* ── (D) « LIQUIDITE NON RAPPORTEE » N'EST PAS « ZERO DOLLAR » ────────────────────────────────────
+ * `(p.liquidity && p.liquidity.usd) || 0` ecrasait un champ ABSENT sur la valeur la plus incriminante
+ * possible. Le contrat passait sous LIQ_FLOOR, sortait de `credible`, et si c'etait le VRAI contrat
+ * dominant qui disparaissait, l'usurpateur devenait `top`: verifier l'usurpateur rendait `genuine`.
+ * Le detecteur d'usurpation certifiait l'usurpateur.
+ *
+ * SONDE DE L'API REELLE le 2026-07-28, sur les six symboles surveilles par hermes/economy/meme-scan:
+ *   DEGEN 3 paires sur 30 sans champ `liquidity` · BRETT 1 sur 30
+ *   apres deduplication par le MAXIMUM: 6 tokens sur 91 (6,6 %) n'avaient AUCUNE paire chiffree
+ * Ce n'est pas une hypothese de schema — c'est ce que l'API rend aujourd'hui. */
+const sansLiq = (chainId, addr, symbol) => ({
+  chainId, baseToken: { address: addr, symbol, name: symbol + ' token' },
+  volume: { h24: 0 }, pairCreatedAt: 1,          // pas de cle `liquidity` du tout, comme DexScreener le fait
+});
+const VRAI = '0xbase00000000000000000000000000000000vrai';
+const FAUX = '0xbase00000000000000000000000000000000faux';
+
+t('★ une liquidite ABSENTE rend null, jamais 0', () => {
+  const c = candidatesFrom([sansLiq('base', VRAI, 'X')], 'X');
+  assert.strictEqual(c.length, 1);
+  assert.strictEqual(c[0].liquidityUsd, null, '0 se lirait « mesure: ce contrat est vide »');
+});
+
+t('LES DEUX BORNES: une liquidite de 0 REELLEMENT rapportee reste 0', () => {
+  const c = candidatesFrom([paire('base', VRAI, 'X', 0)], 'X');
+  assert.strictEqual(c[0].liquidityUsd, 0, 'mesure-et-vide est une VRAIE mesure');
+});
+
+t('★ un contrat non mesure est relegue en FIN de tri, jamais en tete', () => {
+  /* Le tri decide du canonical. Un non mesure en tete certifierait ce qu'on n'a pas su lire.
+   *
+   * ⚠️ CE CAS A ETE RECRIT APRES UNE MUTATION MUETTE. La premiere version tenait sur DEUX elements
+   * ([non mesure, 50k]) et passait meme en inversant la relegation (`return 1` -> `return -1`):
+   * mesure le 2026-07-28, l'ordre restait identique. Le tri de V8 sur deux elements n'atteint qu'une
+   * moitie du comparateur — la branche `a == null` n'etait jamais empruntee, donc le test verifiait la
+   * bonne propriete sur une entree incapable de la distinguer.
+   *
+   * Un comparateur ne se teste pas sur deux elements. Il faut le non mesure au MILIEU, ou deux non
+   * mesures, pour que les deux branches soient exercees:
+   *     sain  0xB > 0xC > 0xA      mute  0xB > 0xA > 0xC     <- discrimine
+   *     sain  0xB>0xC>0xA>0xD      mute  0xC>0xD>0xB>0xA     <- discrimine */
+  const AUTRE = '0xbase0000000000000000000000000000000autre';
+  const c = candidatesFrom([paire('base', AUTRE, 'X', 10000), sansLiq('base', VRAI, 'X'), paire('base', FAUX, 'X', 50000)], 'X');
+  assert.deepStrictEqual(c.map((x) => x.address), [FAUX, AUTRE, VRAI], 'les mesures d abord, decroissantes; l illisible ferme la marche');
+  assert.strictEqual(c[c.length - 1].liquidityUsd, null);
+
+  /* Et avec DEUX illisibles, pour que la branche `a == null && b == null` soit elle aussi exercee. */
+  const AUTRE2 = '0xbase000000000000000000000000000000autre2';
+  const d = candidatesFrom([sansLiq('base', VRAI, 'X'), paire('base', FAUX, 'X', 50000), sansLiq('base', AUTRE2, 'X'), paire('base', AUTRE, 'X', 10000)], 'X');
+  assert.deepStrictEqual(d.slice(0, 2).map((x) => x.address), [FAUX, AUTRE]);
+  assert.strictEqual(d.slice(2).every((x) => x.liquidityUsd === null), true);
+});
+
+t('★ entre deux paires du MEME contrat, la mesuree l emporte sur la non mesuree', () => {
+  /* La deduplication gardait le maximum par `<`, et `null < x` est faux: selon l ordre d arrivee, un
+   * contrat parfaitement chiffre pouvait rester bloque sur sa paire aveugle. */
+  const avant = candidatesFrom([sansLiq('base', VRAI, 'X'), paire('base', VRAI, 'X', 80000)], 'X');
+  const apres = candidatesFrom([paire('base', VRAI, 'X', 80000), sansLiq('base', VRAI, 'X')], 'X');
+  assert.strictEqual(avant[0].liquidityUsd, 80000, 'ordre aveugle-puis-chiffre');
+  assert.strictEqual(apres[0].liquidityUsd, 80000, 'ordre chiffre-puis-aveugle');
+});
+
+t('★ LE CAS QUI COMPTE: un usurpateur ne devient pas « genuine » parce que le vrai est illisible', async () => {
+  /* Le vrai contrat existe et domine, mais sa liquidite n est pas rapportee. Avant: il valait 0, sortait
+   * de `credible`, et le faux — seul survivant — devenait le contrat dominant certifie. */
+  const fetchImpl = async () => ({ pairs: [sansLiq('base', VRAI, 'X'), paire('base', FAUX, 'X', 60000)] });
+  const r = await vetMeme({ symbol: 'X', chainId: 'base', address: FAUX, fetchImpl });
+  assert.strictEqual(r.unmeasured, 1, 'le concurrent illisible doit etre COMPTE, pas efface');
+  assert.match(r.unmeasuredNote, /NOT counted as \$0/);
+  /* Le verdict reste ce que la mesure permet — on ne bascule pas tout en `ambiguous`, ce qui ne
+   * renseignerait plus personne. Mais il ne se lit plus sans la reserve. */
+  assert.ok(r.unmeasuredNote, 'toute revendication de dominance voyage avec le nombre d illisibles');
+});
+
+t('LES DEUX BORNES: sans aucun illisible, AUCUNE reserve n est emise', () => {
+  /* Une reserve permanente apprend a l ignorer — c est pire qu aucune reserve. */
+  const c = candidatesFrom(PAIRES, 'DEGEN');
+  assert.strictEqual(c.every((x) => typeof x.liquidityUsd === 'number'), true);
+});
+
 t('une chaine inconnue ne certifie rien — elle abstient', async () => {
   const r = await vetMeme({ symbol: 'DEGEN', chainId: 'chaine-imaginaire', fetchImpl: faussesPaires(PAIRES) });
   assert.notStrictEqual(r.status, 'genuine', 'jamais de certification sur une chaine qu on n a pas su lire');

@@ -78,8 +78,14 @@ if (require.main === module) (async () => {
     const n = (v.candidates || []).length;
     if (v.status === 'impersonation') { alerts++; lines.push(`🚩 BOOSTED ${symbol} [${chain}] ${address.slice(0, 10)}…: IMPERSONATION — the promoted contract is NOT the dominant one. Paid-boost trap.`); }
     else if (v.status === 'ambiguous') { alerts++; lines.push(`🚩 BOOSTED ${symbol} [${chain}]: AMBIGUOUS — ${n} contracts, no clear real one (verify holders before aping).`); }
-    else if (v.status === 'genuine') lines.push(`· boosted ${symbol} [${chain}]: promoted = the dominant contract${n > 1 ? ' (' + (n - 1) + ' look-alike(s) exist)' : ''}.`);
-    else if (v.status === 'thin') lines.push(`· boosted ${symbol} [${chain}]: thin liquidity — nothing credible.`);
+    /* La reserve des concurrents ILLISIBLES voyage jusqu'ici: « promoted = the dominant contract » est
+     * une affirmation calculee parmi les contrats qu'on a pu mesurer, et ce n'est pas la meme phrase
+     * selon qu'on en a ignore 0 ou 4. */
+    else if (v.status === 'genuine') lines.push(`· boosted ${symbol} [${chain}]: promoted = the dominant contract${n > 1 ? ' (' + (n - 1) + ' look-alike(s) exist)' : ''}${v.unmeasured ? ' — among those measurable; ' + v.unmeasured + ' report no liquidity at all' : ''}.`);
+    else if (v.status === 'thin') lines.push(`· boosted ${symbol} [${chain}]: thin liquidity — nothing credible${v.unmeasured ? ', and ' + v.unmeasured + ' contract(s) report no figure at all (unread, not empty)' : ''}.`);
+    /* `unknown` est un statut DOCUMENTE de vetMeme (« market data unavailable »), pas une surprise. Le
+     * confondre avec un statut inconnu ferait passer une panne de donnee pour un bug de notre cote. */
+    else if (v.status === 'unknown') lines.push(`⚠️ boosted ${symbol} [${chain}]: market data unavailable — NOT scanned, which is not "nothing found".`);
     /* Sans ce dernier cas, un statut inconnu ne produisait AUCUNE ligne: le token etait compte comme
      * examine et ne disait rien, ce qui se lit « rien a signaler ». Un etat qu'on ne sait pas nommer
      * doit s'annoncer, pas se taire. */
