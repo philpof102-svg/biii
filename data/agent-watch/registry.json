@@ -142,7 +142,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agenticfabricationnetwork/ufp",
-      "lastSeen": "2026-07-28T13:07:35.610Z"
+      "lastSeen": "2026-07-28T21:13:46.845Z"
     },
     "https://api.agenticshelf.ai/m/graffeo/mcp": {
       "verdict": "answers",
@@ -151,7 +151,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agenticshelf/graffeo",
-      "lastSeen": "2026-07-28T13:07:37.224Z"
+      "lastSeen": "2026-07-28T21:13:48.469Z"
     },
     "https://api.agenticshelf.ai/mcp": {
       "verdict": "answers",
@@ -160,7 +160,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agenticshelf/mcp",
-      "lastSeen": "2026-07-28T13:07:38.291Z"
+      "lastSeen": "2026-07-28T21:13:49.669Z"
     },
     "https://api.agenticshelf.ai/m/puroair/mcp": {
       "verdict": "answers",
@@ -169,7 +169,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agenticshelf/puroair",
-      "lastSeen": "2026-07-28T13:07:39.549Z"
+      "lastSeen": "2026-07-28T21:13:51.022Z"
     },
     "https://mcp.agenticterminal.ai/mcp": {
       "verdict": "answers",
@@ -178,7 +178,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agenticterminal/directory",
-      "lastSeen": "2026-07-28T13:07:40.982Z"
+      "lastSeen": "2026-07-28T21:13:52.611Z"
     },
     "https://ai-akari.ai/mcp-trust": {
       "verdict": "answers",
@@ -187,7 +187,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.ai-akari/agent-trust-receipt",
-      "lastSeen": "2026-07-28T13:07:42.285Z"
+      "lastSeen": "2026-07-28T21:13:53.942Z"
     },
     "https://ai-akari.ai/mcp": {
       "verdict": "high_risk",
@@ -198,7 +198,7 @@
       ],
       "wantsSecret": [],
       "name": "ai.ai-akari/one-minute-akari",
-      "lastSeen": "2026-07-28T13:07:43.350Z"
+      "lastSeen": "2026-07-28T21:13:55.031Z"
     },
     "https://www.ai-portal.ai/mcp": {
       "verdict": "answers",
@@ -207,16 +207,16 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.ai-portal/ai-portal",
-      "lastSeen": "2026-07-28T13:07:44.772Z"
+      "lastSeen": "2026-07-28T21:13:56.632Z"
     },
     "https://aient.ai/mcp": {
       "verdict": "unauditable",
       "tools": null,
       "names": null,
-      "movesValue": [],
-      "wantsSecret": [],
+      "movesValue": null,
+      "wantsSecret": null,
       "name": "ai.aient/mcp",
-      "lastSeen": "2026-07-28T13:07:45.820Z"
+      "lastSeen": "2026-07-28T21:14:00.033Z"
     },
     "https://mcp.airshelf.ai/mcp": {
       "verdict": "answers",
@@ -225,16 +225,16 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.airshelf/catalog",
-      "lastSeen": "2026-07-28T13:07:47.711Z"
+      "lastSeen": "2026-07-28T21:14:01.900Z"
     },
     "https://api.aisecuritygateway.ai/mcp": {
       "verdict": "unauditable",
       "tools": null,
       "names": null,
-      "movesValue": [],
-      "wantsSecret": [],
+      "movesValue": null,
+      "wantsSecret": null,
       "name": "ai.aisecuritygateway/mcp-gateway",
-      "lastSeen": "2026-07-28T13:07:48.725Z"
+      "lastSeen": "2026-07-28T21:14:02.924Z"
     },
     "https://mcp.alphacreek.ai/mcp": {
       "verdict": "answers",
@@ -243,34 +243,34 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.alphacreek/alphacreek-mcp",
-      "lastSeen": "2026-07-28T13:07:50.005Z"
+      "lastSeen": "2026-07-28T21:14:04.248Z"
     },
     "https://mcp.alpic.ai": {
       "verdict": "unauditable",
       "tools": null,
       "names": null,
-      "movesValue": [],
-      "wantsSecret": [],
+      "movesValue": null,
+      "wantsSecret": null,
       "name": "ai.alpic.mcp/alpic-mcp",
-      "lastSeen": "2026-07-28T13:07:51.387Z"
+      "lastSeen": "2026-07-28T21:14:05.630Z"
     },
     "https://test.alpic.ai/": {
       "verdict": "unreachable",
       "tools": null,
       "names": null,
-      "movesValue": [],
-      "wantsSecret": [],
+      "movesValue": null,
+      "wantsSecret": null,
       "name": "ai.alpic.test/test-mcp-server",
-      "lastSeen": "2026-07-28T13:07:52.352Z"
+      "lastSeen": "2026-07-28T21:14:06.433Z"
     },
     "https://mcp.ambix.ai": {
       "verdict": "unauditable",
       "tools": null,
       "names": null,
-      "movesValue": [],
-      "wantsSecret": [],
+      "movesValue": null,
+      "wantsSecret": null,
       "name": "ai.ambix/ambix",
-      "lastSeen": "2026-07-28T13:07:53.419Z"
+      "lastSeen": "2026-07-28T21:14:07.613Z"
     },
     "https://mcp.anomalyarmor.ai/mcp": {
       "verdict": "unauditable",
@@ -279,7 +279,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.anomalyarmor/armor-mcp",
-      "lastSeen": "2026-07-28T14:39:41.461Z"
+      "lastSeen": "2026-07-28T21:14:08.967Z"
     },
     "https://api-v2.appdeploy.ai/mcp": {
       "verdict": "unauditable",
@@ -288,7 +288,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.appdeploy/deploy-app",
-      "lastSeen": "2026-07-28T14:39:42.692Z"
+      "lastSeen": "2026-07-28T21:14:10.257Z"
     },
     "https://arclan.ai/mcp": {
       "verdict": "answers",
@@ -297,7 +297,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.arclan/registry",
-      "lastSeen": "2026-07-28T14:41:43.987Z"
+      "lastSeen": "2026-07-28T21:14:11.601Z"
     },
     "https://argushq.ai/api/mcp": {
       "verdict": "answers",
@@ -306,7 +306,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.argushq/enforcement-database",
-      "lastSeen": "2026-07-28T14:41:45.275Z"
+      "lastSeen": "2026-07-28T21:14:12.990Z"
     },
     "https://mcp.arpi.ai/mcp": {
       "verdict": "unauditable",
@@ -315,7 +315,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.arpi/arpi-mcp",
-      "lastSeen": "2026-07-28T15:08:46.386Z"
+      "lastSeen": "2026-07-28T21:14:14.921Z"
     },
     "https://artidrop.ai/mcp": {
       "verdict": "answers",
@@ -714,5 +714,5 @@
       "lastSeen": "2026-07-28T19:12:55.859Z"
     }
   },
-  "offset": 16
+  "offset": 36
 }
