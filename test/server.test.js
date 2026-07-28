@@ -152,6 +152,70 @@ const mkCharge = async (s, amountUsd) => (await req(s, 'POST', '/charge', { amou
   });
 
   server.close();
+  /* ── /radar : UNE COUVERTURE NON LUE N'EST PAS UNE COUVERTURE NULLE ────────────────────────────────
+   * Le chargeur de `issuer-verified.json` faisait retomber QUATRE causes d'echec sur le meme `[]`:
+   * fichier absent · JSON illisible (`catch {}`) · cle `entries` manquante · `entries: null`. Mesure du
+   * 2026-07-28: le fichier reel du depot porte **183 entrees sur 11 chaines**, et les quatre echecs
+   * rendaient 0. `/radar` est une surface PUBLIQUE — la couverture passait de 183 a 0 sans un mot, et un
+   * lecteur en concluait que ce noeud n'authentifie aucun emetteur.
+   *
+   * Le cas qui donne son sens a tout: une liste VIDE LEGITIME doit rester distinguable d'une liste non
+   * lue. `0 / read:true` contre `null / read:false`. */
+  {
+    const os = require('node:os'), fsx = require('node:fs'), px = require('node:path');
+    const BAC = px.join(os.tmpdir(), 'biii-issuer-' + process.pid);
+    fsx.mkdirSync(BAC, { recursive: true });
+    const ecrire = (nom, contenu) => { const p = px.join(BAC, nom); fsx.writeFileSync(p, contenu); return p; };
+    const couverture = async (deps) => {
+      const s = build(deps); await new Promise((r) => s.listen(0, r));
+      const rep = await new Promise((r) => http.get(
+        { host: '127.0.0.1', port: s.address().port, path: '/radar' },
+        (res) => { let d = ''; res.on('data', (c) => (d += c)); res.on('end', () => r(JSON.parse(d))); }));
+      s.close();
+      return rep.radar.coverage;
+    };
+
+    const reel = await couverture({});
+    const absent = await couverture({ issuerVerifiedPath: px.join(BAC, 'jamais-cree.json') });
+    const casse = await couverture({ issuerVerifiedPath: ecrire('casse.json', '{"entries":[') });
+    const sansCle = await couverture({ issuerVerifiedPath: ecrire('sans.json', '{"autre":1}') });
+    const videLegitime = await couverture({ issuerVerifiedPath: ecrire('vide.json', '{"entries":[]}') });
+
+    await t('la liste reelle du depot est lue et comptee', () => {
+      assert.equal(reel.issuerListRead, true);
+      assert.ok(reel.issuerVerified > 0, 'le depot embarque une vraie liste');
+      assert.ok(reel.chains > 0);
+    });
+
+    await t('une liste NON LUE rend null, jamais 0', () => {
+      for (const [nom, c] of [['absente', absent], ['illisible', casse], ['sans entries', sansCle]]) {
+        assert.equal(c.issuerListRead, false, nom + ': doit se declarer non lue');
+        assert.equal(c.issuerVerified, null, nom + ': null, pas 0 — un zero muet est une affirmation');
+        assert.equal(c.chains, null, nom);
+        assert.match(c.issuerListNote, /NOT zero, it is UNREAD/, nom + ': la raison doit etre publiee');
+      }
+    });
+
+    await t('une liste VIDE LEGITIME reste un vrai zero — les deux bornes', () => {
+      /* Si le durcissement rendait `null` pour tout, il n'informerait plus: un noeud qui n'authentifie
+       * reellement aucun emetteur doit pouvoir le dire. */
+      assert.equal(videLegitime.issuerListRead, true);
+      assert.equal(videLegitime.issuerVerified, 0);
+      assert.equal(videLegitime.issuerListNote, undefined, 'pas de note parasite sur un cas lu');
+    });
+
+    await t('les quatre causes d echec portent des raisons DISTINCTES', () => {
+      /* Sans ca, « non lu » redeviendrait un seul mot fourre-tout et on perdrait ce qu'il faut reparer. */
+      const raisons = new Set([absent, casse, sansCle].map((c) => c.issuerListNote));
+      assert.equal(raisons.size, 3, 'absente / illisible / sans-cle doivent se distinguer');
+    });
+
+    fsx.rmSync(BAC, { recursive: true, force: true });
+    await t('la fixture issuer a bien ete supprimee', () => {
+      assert.equal(fsx.existsSync(BAC), false);
+    });
+  }
+
   console.log(`\n${pass} passed · ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })();
