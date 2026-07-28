@@ -140,5 +140,41 @@ check('la marque a GAUCHE reste une usurpation', checkLink('https://google.evil.
 check('une URL illisible reste illisible', checkLink('pas une url').verdict, 'unreadable');
 check('  ... et `ok` est faux, seul cas ou il l est', checkLink('pas une url').ok, false);
 
+/* ── LE TRUC DU `@`: LE PLUS CONVAINCANT DES TROIS, ET LE SEUL INVISIBLE ───────────────────────────
+ * `new URL()` range tout ce qui precede le `@` dans `username`/`password` et le retire du `hostname`,
+ * donc l'analyse de marque ne le voyait jamais. Mesure du 2026-07-28:
+ *
+ *   https://zoom.us.web09eu.com/j/1  -> registrable web09eu.com, impersonates ['zoom']   ✓
+ *   https://zoom.us@web09eu.com/j/1  -> registrable web09eu.com, impersonates []         ✗
+ *
+ * La DESTINATION etait juste dans les deux cas — le travail principal du module tient. Mais la forme ou
+ * la marque est le PREMIER mot que lit un humain etait la seule sans drapeau, et ce trou ne figurait pas
+ * dans la liste des manques ecrits en tete du fichier.
+ *
+ * Le verdict NE BOUGE PAS: les noms de marque sont des mots ordinaires et un garde qui crie au loup se
+ * fait desactiver. On rapporte la structure. */
+const uiNote = (u) => /carries text BEFORE an "@"/.test(checkLink(u).reason || '');
+
+check('★ le userinfo est EXTRAIT, pas ignore', checkLink('https://zoom.us@web09eu.com/j/1').userinfo, 'zoom.us');
+check('★ la marque cachee avant le @ est nommee',
+  checkLink('https://zoom.us@web09eu.com/j/1').userinfoBrands.join(','), 'zoom');
+check('★ et le fait entre dans le VERDICT LU par l appelant', uiNote('https://zoom.us@web09eu.com/j/1'), true);
+check('  la destination reelle reste juste',
+  checkLink('https://zoom.us@web09eu.com/j/1').registrable, 'web09eu.com');
+
+/* Un userinfo SANS marque connue reste un fait rapporte: un lien https legitime envoye dans un message
+ * n en porte pas, et c est un signal a quasi-zero faux positif — independamment de toute liste. */
+check('★ un userinfo sans marque est quand meme rapporte', uiNote('https://support@web09eu.com/x'), true);
+
+/* LES DEUX BORNES: aucune reserve inventee sur les liens qui n en portent pas. Une note permanente se
+ * lit comme du decor et cesse d etre lue. */
+check('BORNE: un lien propre ne porte aucune note de userinfo', uiNote('https://zoom.us/j/1'), false);
+check('BORNE: un sous-domaine trompeur non plus', uiNote('https://zoom.us.web09eu.com/j/1'), false);
+check('BORNE: userinfo est null quand il n y en a pas', checkLink('https://zoom.us/j/1').userinfo, null);
+check('BORNE: le sous-domaine trompeur reste une USURPATION',
+  checkLink('https://zoom.us.web09eu.com/j/1').verdict, 'brand_impersonation');
+check('BORNE: la plateforme legitime reste native',
+  checkLink('https://zoom.us/j/1').verdict, 'browser_native');
+
 process.stdout.write(`\n${lances - failed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);
