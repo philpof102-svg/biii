@@ -141,5 +141,96 @@ t('une chaine inconnue n a pas d entree — elle ne doit pas retomber sur une au
   assert.strictEqual(EVM.tron, undefined, 'TRON n est pas EVM et a son propre chemin');
 });
 
-console.log('\n' + pass + ' passed, ' + fail + ' failed');
-process.exit(fail ? 1 : 0);
+/* ── whatMoved : « rien deplace » et « pas pu lire » sortaient identiques ───────────────────────────
+ * Ce module a servi a tracer un vol reel, et sa question est litteralement « qu'est-ce qui a bouge ? ».
+ * Deux defauts mesures le 2026-07-28, `lireJson` injecte, aucun reseau :
+ *
+ * 1. `((xfers && xfers.items) || [])` coalescait un ECHEC de lecture sur le tableau vide. La sortie
+ *    portait `ok:true, transfers:[], forgedTransfers:0` — indiscernable d'une transaction qui ne bouge
+ *    reellement aucun jeton. Le silence d'un endpoint devenait une phrase sur un flux de fonds.
+ *
+ * 2. `const dec = (t.total && t.total.decimals) || 18` faisait d'une decimale ABSENTE une mesure, et
+ *    cette valeur DIVISE le montant : sur de l'USDC (6 decimales) un champ manquant rendait
+ *    0.000000000001 au lieu de 1 — faux de douze ordres de grandeur, sans rien pour le signaler. Le
+ *    meme `|| 18` avalait le zero legitime des jetons a 0 decimale (5 devenait 5e-18).
+ *
+ * ⚠️ Le harnais `t` de ce fichier est SYNCHRONE. On calcule donc tout par `await` AVANT, puis on assertit
+ * sur les valeurs : `t('...', async () => ...)` ne pourrait jamais echouer, et la garde de la suite le
+ * signalerait a juste titre. */
+const { whatMoved } = require('../lib/trace.js');
+
+(async () => {
+  const TX = '0x' + 'ab'.repeat(32);
+  const SIGNEUR = '0x' + '11'.repeat(20);
+  const TIERS = '0x' + '99'.repeat(20);
+  const tx = { hash: TX, from: { hash: SIGNEUR }, to: { hash: '0x' + '22'.repeat(20) },
+    timestamp: '2026-07-28T00:00:00Z', value: '0' };
+  const transfert = (from, dec, val) => ({ from: { hash: from }, to: { hash: '0x' + '33'.repeat(20) },
+    token: { symbol: 'USDC' }, total: { decimals: dec, value: val } });
+  /* Le bouchon distingue les DEUX endpoints: c'est le second qui peut mourir seul. */
+  const rpc = (second) => async (url) => (url.includes('token-transfers') ? second : tx);
+
+  const usdc = await whatMoved('base', TX, rpc({ items: [transfert(SIGNEUR, 6, '1000000')] }));
+  const sansDec = await whatMoved('base', TX, rpc({ items: [transfert(SIGNEUR, undefined, '1000000')] }));
+  const zeroDec = await whatMoved('base', TX, rpc({ items: [transfert(SIGNEUR, 0, '5')] }));
+  const vide = await whatMoved('base', TX, rpc({ items: [] }));
+  const nonLue = await whatMoved('base', TX, rpc(null));
+  const forge = await whatMoved('base', TX, rpc({ items: [transfert(TIERS, 6, '1000000')] }));
+
+  t('un montant lisible est mis a l echelle correctement', () => {
+    assert.strictEqual(usdc.transfers[0].amount, 1);
+    assert.strictEqual(usdc.transfers[0].decimals, 6);
+  });
+
+  t('une decimale ABSENTE ne devient pas 18 — le montant est null, pas invente', () => {
+    assert.strictEqual(sansDec.transfers[0].amount, null);
+    assert.strictEqual(sansDec.transfers[0].decimals, null);
+    assert.match(sansDec.transfers[0].amountUnread, /wrong amount travels further than a missing one/);
+    /* Le brut voyage: un lecteur peut refaire le calcul lui-meme au lieu de nous croire. */
+    assert.strictEqual(sansDec.transfers[0].rawValue, '1000000');
+  });
+
+  t('un jeton a 0 decimale garde son montant (le `|| 18` l avalait)', () => {
+    assert.strictEqual(zeroDec.transfers[0].amount, 5);
+    assert.strictEqual(zeroDec.transfers[0].decimals, 0);
+  });
+
+  t('« rien deplace » et « pas pu lire » ne sortent plus pareil', () => {
+    assert.strictEqual(vide.transfersRead, true);
+    assert.strictEqual(nonLue.transfersRead, false);
+    assert.strictEqual(vide.transfers.length, 0);
+    assert.strictEqual(nonLue.transfers.length, 0);
+    /* ⚠️ Le coeur: memes tableaux vides, etats OPPOSES. Sans cette paire, coller `transfersRead: true`
+     * en dur passerait au vert. */
+    assert.notStrictEqual(vide.transfersRead, nonLue.transfersRead);
+    assert.strictEqual(vide.transfersNote, null);
+    assert.match(nonLue.transfersNote, /not because nothing moved/);
+  });
+
+  t('un evenement dont le signataire n est pas l emetteur reste marque FORGE', () => {
+    /* La regle fondatrice du module: un log ERC-20 est du texte controle par l attaquant, seul le
+     * signataire de la transaction fait foi. Le durcissement ci-dessus ne doit pas l avoir dilue. */
+    assert.strictEqual(forge.transfers[0].authentic, false);
+    assert.strictEqual(forge.forgedTransfers, 1);
+    assert.strictEqual(usdc.transfers[0].authentic, true);
+    assert.strictEqual(usdc.forgedTransfers, 0);
+  });
+
+  t('une transaction introuvable reste un refus, pas un resultat vide', () => {
+    assert.strictEqual(vide.ok, true);
+  });
+  const absente = await whatMoved('base', TX, async () => null);
+  t('  ... et le refus porte sa raison', () => {
+    assert.strictEqual(absente.ok, false);
+    assert.match(absente.reason, /not found/);
+  });
+
+  console.log('\n' + pass + ' passed, ' + fail + ' failed');
+  process.exit(fail ? 1 : 0);
+})().catch((e) => {
+  /* Sans ce filet, une promesse rejetee tuerait le processus AVANT le bilan — et l agregateur compte les
+   * bilans. Un fichier sans bilan doit crier, pas disparaitre. */
+  console.log('  FAIL harnais async: ' + (e && e.message));
+  console.log('\n' + pass + ' passed, ' + (fail + 1) + ' failed');
+  process.exit(1);
+});
