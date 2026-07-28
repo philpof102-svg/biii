@@ -76,6 +76,44 @@ function req(server, method, p, body, headers) {
     assert.equal(r.status, 200);
   });
 
+  /* ── ON ENCAISSAIT AVANT DE VALIDER, ET LA MISE ETAIT PERDUE ────────────────────────────────────
+   * `settleOnce` BRULE la transaction — c'est tout son propos — et le controle d'adresse arrivait
+   * APRES. Prouve le 2026-07-28 sur un vrai serveur, une seule transaction:
+   *
+   *   1) POST /x402/vet-address {address:'0x123'}  -> HTTP 400, adresse malformee
+   *   2) POST /x402/vet-address {address: valide}  -> HTTP 409, « payment already redeemed »
+   *
+   * L'appelant a paye, s'est trompe d'un caractere, et a perdu sa mise sans verdict — sans pouvoir
+   * reessayer. Ce n'est pas une lecture manquee: c'est un ORDRE D'OPERATIONS. On ne consomme jamais un
+   * paiement pour une requete qu'on allait refuser. */
+  const PTX_TYPO = tx(44);
+  await t('★ une entree invalide est refusee AVANT le reglement — la mise n est pas consommee', async () => {
+    const r = await req(server, 'POST', '/x402/vet-address', { address: '0x123' }, { 'x-payment': PTX_TYPO });
+    assert.equal(r.status, 400);
+    assert.match(String(r.body && r.body.note), /payment was NOT consumed/i,
+      'le refus doit DIRE que la mise est intacte, sinon l appelant n ose pas reessayer');
+  });
+
+  await t('★ ... et la MEME transaction paie encore un verdict apres correction', async () => {
+    const r = await req(server, 'POST', '/x402/vet-address', { address: '0x' + 'c1'.repeat(20) }, { 'x-payment': PTX_TYPO });
+    assert.equal(r.status, 200, 'la mise devait survivre a la faute de frappe');
+    assert.ok(r.body && r.body.vet, 'et rendre le verdict paye');
+  });
+
+  await t('★ LES DEUX BORNES: l anti-rejeu tient toujours apres ce chemin', async () => {
+    /* Le durcissement ne doit pas ouvrir la porte qu il longe: une fois le verdict rendu, la meme
+     * transaction ne doit plus rien acheter. */
+    const r = await req(server, 'POST', '/x402/vet-address', { address: '0x' + 'c1'.repeat(20) }, { 'x-payment': PTX_TYPO });
+    assert.equal(r.status, 409);
+  });
+
+  await t('LES DEUX BORNES: une sonde NON PAYANTE recoit toujours le defi 402, pas un 400', async () => {
+    /* Le corps est lu plus tot qu avant; le defi 402 doit rester en amont, sinon on renseignerait un
+     * visiteur non payant sur la validite de son entree. */
+    const r = await req(server, 'POST', '/x402/vet-address', { address: '0x123' }, {});
+    assert.equal(r.status, 402);
+  });
+
   /* ── LES DEUX CHAMPS QUI ANCRENT LA GARDE, ET LA COERCITION QUI LES ANNULAIT ──────────────────────
    *
    * `Number(proof.confirmations || 0)` faisait d'un champ absent un age de ZERO, c'est-a-dire la
