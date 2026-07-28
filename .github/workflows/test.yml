@@ -1,0 +1,66 @@
+# LA SUITE TOURNE SUR CHAQUE POUSSEE — pas seulement le jour d'une publication.
+#
+# ⚠️ POURQUOI CE FICHIER EXISTE. Jusqu'au 2026-07-28 le dépôt n'avait qu'un seul workflow,
+# `publish.yml`, déclenché sur les tags `v*.*.*` et en manuel. Douze commits ont été poussés ce
+# jour-là sans qu'AUCUNE validation machine ne tourne : la suite ne s'exécutait que sur le poste
+# de l'auteur. Un commit qui casse la suite n'aurait été vu qu'au moment de publier — c'est-à-dire
+# au pire moment, quand on a déjà décidé d'expédier.
+#
+# C'est le principe que ce dépôt applique partout ailleurs : un garde MACHINE, jamais un « faire
+# attention ». La discipline humaine a tenu aujourd'hui ; elle ne tiendra pas tous les jours, et
+# elle ne tient pas du tout pour un contributeur extérieur.
+#
+# Ce workflow ne demande AUCUN secret : il ne publie rien, il vérifie. Il peut donc tourner sur
+# une pull request venue d'un fork sans rien exposer.
+
+name: Tests
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+# Une nouvelle poussée annule le run précédent de la même branche : inutile de payer deux fois
+# pour un état qui n'existe déjà plus.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # `npm ci` et non `npm install` : le lockfile EXISTE (vérifié), et `ci` installe exactement ce
+      # qu'il décrit au lieu de le réécrire. La seule dépendance est `trust-core`, vendorée dans le
+      # dépôt (`vendor/trust-core`, 5 fichiers suivis) — donc résolvable hors ligne, sans registre.
+      - name: Installer
+        run: npm ci --no-audit --no-fund
+
+      # ⚠️ `test:total` et non `test`. Le premier lance le second PUIS additionne les bilans et
+      # les compare au nombre de fichiers lancés — c'est ce qui a révélé, le 2026-07-27, qu'un
+      # total annoncé à « 473 » en valait 574 parce qu'un compteur ne voyait qu'un séparateur sur
+      # deux. Un `npm test` vert ne prouve pas que la suite entière a tourné ; `test:total` si.
+      #
+      # Aucun `| grep` ici, et c'est délibéré : un tube écrase le code de sortie, ce qui a déjà
+      # fait pousser deux échecs à l'écran dans ce dépôt.
+      - name: Suite complète (bilans comptés)
+        run: npm run test:total
+
+      # ⚠️ UNE ÉTAPE `--if-present` A ÉTÉ RETIRÉE D'ICI. Le premier jet appelait
+      # `npm run test:publishable --if-present` — un script qui N'EXISTE PAS dans ce dépôt. Le drapeau
+      # l'aurait rendue silencieusement inopérante : une étape verte qui ne vérifie rien, dans le garde
+      # censé vérifier le reste. C'est le motif « lecteur sans écrivain » que ce dépôt traque partout
+      # ailleurs, écrit dans son propre garde-fou.
+      #
+      # Si un contrôle de publiabilité est ajouté un jour, il s'appelle SANS `--if-present` : une étape
+      # qui ne peut pas échouer n'est pas une étape.
+      - name: Le serveur MCP démarre et annonce ses outils
+        run: node -e "const{TOOLS}=require('./bin/biii-mcp.js');if(!Array.isArray(TOOLS)||!TOOLS.length)throw new Error('le catalogue MCP est vide');console.log(TOOLS.length+' outils annonces')"
