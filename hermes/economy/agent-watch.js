@@ -11,6 +11,21 @@
  * live input, and a 30-server sample from one page will probably never meet it. Covering the registry
  * continuously and remembering what each server looked like is how a rare case eventually walks past.
  *
+ * ⚠️ CE QUE « 0 » VEUT DIRE ICI, ET DEPUIS QUAND. Jusqu'au 2026-07-28, ce zero couvrait deux etats
+ * OPPOSES — « aucun serveur public ne demande de cle » et « le detecteur ne marche pas » — et rien dans
+ * le depot ne permettait de les distinguer. Sortie constante = l'instrument, pas le sujet.
+ * `test/agent-vet-secret-branch.test.js` fait desormais passer `vetAgent` par un VRAI serveur MCP local
+ * et prouve la chaine complete (initialize -> tools/list -> auditTools -> verdict `refuse`).
+ *
+ * La distinction reste entiere, et il faut la dire proprement: le detecteur est PROUVE, il n'a toujours
+ * JAMAIS tire sur une entree reelle. Ce qui a change n'est pas le chiffre, c'est ce qu'on a le droit d'en
+ * lire — un zero live signifie maintenant « personne n'a demande », plus « detecteur non teste ».
+ *
+ * Trou connu et borne, epingle par ce meme test: le motif secret n'est cherche que dans les NOMS DE
+ * CHAMPS du schema, jamais dans le nom de l'outil. `import_private_key({ value })` sort en lecture seule.
+ * Le fermer demanderait de separer `import_private_key` de `check_private_key_leak` sur le seul nom —
+ * une decision de conception, pas un correctif mecanique.
+ *
  * ROTATES ON PURPOSE. A slice per run, advancing through the registry, so full coverage accumulates without
  * anyone's endpoint being hit every thirty minutes. Introspection only: initialize and tools/list, exactly
  * what any MCP client sends on connect, and no tool is ever called. Measuring strangers rudely would be its
