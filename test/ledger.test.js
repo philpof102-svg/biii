@@ -104,5 +104,62 @@ t('reverifyRoll: allVerified ONLY when every line re-checks on Base — fail-clo
   assert.equal(L.reverifyRoll([], facts).allVerified, false);
 });
 
+/* ── UN NUMERO DE RECU N'A QU'UN SEUL TRAVAIL: ETRE UNIQUE ──────────────────────────────────────────
+ * `receiptNo(r.length + 1)` le derivait de la LONGUEUR du registre. Mesure du 2026-07-28: trois recus
+ * (B3-0001..0003), on retire le deuxieme du tableau — correction, purge, migration, rien d'exotique pour
+ * un registre stocke en JSON — puis on ajoute. La longueur etant retombee a 2, le nouveau recu sortait en
+ * **B3-0003**: deux recus differents, le meme numero, dans les livres d'un commerçant.
+ *
+ * Une quantite derivee ne peut pas garantir l'unicite parce qu'elle DESCEND. Un compteur monotone le
+ * peut. C'est la meme lecon que l'horloge qui ne sait pas ordonner deux evenements du meme tick. */
+const recu = (h) => ({ txHash: '0x' + String(h).repeat(64).slice(0, 64), blockTime: 1,
+  valueMicro: '1000000', to: '0x' + 'a'.repeat(40) });
+const numeros = (rows) => rows.map((e) => e.no);
+const aDesDoublons = (l) => new Set(l).size !== l.length;
+
+t('un numero de recu n est JAMAIS reutilise apres un retrait', () => {
+  let r = [];
+  for (const h of ['1', '2', '3']) r = L.appendReceipt(r, recu(h)).rows;
+  assert.deepStrictEqual(numeros(r), ['B3-0001', 'B3-0002', 'B3-0003']);
+  r.splice(1, 1);                                   // le #2 disparait du tableau
+  r = L.appendReceipt(r, recu('4')).rows;
+  /* ⚠️ Avant: ['B3-0001','B3-0003','B3-0003']. */
+  assert.strictEqual(aDesDoublons(numeros(r)), false, 'un numero deja emis ne doit jamais revenir');
+  assert.strictEqual(numeros(r)[2], 'B3-0004');
+});
+
+t('le compteur ne redescend pas, meme apres plusieurs retraits', () => {
+  let r = [];
+  for (const h of ['1', '2', '3', '4', '5']) r = L.appendReceipt(r, recu(h)).rows;
+  r.splice(0, 4);                                   // il ne reste que le #5
+  r = L.appendReceipt(r, recu('6')).rows;
+  assert.strictEqual(numeros(r)[1], 'B3-0006', 'le suivant vient du plus grand n, pas du nombre de lignes');
+});
+
+t('un registre ancien SANS `n` ne retombe pas sur un numero qui pourrait exister', () => {
+  /* La ceinture: sans `n` nulle part, le maximum vaut 0 et on retomberait sur 1 — qui existe peut-etre
+   * deja sous une autre forme dans un registre importe. */
+  const vieux = [{ receipt: recu('7') }, { receipt: recu('8') }];
+  assert.strictEqual(L.appendReceipt(vieux, recu('9')).entry.no, 'B3-0003');
+});
+
+t('le durcissement n a rien avale: le doublon de txHash est toujours refuse', () => {
+  /* Les deux bornes. Un compteur monotone ne doit pas devenir une excuse pour accepter deux fois la meme
+   * transaction — c'est la protection d'origine et elle reste entiere. */
+  let r = L.appendReceipt([], recu('1')).rows;
+  const encore = L.appendReceipt(r, recu('1'));
+  assert.strictEqual(encore.duplicate, true);
+  assert.strictEqual(encore.entry, null);
+  assert.strictEqual(encore.rows.length, 1);
+});
+
+t('la numerotation reste STRICTEMENT croissante sur une suite normale', () => {
+  let r = [];
+  for (let i = 1; i <= 12; i++) r = L.appendReceipt(r, recu(String(i % 10) + String(i))).rows;
+  const ns = r.map((e) => e.n);
+  for (let i = 1; i < ns.length; i++) assert.ok(ns[i] > ns[i - 1], 'n doit croitre strictement');
+  assert.strictEqual(aDesDoublons(numeros(r)), false);
+});
+
 console.log(`\n${pass} passed · ${fail} failed`);
 process.exit(fail ? 1 : 0);
