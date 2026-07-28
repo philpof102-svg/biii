@@ -132,5 +132,70 @@ t('bytes win over a digest when both are supplied — a digest is a claim, bytes
   assert.equal(r.verdict, 'substituted', 'the caller-supplied digest must not override what was actually handed over');
 });
 
+/* ── L'ORDRE TESTAIT LA PRESENCE, PAS LA LISIBILITE ─────────────────────────────────────────────────
+ * `const ordered = paidAt != null && committedAt != null` puis `Number(committedAt) >= Number(paidAt)`.
+ * Avec des horodatages ISO — le format le plus naturel qu'un appelant puisse envoyer — `Number()` rend
+ * NaN: `ordered` valait quand meme true, `NaN >= NaN` etait false, les DEUX branches etaient sautees, et
+ * on tombait sur le `served` final, celui qui affirme le plus.
+ *
+ * Mesure du 2026-07-28, engagement APRES le paiement:
+ *   paidAt='2026-07-28T09:00:00Z', committedAt='2026-07-28T10:00:00Z'
+ *   -> verdict `served`, phrase: « a commitment recorded at 10:00:00Z, BEFORE the payment at 09:00:00Z »
+ *
+ * Elle affirmait « avant » EN IMPRIMANT deux dates qui disent le contraire. Ce n'est pas une reserve
+ * manquante: c'est une affirmation fausse, contredite par sa propre preuve citee. */
+const engagement = commit({ jobId: 'job-ordre', deliverable: 'livrable' });
+const juger = (paidAt, committedAt) =>
+  assessDelivery({ commitment: engagement, received: 'livrable', paidAt, committedAt });
+
+t('un ordre ISO ne produit plus la phrase forte', () => {
+  const r = juger('2026-07-28T09:00:00Z', '2026-07-28T10:00:00Z');
+  assert.doesNotMatch(r.reason, /before the payment/,
+    'la phrase ne doit plus affirmer « avant » sur des valeurs qu elle n a pas lues');
+  assert.match(r.reason, /could not read/);
+  assert.equal(r.limits.length, 2, 'la reserve d ordre doit revenir');
+});
+
+t('« ordre absent » et « ordre illisible » ne disent PAS la meme chose', () => {
+  const absent = juger(null, null);
+  const illisible = juger('2026-07-28T09:00:00Z', '2026-07-28T10:00:00Z');
+  assert.equal(absent.verdict, illisible.verdict, 'meme verdict — c est la RAISON qui doit differer');
+  assert.notEqual(absent.reason, illisible.reason);
+  assert.match(absent.reason, /NOT supplied/);
+  assert.match(illisible.reason, /SUPPLIED but is not readable/);
+});
+
+t('un HASH ne se fait plus comparer comme une date', () => {
+  /* `Number('0x' + 'ab'.repeat(32))` vaut 7,76e76 — fini, donc accepte avant, puis compare. Deux hashes
+   * produisaient un `commitment_too_late` dont la phrase citait « 0xdef vs 0xabc » comme des instants. */
+  const r = juger('0x' + 'ab'.repeat(32), '0x' + 'cd'.repeat(32));
+  assert.equal(r.verdict, 'served');
+  assert.equal(r.limits.length, 2);
+  assert.match(r.reason, /not readable as a number/);
+});
+
+t('LES DEUX BORNES: l hexadecimal LEGITIME passe toujours', () => {
+  /* Un numero de bloc circule en `0x…` sur tout l ecosysteme. Le rejeter casserait un appelant juste —
+   * un fail-closed pousse trop loin cesse d informer. La borne est MAX_SAFE_INTEGER: un bloc tient tres
+   * largement en dessous, un hash de 32 octets est 60 ordres de grandeur au-dessus. */
+  const r = juger('0x1406f40', '0x1406f00');            // bloc 21000000 paye, engage un peu avant
+  assert.equal(r.verdict, 'served');
+  assert.equal(r.limits.length, 1, 'ordre LU: pas de reserve supplementaire');
+  assert.match(r.reason, /before the money moved/);
+});
+
+t('les chemins numeriques d origine ne bougent pas', () => {
+  assert.equal(juger(1785240000000, 1785239000000).verdict, 'served');
+  assert.equal(juger(1785239000000, 1785240000000).verdict, 'commitment_too_late');
+});
+
+t('les quatre situations sont DISTINGUABLES', () => {
+  /* Sans ce cas, aplatir deux etats l un sur l autre resterait vert tant qu ils ne se croisent pas. */
+  const sig = (r) => r.verdict + ':' + r.limits.length + ':' + /readable/.test(r.reason);
+  const vus = new Set([juger(1785240000000, 1785239000000), juger(1785239000000, 1785240000000),
+    juger(null, null), juger('2026-07-28T09:00:00Z', '2026-07-28T10:00:00Z')].map(sig));
+  assert.equal(vus.size, 4);
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
