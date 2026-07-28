@@ -66,6 +66,11 @@ t('malformed watchlist never throws; a mixed list flags only the threats', () =>
  * On appelle le VRAI script par stdin — c'est son contrat exact, un hook qui lit stdin et ecrit stdout.
  */
 const { execFileSync } = require('node:child_process');
+/* ⚠️ `fs` MANQUAIT ICI, et le cas de derive passait quand meme — au VERT. Le `try/catch` autour de
+ * `fs.statSync` avalait la `ReferenceError` et la rendait comme « ce chemin n'existe pas », donc le test
+ * annoncait « SAUTÉ » meme sur une machine ou la copie deployee EXISTE. Le defaut exact traque toute la
+ * journee, dans le garde ecrit pour le traquer. Trouve en demandant POURQUOI le test etait vert. */
+const fs = require('node:fs');
 const GARDE = require('node:path').join(__dirname, '..', 'hermes', 'agents', 'biii-monitor', 'readonly-guard.js');
 const passeGarde = (entree) => {
   const out = execFileSync(process.execPath, [GARDE], { input: entree, encoding: 'utf8' });
@@ -127,6 +132,39 @@ t('★ LES DEUX BORNES: les LECTURES passent — un garde qui bloque tout se fai
     'lawbor_read', 'till_verify_delivery', 'till_resolve']) {
     assert.strictEqual(passeGarde(appel(n)), 'allow', n + ' est une LECTURE et doit passer');
   }
+});
+
+/* ════════════════════════════════════════════════════════════════════════════════════════════════════
+ * LE FICHIER QU'ON DURCIT N'EST PAS CELUI QUI TOURNE.
+ *
+ * `readonly-guard.js` vit dans ce depot, mais Hermes execute une COPIE: sa propre docstring donne le
+ * chemin, `command: node /root/.hermes-biii/hooks/readonly-guard.js`. Mesure du 2026-07-28, apres avoir
+ * durci la version du depot:
+ *
+ *   copie deployee (22 juillet) -> JSON malforme AUTORISE, tool_name absent AUTORISE,
+ *                                  stdin vide AUTORISE, champ renomme AUTORISE, wallet.send.now AUTORISE
+ *
+ * Autrement dit: l'agent en service etait protege par la version vulnerable, et rien ne le signalait. Un
+ * correctif de securite applique a une copie source est un correctif que personne n'a.
+ *
+ * Ce cas SE SAUTE quand la copie deployee n'est pas joignable (CI, autre machine) — et il le DIT, plutot
+ * que de se declarer vert. Un test qui se tait quand il ne peut pas regarder est le defaut qu'on passe
+ * la journee a corriger ailleurs. */
+t('★ le garde DEPLOYE est identique a celui du depot (ou le desaccord est DIT)', () => {
+  const CHEMINS = [
+    process.env.BIII_DEPLOYED_GUARD,
+    '/root/.hermes-biii/hooks/readonly-guard.js',
+    require('node:os').homedir() + '/.hermes-biii/hooks/readonly-guard.js',
+  ].filter(Boolean);
+  const deploye = CHEMINS.find((p) => { try { return fs.statSync(p).isFile(); } catch { return false; } });
+  if (!deploye) {
+    console.log('       ↳ SAUTÉ: aucune copie déployée joignable (' + CHEMINS.length + ' chemins essayés). '
+      + 'Ce n\'est PAS une preuve que le garde en service est à jour — c\'est une vérification qui n\'a pas eu lieu.');
+    return;
+  }
+  const memeContenu = fs.readFileSync(deploye, 'utf8') === fs.readFileSync(GARDE, 'utf8');
+  assert.ok(memeContenu, 'la copie déployée (' + deploye + ') DIVERGE du dépôt — l\'agent en service '
+    + 'tourne sur une autre version du garde. Redéployer avant de croire ce que le dépôt promet.');
 });
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
