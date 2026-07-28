@@ -227,6 +227,58 @@ t('un rail temoignable, lui, passe bien par la chaine', async () => {
   assert.ok(atteintLaChaine, 'rail base = la chaine doit rester le juge');
 });
 
+/* ── DEUX CHAMPS QUI SE CONTREDISENT NE SE TRANCHENT PAS EN SILENCE ─────────────────────────────────
+ * Mesure du 2026-07-28: `{qty:2, unitUsd:'5.00', amountUsd:'100.00'}` rendait **10,00 $** et jetait le
+ * 100,00 sans un mot. Les deux valeurs different d'un facteur dix, et le client etait facture sur celle
+ * que le code avait choisie tout seul.
+ *
+ * L'appelant qui envoie les deux a calcule un total quelque part; s'il ne correspond pas au produit,
+ * l'un des deux est un bug CHEZ LUI. En choisir un revient a decider a sa place quel montant reclamer a
+ * un tiers — la seule chose qu'une couche de facturation ne doit jamais faire seule. C'est la meme regle
+ * que le conflit d'etiquettes de l'explorateur, qui ne se resout jamais en silence non plus.
+ *
+ * ⚠️ Huit des neuf formes essayees etaient DEJA correctes et fail-closed (qty nul, negatif, non entier,
+ * montant absent, prix unitaire manquant). Une seule etait un defaut — et l'hypothese « qty sans prix
+ * unitaire produit une ligne gratuite » a ete REFUTEE par la mesure: ca refuse. */
+t('une ligne dont amountUsd contredit qty x unitUsd est REFUSEE', () => {
+  assert.throws(() => I.normalizeItem({ description: 'x', qty: 2, unitUsd: '5.00', amountUsd: '100.00' }),
+    /contradicts/, 'la contradiction doit etre refusee, pas arbitree');
+  /* Le message doit porter LES DEUX nombres: un refus qui ne dit pas quoi corriger se contourne au
+   * hasard. */
+  try { I.normalizeItem({ description: 'x', qty: 2, unitUsd: '5.00', amountUsd: '100.00' }); }
+  catch (e) {
+    assert.match(e.message, /100\.00/);
+    assert.match(e.message, /10\.00/);
+  }
+});
+
+t('une redondance COHERENTE reste acceptee', () => {
+  /* Les DEUX bornes. Refuser un appelant qui se relit casserait du code correct, et un fail-closed qui
+   * refuse le juste cesse d'informer. On ne refuse QUE la contradiction. */
+  const r = I.normalizeItem({ description: 'x', qty: 2, unitUsd: '5.00', amountUsd: '10.00' });
+  assert.strictEqual(r.amountUsd, '10.00');
+  assert.strictEqual(r.qty, 2);
+});
+
+t('les chemins existants ne bougent pas', () => {
+  assert.strictEqual(I.normalizeItem({ description: 'x', qty: 2, unitUsd: '5.00' }).amountUsd, '10.00');
+  assert.strictEqual(I.normalizeItem({ description: 'x', amountUsd: '10.00' }).amountUsd, '10.00');
+  /* Une chaine vide n'est pas une contradiction: c'est l'absence du champ. */
+  assert.strictEqual(I.normalizeItem({ description: 'x', qty: 2, unitUsd: '5.00', amountUsd: '' }).amountUsd, '10.00');
+});
+
+t('les refus deja en place tiennent toujours', () => {
+  /* Ce que la mesure a trouve CORRECT et qu'il ne faut pas casser en durcissant ailleurs. */
+  for (const mauvais of [{ qty: 0, unitUsd: '5' }, { qty: -3, unitUsd: '5' }, { qty: 1.5, unitUsd: '5' }]) {
+    assert.throws(() => I.normalizeItem({ description: 'x', ...mauvais }), /positive integer/);
+  }
+  assert.throws(() => I.normalizeItem({ description: 'x', qty: 5 }), /invalid USD amount/,
+    'qty sans prix unitaire refuse — jamais une ligne gratuite');
+  assert.throws(() => I.normalizeItem({ description: 'x' }), /invalid USD amount/);
+  assert.throws(() => I.normalizeItem({ description: 'x', qty: 2, unitUsd: '5.00', amountUsd: 'abc' }),
+    /invalid USD amount/, 'un montant illisible reste refuse avant toute comparaison');
+});
+
 (async () => {
   for (const [n, fn] of files) {
     try { await fn(); pass++; console.log('  ✓ ' + n); }
