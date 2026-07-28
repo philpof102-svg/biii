@@ -302,6 +302,33 @@ function exigeAdresse(brut, champ = 'address') {
   return { adresse: adr };
 }
 
+/**
+ * instantMs — un horodatage FOURNI mais illisible n'est pas un horodatage ABSENT.
+ *
+ * ⚠️ `Number(a.paidAt)` detruisait toute date ISO-8601. Mesure du 2026-07-28, meme scenario, engagement
+ * publie APRES le paiement — le tour exact que `till_verify_delivery` existe pour attraper:
+ *
+ *   committedAt/paidAt en millisecondes -> commitment_too_late   ✓
+ *   committedAt/paidAt en ISO-8601      -> served                ✗
+ *
+ * `Number('2026-07-02T00:00:00Z')` vaut NaN, les deux instants tombaient a null, et `lib/delivery.js` —
+ * qui est correct — repondait honnetement « Ordering was NOT supplied ». Sauf que l'appelant AVAIT
+ * fourni l'ordre: la coercition l'avait mange, et l'outil lui disait qu'il ne l'avait pas donne. Une
+ * valeur non LUE presentee comme non DONNEE, avec le verdict propre a la place de la prise.
+ *
+ * L'ISO est la forme la plus naturelle ici: c'est celle de tous les horodatages de ce depot.
+ *
+ * ⚠️ Les nombres sont testes AVANT `Date.parse`, sinon `Date.parse(0)` rendrait l'an 2000 pour l'epoch.
+ */
+function instantMs(v) {
+  if (v == null || v === '') return { fourni: false, ms: null };
+  if (typeof v === 'number') return Number.isFinite(v) ? { fourni: true, ms: v } : { fourni: true, ms: null };
+  const n = Number(v);
+  if (Number.isFinite(n)) return { fourni: true, ms: n };
+  const d = Date.parse(String(v));
+  return { fourni: true, ms: Number.isFinite(d) ? d : null };
+}
+
 async function callTool(name, a = {}) {
   if (name === 'till_vet_merchant') {
     const g = exigeAdresse(a.address); if (g.error) return g;
@@ -590,14 +617,27 @@ async function callTool(name, a = {}) {
     return SEED.scanPaths(paths, SEED.loadWordlist());
   }
   if (name === 'till_verify_delivery') {
+    /* Un horodatage donne et illisible fait REFUSER, il ne se degrade pas en « pas fourni ». Le verdict
+     * qui en sortirait serait `served` la ou `commitment_too_late` etait du — une reponse fausse dans le
+     * sens qui coute de l'argent. Mieux vaut redemander: la comparaison de hash est bon marche. */
+    const tPaid = instantMs(a.paidAt), tComm = instantMs(a.committedAt);
+    const illisibles = [tPaid.fourni && tPaid.ms == null ? 'paidAt' : null,
+      tComm.fourni && tComm.ms == null ? 'committedAt' : null].filter(Boolean);
+    if (illisibles.length) {
+      return { error: illisibles.join(' and ') + ' was supplied but could not be read as a time. Send '
+        + 'milliseconds since epoch (1751328000000) or an ISO-8601 instant (2026-07-01T00:00:00Z). '
+        + 'REFUSED rather than judged: with the ordering lost, a late commitment would come back as '
+        + '"served", which is the exact trick this tool exists to catch.',
+        got: { paidAt: a.paidAt ?? null, committedAt: a.committedAt ?? null } };
+    }
     // Either the artifact or its digest — the digest is the better habit, and on a hosted server the only
     // defensible one: nothing here should hold someone's deliverable in order to compare a hash.
     return DELIV.assessDelivery({
       commitment: a.commitmentHash ? { deliverableHash: String(a.commitmentHash).toLowerCase() } : null,
       received: a.received,
       receivedHash: a.receivedHash,
-      paidAt: a.paidAt == null ? null : Number(a.paidAt),
-      committedAt: a.committedAt == null ? null : Number(a.committedAt),
+      paidAt: tPaid.ms,
+      committedAt: tComm.ms,
     });
   }
   if (name === 'till_funder_history') {

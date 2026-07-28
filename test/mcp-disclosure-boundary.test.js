@@ -164,6 +164,55 @@ const BAC = path.join(os.tmpdir(), 'biii-mcp-frontiere-' + process.pid);
     }
   });
 
+  /* ── UN HORODATAGE FOURNI ET ILLISIBLE N'EST PAS UN HORODATAGE ABSENT ──────────────────────────
+   * `Number(a.paidAt)` detruisait toute date ISO-8601. Mesure du 2026-07-28 via le VRAI handler, meme
+   * scenario — engagement publie APRES le paiement, le tour exact que cet outil existe pour attraper:
+   *
+   *   committedAt/paidAt en millisecondes -> commitment_too_late   ✓
+   *   committedAt/paidAt en ISO-8601      -> served                ✗
+   *
+   * `Number('2026-07-02T00:00:00Z')` vaut NaN. `lib/delivery.js` est correct et repondait honnetement
+   * « Ordering was NOT supplied » — sauf que l'appelant AVAIT fourni l'ordre. La coercition l'avait
+   * mange, et l'outil lui disait qu'il ne l'avait pas donne: une valeur non LUE rendue comme non DONNEE,
+   * avec le verdict propre a la place de la prise. L'ISO est la forme de tous les horodatages du depot. */
+  const sha = require('node:crypto');
+  const HASH = (s) => '0x' + sha.createHash('sha256').update(Buffer.from(s, 'utf8')).digest('hex');
+  const TOT = 1751328000000, TARD = 1751414400000;
+  const livraison = (o) => callTool('till_verify_delivery', { commitmentHash: HASH('x'), received: 'x', ...o });
+
+  const msTard = await livraison({ committedAt: TARD, paidAt: TOT });
+  const isoTard = await livraison({ committedAt: '2026-07-02T00:00:00Z', paidAt: '2026-07-01T00:00:00Z' });
+  const isoTot = await livraison({ committedAt: '2026-07-01T00:00:00Z', paidAt: '2026-07-02T00:00:00Z' });
+  const chaineMs = await livraison({ committedAt: String(TARD), paidAt: String(TOT) });
+  const illisible = await livraison({ committedAt: 'la semaine derniere', paidAt: TOT });
+  const epoch0 = await livraison({ committedAt: 0, paidAt: TOT });
+  const sansDate = await livraison({});
+
+  await t('★ un engagement TARDIF est attrape en ISO comme en millisecondes', () => {
+    assert.strictEqual(msTard.verdict, 'commitment_too_late', 'temoin: la forme qui marchait deja');
+    assert.strictEqual(isoTard.verdict, 'commitment_too_late', 'ISO-8601 rendait « served » — la prise etait perdue');
+    assert.strictEqual(chaineMs.verdict, 'commitment_too_late', 'des millisecondes en CHAINE aussi');
+  });
+
+  await t('★ un horodatage ILLISIBLE fait REFUSER, il ne se degrade pas en « pas fourni »', () => {
+    assert.ok(illisible.error, 'un verdict rendu ici serait « served » a la place de la prise');
+    assert.match(illisible.error, /could not be read as a time/i);
+    assert.match(illisible.error, /the exact trick this tool exists to catch/i);
+    assert.ok(!illisible.verdict, 'aucun verdict ne doit accompagner le refus');
+  });
+
+  await t('★ epoch 0 reste l epoch, pas l an 2000 (Date.parse(0) est le piege)', () => {
+    /* `Date.parse(0)` coerce en chaine « 0 » et rend l an 2000. Les nombres sont donc testes AVANT. */
+    assert.strictEqual(epoch0.verdict, 'served', 'commitment a 0, paiement plus tard: dans l ordre');
+  });
+
+  await t('LES DEUX BORNES: sans date, la reponse honnete d avant est conservee', () => {
+    assert.strictEqual(isoTot.verdict, 'served', 'un engagement anterieur reste servi');
+    assert.strictEqual(sansDate.verdict, 'served');
+    assert.match(sansDate.reason, /Ordering was NOT supplied/i,
+      'ne rien fournir reste different de fournir quelque chose d illisible');
+  });
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })().catch((e) => {
