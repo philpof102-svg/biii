@@ -59,6 +59,25 @@ async function listEndpoints() {
 }
 
 /** A stable description of what a server can do, so a change in it is detectable without storing everything. */
+/* ⚠️ DEUX CHAMPS SUR QUATRE PORTAIENT LA DISTINCTION, ET PAS LES DEUX QUI COMPTENT.
+ * `tools` et `names` valaient `null` quand la surface etait illisible — l'auteur connaissait donc la
+ * forme a trois etats. `movesValue` et `wantsSecret` retombaient a `[]`, c'est-a-dire « verifie: cet
+ * agent n'expose aucune surface de paiement et ne demande aucune cle ». Ce sont exactement les deux
+ * champs qui portent tout le propos de ce surveillant.
+ *
+ * Mesure du 2026-07-28 sur l'etat REEL (data/agent-watch/registry.json): 49 entrees sur 79 — 62 % —
+ * portaient `tools: null` a cote de `movesValue: []`. Le `verdict` disait la verite (`unreachable`,
+ * `unauditable`) et les tableaux la contredisaient DANS LE MEME OBJET. Ce n'etait pas latent: c'etait
+ * la majorite de l'etat stocke.
+ *
+ * Deux consequences, opposees et toutes deux mauvaises:
+ *   - maintenant: un appelant qui lit `movesValue` sans croiser `verdict` lit « aucune surface » sur une
+ *     surface qu'on n'a jamais ouverte;
+ *   - plus tard: au premier passage REUSSI, `gainedValue` vaut TOUT, et on annonce « X added a payment
+ *     surface » — faux, il ne l'a pas ajoutee, on ne la voyait pas. Une panne de lecture fabrique une
+ *     alerte de securite une semaine apres.
+ *
+ * `null` = PAS LU. `[]` = lu, et il n'y a rien. */
 function fingerprint(r) {
   const s = r.surface;
   return {
@@ -66,12 +85,101 @@ function fingerprint(r) {
     tools: s ? s.toolCount : null,
     names: s ? [...s.readOnly, ...s.movesValue.map((x) => x.name), ...s.namedButNoSurface.map((x) => x.name),
       ...s.wantsSecret.map((x) => x.name)].sort().join(',') : null,
-    movesValue: s ? s.movesValue.map((x) => x.name).sort() : [],
-    wantsSecret: s ? s.wantsSecret.map((x) => x.name).sort() : [],
+    movesValue: s ? s.movesValue.map((x) => x.name).sort() : null,
+    wantsSecret: s ? s.wantsSecret.map((x) => x.name).sort() : null,
   };
 }
 
-(async () => {
+/** Une surface est LUE quand on en a rapporte une liste — un tableau vide en est une, `null` non. */
+const lue = (v) => Array.isArray(v);
+
+/**
+ * judgeChange — ce qu'il faut dire d'UN agent, entre l'observation precedente et celle-ci. Extrait pur
+ * pour qu'un test puisse l'atteindre: tant que la logique vivait dans l'IIFE, aucun lecteur ne pouvait
+ * l'appeler, et c'est ce qui a laisse vivre le defaut ci-dessus. Rend { alerts, quiet }.
+ */
+function judgeChange(prev, now, e) {
+  const alerts = [], quiet = [];
+  const ou = '  ' + e.url;
+
+  if (!lue(now.wantsSecret) || !lue(now.movesValue)) {
+    /* Rien a comparer, et surtout rien a absoudre. On le dit au lieu de classer l'agent « rien a
+     * signaler » — un silence issu d'une porte fermee n'est pas un silence rassurant. */
+    quiet.push(e.name + ': surface NOT read (' + now.verdict + ') — this is not a clean read, nothing about '
+      + 'its payment surface is known this run.' + ou);
+    return { alerts, quiet };
+  }
+
+  if (!prev) {
+    if (now.wantsSecret.length) alerts.push('🚨 NEW to the registry and it asks for key material: ' + e.name + ' — ' + now.wantsSecret.join(', ') + ou);
+    else if (now.movesValue.length) alerts.push('⚠️  new: ' + e.name + ' exposes a payment surface (' + now.movesValue.join(', ') + ')' + ou);
+    else quiet.push('first look: ' + e.name + ' [' + now.verdict + (now.tools != null ? ', ' + now.tools + ' tools' : '') + ']');
+    return { alerts, quiet };
+  }
+
+  /* Un « il l'a AJOUTE » exige d'avoir vu l'avant. Si la lecture precedente avait echoue, ce passage-ci
+   * est la PREMIERE lecture reelle, pas un changement — l'annoncer comme un ajout serait une accusation
+   * fabriquee par notre propre panne. */
+  if (!lue(prev.wantsSecret) || !lue(prev.movesValue)) {
+    if (now.wantsSecret.length) alerts.push('🚨 ' + e.name + ' asks for key material (' + now.wantsSecret.join(', ')
+      + ') — FIRST readable look, the previous run could not open its surface, so this is a state, not a change.' + ou);
+    else if (now.movesValue.length) quiet.push(e.name + ' exposes a payment surface (' + now.movesValue.join(', ')
+      + ') — first readable look after an unread run; state, not a change.' + ou);
+    else quiet.push(e.name + ': surface readable again [' + now.verdict + '], nothing dangerous on it.' + ou);
+    return { alerts, quiet };
+  }
+
+  if (now.wantsSecret.length && !prev.wantsSecret.length)
+    alerts.push('🚨 ' + e.name + ' NOW ASKS FOR KEY MATERIAL (' + now.wantsSecret.join(', ') + ') — it did not before.' + ou);
+  const gainedValue = now.movesValue.filter((n) => !prev.movesValue.includes(n));
+  if (gainedValue.length) alerts.push('⚠️  ' + e.name + ' added a payment surface: ' + gainedValue.join(', ') + ou);
+  if (prev.verdict === 'answers' && now.verdict === 'unreachable')
+    alerts.push('🕳️ ' + e.name + ' answered before and is dark now.' + ou);
+  if (now.names && prev.names && now.names !== prev.names && !gainedValue.length && !now.wantsSecret.length)
+    quiet.push(e.name + ' changed its tool set (' + prev.tools + ' → ' + now.tools + ') with nothing dangerous added');
+  return { alerts, quiet };
+}
+
+/**
+ * summarise — la ligne de titre, extraite pour qu'un test puisse l'epingler.
+ *
+ * ⚠️ DEUX DEFAUTS TROUVES EN LANCANT LE SCRIPT POUR DE VRAI, qu'aucun test unitaire ne pouvait voir.
+ * Sortie observee le 2026-07-28 sur deux agents dont la surface etait inauditable:
+ *
+ *   ✓ agent-watch: nothing dangerous appeared in 2 agents this run.
+ *     coverage: 79 of 39 registered endpoints
+ *
+ *   1. `blind` ne comptait que les INJOIGNABLES. Un agent qui repond mais dont on n'ouvre pas la
+ *      surface etait compte comme « verifie », donc la clause « so silence is partial » ne se
+ *      declenchait pas: le titre affirmait un balayage propre de 2 agents dont on n'avait ouvert
+ *      AUCUN. Le meme fail-open que dans `fingerprint`, un etage plus haut.
+ *   2. « 79 of 39 » — un ratio dont les deux cotes viennent de populations differentes: `known` est
+ *      l'etat accumule sur tous les passages, `all.length` ce que le registre a rendu CE run. Avec la
+ *      pagination par defaut le rapport a l'air plausible, ce qui est exactement pourquoi il a survecu.
+ */
+function summarise({ alerts, checked, blind, unread, known, registryThisRun, offset }) {
+  const ouverts = checked - blind - unread;
+  const partiel = [];
+  if (blind) partiel.push(blind + ' unreachable');
+  if (unread) partiel.push(unread + ' answered but their surface could not be opened');
+  const reserve = partiel.length ? ' — ' + partiel.join(', ') + ', so this silence is PARTIAL' : '';
+  return [
+    alerts
+      ? '🚨 agent-watch: ' + alerts + ' change(s) worth knowing across ' + checked + ' agents checked this run.'
+      : '✓ agent-watch: nothing dangerous appeared on the ' + ouverts + ' surface(s) actually opened, of '
+        + checked + ' agents visited' + reserve + '.',
+    '  coverage: ' + known + ' endpoint(s) seen at least once across all runs; the registry returned '
+      + registryThisRun + ' this run; next run resumes at #' + offset,
+  ];
+}
+
+/* Exporte AVANT l'IIFE, et l'IIFE ne tourne plus qu'en execution directe. Sans ce garde, requerir ce
+ * fichier depuis un test lancerait un balayage reseau du registre — c'est pour ca qu'il n'exportait
+ * rien, et donc que sa logique de jugement n'avait aucun lecteur. Le meme oubli est deja documente en
+ * tete de scripts/biii-known-bad-ingest.js. */
+module.exports = { fingerprint, judgeChange, summarise };
+
+if (require.main === module) (async () => {
   const state = readState();
   const all = await listEndpoints();
   if (!all.length) { console.log('⚠️ agent-watch: the registry did not answer — nothing was checked, which is not the same as nothing changed.'); return; }
@@ -83,6 +191,7 @@ function fingerprint(r) {
 
   const alerts = [], quiet = [];
   let blind = 0;
+  let unread = 0;                 // a repondu, mais sa surface n a pas pu etre ouverte
 
   for (const e of slice) {
     let r;
@@ -91,25 +200,10 @@ function fingerprint(r) {
     if (!r) { blind++; continue; }
 
     const now = fingerprint(r);
-    const prev = state.servers[e.url];
-
-    if (!prev) {
-      // New to us. Only worth a line if it carries something a caller should know before connecting.
-      if (now.wantsSecret.length) alerts.push('🚨 NEW to the registry and it asks for key material: ' + e.name + ' — ' + now.wantsSecret.join(', ') + '  ' + e.url);
-      else if (now.movesValue.length) alerts.push('⚠️  new: ' + e.name + ' exposes a payment surface (' + now.movesValue.join(', ') + ')  ' + e.url);
-      else quiet.push('first look: ' + e.name + ' [' + now.verdict + (now.tools != null ? ', ' + now.tools + ' tools' : '') + ']');
-    } else {
-      // The whole point: a change, not a state.
-      if (now.wantsSecret.length && !prev.wantsSecret.length)
-        alerts.push('🚨 ' + e.name + ' NOW ASKS FOR KEY MATERIAL (' + now.wantsSecret.join(', ') + ') — it did not before.  ' + e.url);
-      const gainedValue = now.movesValue.filter((n) => !(prev.movesValue || []).includes(n));
-      if (gainedValue.length)
-        alerts.push('⚠️  ' + e.name + ' added a payment surface: ' + gainedValue.join(', ') + '  ' + e.url);
-      if (prev.verdict === 'answers' && now.verdict === 'unreachable')
-        alerts.push('🕳️ ' + e.name + ' answered before and is dark now.  ' + e.url);
-      if (now.names && prev.names && now.names !== prev.names && !gainedValue.length && !now.wantsSecret.length)
-        quiet.push(e.name + ' changed its tool set (' + (prev.tools || 0) + ' → ' + (now.tools || 0) + ') with nothing dangerous added');
-    }
+    if (!Array.isArray(now.movesValue)) unread++;
+    const jugement = judgeChange(state.servers[e.url], now, e);
+    alerts.push(...jugement.alerts);
+    quiet.push(...jugement.quiet);
     state.servers[e.url] = { ...now, name: e.name, lastSeen: new Date().toISOString() };
   }
 
@@ -117,11 +211,8 @@ function fingerprint(r) {
   fs.mkdirSync(path.dirname(STATE), { recursive: true });
   fs.writeFileSync(STATE, JSON.stringify(state, null, 2) + '\n');
 
-  const known = Object.keys(state.servers).length;
-  console.log(alerts.length
-    ? '🚨 agent-watch: ' + alerts.length + ' change(s) worth knowing across ' + slice.length + ' agents checked this run.'
-    : '✓ agent-watch: nothing dangerous appeared in ' + slice.length + ' agents this run' + (blind ? ' (' + blind + ' could not be reached, so silence is partial)' : '') + '.');
+  for (const l of summarise({ alerts: alerts.length, checked: slice.length, blind, unread,
+    known: Object.keys(state.servers).length, registryThisRun: all.length, offset: state.offset })) console.log(l);
   for (const a of alerts) console.log('  ' + a);
-  console.log('  coverage: ' + known + ' of ' + all.length + ' registered endpoints seen at least once; next run resumes at #' + state.offset);
   for (const q of quiet.slice(0, 6)) console.log('  · ' + q);
 })();
