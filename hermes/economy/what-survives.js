@@ -74,7 +74,19 @@ function compare(label, fn, fmt = (v) => String(v)) {
     + (omis[0] + omis[1] ? '   (non mesurés — R:' + omis[0] + ' A:' + omis[1] + ', hors dénominateur)' : ''));
 }
 
-console.log('== what separates the ' + alive.length + ' survivors from the ' + dead.length + ' that died ==\n');
+/* ⚠️ TOUT CHIFFRE D'ICI PORTE DESORMAIS SON INSTANT. Le 2026-07-28, une comparaison avant/apres a ete
+ * faite en deux executions successives de ce script — et `tokens.json` est ecrit par le radar PENDANT
+ * qu'on travaille: 570 lignes a 14h25, 579 a 14h28. Les deux moities du delta publie n'avaient donc
+ * jamais coexiste. La signature de cette panne est « deux mesures identiques qui divergent », et elle se
+ * diagnostique par les mtimes, pas par le code — mais on ne pense a regarder le mtime que si on l'a sous
+ * les yeux. C'est pour ca qu'il s'imprime, meme quand personne ne le demande.
+ *
+ * Un delta entre DEUX versions de code se mesure sur UN instantane lu une seule fois, jamais en relancant
+ * le script entre les deux. */
+const instantane = require('node:fs').statSync(path.join(__dirname, '..', '..', 'data', 'token-radar', 'tokens.json'));
+console.log('== what separates the ' + alive.length + ' survivors from the ' + dead.length + ' that died ==');
+console.log('   instantané ' + instantane.mtime.toISOString() + ' — ' + all.length + ' lignes. Le radar écrit');
+console.log('   dans ce fichier en continu: un chiffre d\'ici n\'est comparable qu\'à un autre du MÊME instant.\n');
 console.log('  ' + 'feature'.padEnd(34) + '     RUGGED' + '      ALIVE');
 console.log('  ' + '-'.repeat(58));
 

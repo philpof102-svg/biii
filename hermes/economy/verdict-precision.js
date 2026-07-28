@@ -22,12 +22,24 @@ const settled = all.filter((t) => t.outcome === 'rugged' || t.outcome === 'live'
 const base = settled.length ? settled.filter((t) => t.outcome === 'rugged').length / settled.length : 0;
 const pc = (x) => Math.round(x * 100) + '%';
 
-console.log('== per-verdict precision, ' + settled.length + ' tokens with a settled outcome ==\n');
+/* L'instant d'ou sortent ces chiffres, imprime meme quand personne ne le demande: `tokens.json` est
+ * ecrit par le radar en continu (570 lignes a 14h25 le 2026-07-28, 579 a 14h28). Une precision d'ici
+ * n'est comparable qu'a une autre du MEME instantane — et on ne pense a verifier le mtime que si on
+ * l'a sous les yeux. */
+const instantane = require('node:fs').statSync(path.join(__dirname, '..', '..', 'data', 'token-radar', 'tokens.json'));
+console.log('== per-verdict precision, ' + settled.length + ' tokens with a settled outcome ==');
+console.log('   instantané ' + instantane.mtime.toISOString() + ' — comparable seulement à un chiffre du même instant\n');
 console.log('  base rate: ' + pc(base) + ' of all tracked tokens rugged\n');
 console.log('  verdict      rugs/total     rate    lift     read');
 console.log('  ' + '-'.repeat(62));
 
-for (const v of ['rug_ready', 'high_risk', 'caution', 'unknown', 'clean']) {
+/* La liste est EN DUR, et le taux de base compte tout le monde: un verdict qui n'y figure pas disparait
+ * du tableau pendant qu'il pese sur la reference a laquelle le tableau se compare. Mesure du 2026-07-28:
+ * 0 invisible sur 579 — le defaut est LATENT, pas actif, et il le restera tant que personne n'ajoutera
+ * une valeur de verdict. C'est exactement le moment ou un garde coute deux lignes. */
+const VERDICTS = ['rug_ready', 'high_risk', 'caution', 'unknown', 'clean'];
+const invisibles = settled.filter((t) => !VERDICTS.includes(t.firstVerdict));
+for (const v of VERDICTS) {
   const g = settled.filter((t) => t.firstVerdict === v);
   if (!g.length) continue;
   const r = g.filter((t) => t.outcome === 'rugged').length;
@@ -41,6 +53,13 @@ for (const v of ['rug_ready', 'high_risk', 'caution', 'unknown', 'clean']) {
   const small = g.length < 10 ? '  (N too small to trust)' : '';
   console.log('  ' + v.padEnd(12) + (r + '/' + g.length).padEnd(14) + pc(p).padEnd(8) +
     ((lift > 0 ? '+' : '') + lift + 'pt').padEnd(9) + (good ? 'as intended' : 'NOT better than guessing') + small);
+}
+
+if (invisibles.length) {
+  const vus = [...new Set(invisibles.map((t) => String(t.firstVerdict)))].join(', ');
+  console.log('\n  ⚠️ ' + invisibles.length + ' token(s) ABSENTS du tableau ci-dessus (verdicts inconnus: ' + vus + ').');
+  console.log('     Ils comptent dans le taux de base mais n\'ont aucune ligne: le tableau ne se somme plus.');
+  console.log('     Ajoutez la valeur à VERDICTS, ou le lift se lit contre une référence qu\'il ne couvre pas.');
 }
 
 console.log('\n== what this says today ==');
