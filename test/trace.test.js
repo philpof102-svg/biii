@@ -225,6 +225,71 @@ const { whatMoved } = require('../lib/trace.js');
     assert.match(absente.reason, /not found/);
   });
 
+  /* ── readBridgeExit : calldata NON DECODE ≠ pont sans destination ─────────────────────────────────
+   * `(tx.decoded_input && ….parameters) || []` faisait des deux cas le meme tableau vide, et la sortie
+   * portait `ok:true, destinationChains: []` — « ce pont ne dit pas ou sont partis les fonds » au lieu de
+   * « l'explorateur n'a pas decode le calldata ». Ca arrive des que le contrat n'est pas verifie.
+   * Aucun repli sur un champ brut: `raw_input` n'apparait nulle part dans le depot, donc coder dessus
+   * serait coder contre un souvenir — c'est ce qui fabrique une fausse piste. */
+  const { readBridgeExit, followTron } = require('../lib/trace.js');
+  const TXB = '0x' + 'cd'.repeat(32);
+  const decode = await readBridgeExit('base', TXB, async () => ({ hash: TXB, decoded_input: { parameters: [] } }));
+  const brut = await readBridgeExit('base', TXB, async () => ({ hash: TXB }));
+
+  t('un calldata non decode ne se lit pas comme un pont sans destination', () => {
+    assert.strictEqual(decode.calldataDecoded, true);
+    assert.strictEqual(brut.calldataDecoded, false);
+    /* Les deux ont zero chaine — c'est bien pour ca qu'il faut un AUTRE champ pour les distinguer. */
+    assert.strictEqual(decode.destinationChains.length, 0);
+    assert.strictEqual(brut.destinationChains.length, 0);
+    assert.notStrictEqual(decode.note, brut.note);
+    assert.match(brut.note, /NOTHING WAS EXAMINED/);
+  });
+
+  /* ── followTron : LE FAUX TERMINUS ────────────────────────────────────────────────────────────────
+   * `(txs && txs.data) || []` faisait d'une lecture RATEE une liste vide: aucune sortie, donc
+   * `current = null`, donc la boucle s'arretait — et l'adresse etait rapportee comme TERMINUS. Dans une
+   * trace de vol le terminus EST la conclusion. Un hoquet reseau fabriquait un faux point d'arrivee. */
+  const COMPTE = { data: [{ balance: 5000000, create_time: 1700000000000 }] };
+  const ADR = 'T' + 'A'.repeat(33);
+  const suivre = (implTx, implCompte) => followTron(ADR, { maxHops: 3,
+    lireJson: async (u) => (u.includes('/transactions') ? implTx : (implCompte === undefined ? COMPTE : implCompte)) });
+
+  const coupe = await suivre(null);
+  const finReelle = await suivre({ data: [] });
+  const compteMuet = await followTron(ADR, { maxHops: 1,
+    lireJson: async (u) => (u.includes('/transactions') ? { data: [] } : null) });
+
+  t('une lecture ratee ne fabrique PAS un terminus', () => {
+    assert.strictEqual(coupe.stoppedBecause, 'unread');
+    assert.strictEqual(coupe.complete, false);
+    assert.strictEqual(coupe.hops[0].transactionsRead, false);
+    assert.match(coupe.stopNote, /NOT\s+a destination/);
+  });
+
+  t('une vraie fin de piste reste une vraie fin de piste', () => {
+    /* Les DEUX bornes: si le durcissement rendait tout « non lu », il n'informerait plus. */
+    assert.strictEqual(finReelle.stoppedBecause, 'no_outbound');
+    assert.strictEqual(finReelle.complete, true);
+    assert.strictEqual(finReelle.hops[0].transactionsRead, true);
+    assert.notStrictEqual(coupe.stoppedBecause, finReelle.stoppedBecause);
+  });
+
+  /* ⚠️ Ce cas a d'abord ete ecrit en RENDANT une promesse au harnais `t`, qui est SYNCHRONE et l'ignore:
+   * les assertions du `.then()` n'auraient jamais ete verifiees et le cas serait passe au vert quoi qu'il
+   * arrive. Le bug exact que ce depot traque, ecrit ici par moi. On calcule AVANT, on assertit apres. */
+  const compteVide = await followTron(ADR, { maxHops: 1, lireJson: async (u) => (u.includes('/transactions')
+    ? { data: [] } : { data: [{ balance: 0, create_time: 1700000000000 }] }) });
+
+  t('un compte non lu rend un solde null, pas zero', () => {
+    assert.strictEqual(compteMuet.hops[0].balanceTrx, null);
+    assert.strictEqual(compteMuet.hops[0].accountRead, false);
+    /* Un compte VRAIMENT vide doit rester distinguable d'un compte non lu: 0 et null, pas le meme mot. */
+    assert.strictEqual(compteVide.hops[0].balanceTrx, 0);
+    assert.strictEqual(compteVide.hops[0].accountRead, true);
+    assert.notStrictEqual(compteMuet.hops[0].balanceTrx, compteVide.hops[0].balanceTrx);
+  });
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })().catch((e) => {
