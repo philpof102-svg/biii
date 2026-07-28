@@ -29,6 +29,53 @@ const get = (url) => new Promise((resolve) => {
   }).on('error', () => resolve(null));
 });
 
+/**
+ * distribution — les lignes du recensement. Extrait pur, parce que ce script n'exportait rien et que le
+ * chiffre qu'il produit est destine a etre PUBLIE: un artefact public sans lecteur est un artefact qu'on
+ * croit sur parole.
+ *
+ * ⚠️ `if (v)` SUPPRIMAIT LES CATEGORIES A ZERO. Sur un recensement, « refuse: 0/79 » EST une mesure —
+ * elle dit qu'on a regarde et qu'on n'en a pas trouve. La faire disparaitre rend le zero indiscernable
+ * d'un controle qui n'a pas tourne, c'est-a-dire exactement ce que ce depot passe la journee a separer.
+ * Toutes les cases sont donc imprimees, y compris vides.
+ */
+function distribution(tally, total, totalTools) {
+  const lignes = [];
+  for (const [k, v] of Object.entries(tally)) {
+    lignes.push('  ' + k.padEnd(14) + v + '/' + total + (v === 0 ? '   (mesuré, aucun)' : ''));
+  }
+  if (tally.surveyFailed) {
+    lignes.push('  ⚠️ surveyFailed compte NOS échecs (DNS, débit, socket), pas leurs endpoints — ces '
+      + tally.surveyFailed + ' ne disent rien sur les services concernés.');
+  }
+  lignes.push('  tools seen in total: ' + totalTools);
+  return lignes;
+}
+
+/**
+ * classerReponse — dans quelle case tombe UNE reponse de `vetAgent`. Extrait pur pour la meme raison que
+ * `distribution`: la ligne vivait dans la boucle reseau, donc aucun test ne pouvait l'atteindre — et la
+ * mutation « notre panne comptee comme la leur » revenait MUETTE, c'est-a-dire que le correctif le plus
+ * important du fichier n'avait pas de lecteur.
+ *
+ * `null` = notre appel a jete (DNS, debit, socket). Ce n'est PAS `unreachable`, qui est un verdict SUR
+ * leur service.
+ */
+function classerReponse(r) {
+  if (!r) return { cle: 'surveyFailed', noToolList: false, tools: 0 };
+  const s = r.surface;
+  return {
+    cle: r.verdict,
+    // Un endpoint garde n'a pas de surface PARCE QU'il nous a refuses — c'est deja son verdict, et le
+    // compter deux fois gonflait ce chiffre.
+    noToolList: r.verdict === 'answers' && !s,
+    tools: s ? (s.toolCount || 0) : 0,
+  };
+}
+
+module.exports = { distribution, classerReponse };
+if (require.main !== module) return;
+
 (async () => {
   const reg = await get('https://registry.modelcontextprotocol.io/v0/servers?limit=100');
   const entries0 = ((reg && reg.servers) || [])
@@ -50,22 +97,28 @@ const get = (url) => new Promise((resolve) => {
   console.log('   (deduplicated by URL — the registry lists every published version separately)');
   console.log('   introspection only: initialize + tools/list, no tool is ever called\n');
 
-  const tally = { unreachable: 0, unauditable: 0, answers: 0, high_risk: 0, refuse: 0, noToolList: 0 };
+  /* `surveyFailed` est DISTINCT d'`unreachable`: le premier est notre instrument, le second leur service.
+   * Les confondre publie notre panne sous le nom de quelqu'un d'autre. */
+  const tally = { unreachable: 0, unauditable: 0, answers: 0, high_risk: 0, refuse: 0, noToolList: 0,
+    surveyFailed: 0 };
   const notable = [];
   let totalTools = 0;
 
   for (const e of entries) {
     let r;
+    /* ⚠️ NOTRE PANNE DEVENAIT UN FAIT PUBLIE SUR UN TIERS.
+     * Un `vetAgent` qui JETTE de notre cote (DNS, limite de debit, socket) atterrissait dans
+     * `unreachable` — le seau qui veut dire « leur endpoint ne repond pas ». Or tout le propos de ce
+     * recensement est de qualifier LEUR auditabilite: publier notre echec sous leur nom est la meme
+     * faute que toutes les accusations corrigees aujourd'hui, sur un chiffre destine a sortir. */
     try { r = await vetAgent({ url: e.url }); } catch { r = null; }
     await new Promise((s) => setTimeout(s, PACE_MS));
-    if (!r) { tally.unreachable++; continue; }
-
-    tally[r.verdict] = (tally[r.verdict] || 0) + 1;
+    const cl = classerReponse(r);
+    tally[cl.cle] = (tally[cl.cle] || 0) + 1;
+    if (cl.noToolList) tally.noToolList++;
+    totalTools += cl.tools;
+    if (!r) continue;
     const s = r.surface;
-    // Only count a missing tool list where one was actually expected. A gated endpoint has no surface
-    // BECAUSE it refused us, which is already its own verdict — counting it twice inflated this to 15.
-    if (r.verdict === 'answers' && !s) tally.noToolList++;
-    if (s) totalTools += s.toolCount || 0;
 
     const flag = (s && s.wantsSecret.length) ? 'ASKS FOR KEY MATERIAL: ' + s.wantsSecret.map((x) => x.name).join(', ')
       : (s && s.movesValue.length) ? 'payment surface: ' + s.movesValue.map((x) => x.name + ' (' + x.field + ')').join(', ')
@@ -78,8 +131,7 @@ const get = (url) => new Promise((resolve) => {
   }
 
   console.log('\n== distribution ==');
-  for (const [k, v] of Object.entries(tally)) if (v) console.log('  ' + k.padEnd(14) + v + '/' + entries.length);
-  console.log('  tools seen in total: ' + totalTools);
+  for (const l of distribution(tally, entries.length, totalTools)) console.log(l);
 
   if (notable.length) {
     console.log('\n== what a caller should know before connecting ==');
