@@ -53,24 +53,45 @@ const get = (url) => new Promise((resolve) => {
 const readState = () => { try { return JSON.parse(fs.readFileSync(STATE, 'utf8')); } catch { return { servers: {}, offset: 0 }; } };
 
 /** Every distinct HTTP endpoint the registry knows about, deduplicated (it lists each published version). */
-async function listEndpoints() {
+/* ⚠️ UNE PAGE NON LUE DEVENAIT UNE PAGE VIDE, ET METTAIT FIN A LA PAGINATION. `((j && j.servers) || [])`
+ * absorbait l'echec; puis `cursor` se calculait sur le meme `j` nul, donc valait `null`, donc `break`.
+ * Un hoquet reseau sur la page 2 rendait la page 1 COMME SI C'ETAIT TOUT le registre — et l'appelant
+ * recevait un tableau sans aucun moyen de savoir qu'il etait tronque.
+ *
+ * Ce que ca coute: cette liste est le DENOMINATEUR du recensement d'auditabilite (« 62 % des endpoints
+ * publics ne sont pas auditables avant connexion »). Un denominateur silencieusement tronque donne un
+ * pourcentage qui a l'air d'un resultat. Meme chose pour le plafond `PAGES`: s'arreter parce qu'on a
+ * atteint la limite et s'arreter parce que la liste est finie sont deux faits differents.
+ *
+ * Le retour DIT desormais ce qu'il a lu. Et `get` est injectable: sans joint, cette fonction etait
+ * intestable par construction, ce qui explique qu'aucun test ne l'ait jamais nommee. */
+async function listEndpoints({ get: fetchImpl = get } = {}) {
   const seen = new Map();
-  let cursor = null;
+  let cursor = null, pagesRead = 0, pagesFailed = 0, hitPageCap = false;
   for (let p = 0; p < PAGES; p++) {
     const url = 'https://registry.modelcontextprotocol.io/v0/servers?limit=100' +
       (cursor ? '&cursor=' + encodeURIComponent(cursor) : '');
-    const j = await get(url);
-    for (const e of ((j && j.servers) || [])) {
+    const j = await fetchImpl(url);
+    // Une page qui n'a pas repondu, ou dont la forme n'est pas celle attendue, n'est pas une page vide.
+    if (!j || !Array.isArray(j.servers)) { pagesFailed++; break; }
+    pagesRead++;
+    for (const e of j.servers) {
       const s = e && e.server;
       if (!s) continue;
       const remote = (s.remotes || []).find((r) => /http/i.test(r.type || '') && /^https:\/\//.test(r.url || ''));
       if (remote && !seen.has(remote.url)) seen.set(remote.url, { name: s.name, url: remote.url });
     }
-    cursor = j && j.metadata && (j.metadata.nextCursor || j.metadata.next_cursor);
-    if (!cursor) break;
+    cursor = j.metadata && (j.metadata.nextCursor || j.metadata.next_cursor);
+    if (!cursor) break;                       // vraie fin de liste
+    if (p === PAGES - 1) { hitPageCap = true; break; }   // on s'arrete par PLAFOND, ce qui n'est pas la fin
     await new Promise((r) => setTimeout(r, 300));
   }
-  return [...seen.values()];
+  const endpoints = [...seen.values()];
+  return { endpoints, pagesRead, pagesFailed, hitPageCap,
+    complete: pagesFailed === 0 && !hitPageCap,
+    note: pagesFailed ? 'a registry page did not answer, so this list is a FLOOR — endpoints beyond it were never seen'
+      : hitPageCap ? 'stopped at the ' + PAGES + '-page cap while the registry still had more, so this list is a FLOOR'
+        : null };
 }
 
 /** A stable description of what a server can do, so a change in it is detectable without storing everything. */
@@ -192,12 +213,17 @@ function summarise({ alerts, checked, blind, unread, known, registryThisRun, off
  * fichier depuis un test lancerait un balayage reseau du registre — c'est pour ca qu'il n'exportait
  * rien, et donc que sa logique de jugement n'avait aucun lecteur. Le meme oubli est deja documente en
  * tete de scripts/biii-known-bad-ingest.js. */
-module.exports = { fingerprint, judgeChange, summarise };
+module.exports = { fingerprint, judgeChange, summarise, listEndpoints };
 
 if (require.main === module) (async () => {
   const state = readState();
-  const all = await listEndpoints();
-  if (!all.length) { console.log('⚠️ agent-watch: the registry did not answer — nothing was checked, which is not the same as nothing changed.'); return; }
+  const listing = await listEndpoints();
+  const all = listing.endpoints;
+  /* Trois issues, pas deux. « Le registre n'a pas repondu » et « le registre a repondu, il est vide »
+   * meritent des phrases differentes — et une liste TRONQUEE doit se dire avant qu'on en tire un taux. */
+  if (!listing.pagesRead) { console.log('⚠️ agent-watch: the registry did not answer at all — nothing was checked, which is not the same as nothing changed.'); return; }
+  if (!all.length) { console.log('⚠️ agent-watch: the registry answered but listed no HTTP endpoint. That is a reading, not a failure — and not a reason to conclude anything about the agents.'); return; }
+  if (!listing.complete) console.log('⚠️ agent-watch: ' + listing.note + ' (' + listing.pagesRead + ' page(s) read, ' + all.length + ' endpoint(s) — a FLOOR, not a census).');
 
   // Rotate: take a slice starting where the last run stopped, wrapping around.
   const start = (state.offset || 0) % all.length;

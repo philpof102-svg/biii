@@ -137,5 +137,81 @@ t('★ la couverture ne compare plus deux populations différentes', () => {
   assert.match(l, /registry returned 39 this run/);
 });
 
-console.log('\n' + pass + ' passed, ' + fail + ' failed');
-process.exit(fail ? 1 : 0);
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * listEndpoints — le DENOMINATEUR du recensement, et il pouvait se tronquer en silence.
+ *
+ * ⚠️ `((j && j.servers) || [])` absorbait l'echec d'une page; `cursor` se calculait ensuite sur le meme
+ * `j` nul, valait donc `null`, et la boucle s'ARRETAIT. Un hoquet reseau sur la page 2 rendait la page 1
+ * comme si c'etait tout le registre, sans que l'appelant puisse le savoir. Or c'est cette liste qui sert
+ * de denominateur au recensement d'auditabilite : un denominateur tronque en silence donne un
+ * pourcentage qui a l'air d'un resultat.
+ *
+ * ⚠️ HARNAIS: le `t()` de ce fichier est SYNCHRONE (`try { fn() }`). Un corps `async` y passerait
+ * TOUJOURS, sans rien verifier — le piege deja paye une fois dans ce depot. Les cas asynchrones vivent
+ * donc dans ce bloc dedie, qui attend vraiment, compte lui-meme, et decide seul du code de sortie.
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+const { listEndpoints } = require('../hermes/economy/agent-watch');
+
+const page = (n, cursor) => ({
+  servers: Array.from({ length: n }, (_, i) => ({
+    server: { name: 'srv-' + cursor + '-' + i, remotes: [{ type: 'http', url: 'https://x' + cursor + '-' + i + '.test/mcp' }] },
+  })),
+  metadata: cursor ? { nextCursor: cursor } : {},
+});
+
+(async () => {
+  const ta = async (n, fn) => {
+    try { await fn(); pass++; console.log('  ✓ ' + n); }
+    catch (e) { fail++; console.log('  ✗ ' + n + '\n      ' + (e && e.message)); }
+  };
+  console.log('\nlistEndpoints — une page non lue n est pas une page vide:');
+
+  await ta('★ BORNE: deux pages lues rendent TOUS les endpoints, et se declarent completes', async () => {
+    let appel = 0;
+    const r = await listEndpoints({ get: async () => (++appel === 1 ? page(2, 'c1') : page(2, null)) });
+    assert.equal(r.endpoints.length, 4, 'les deux pages doivent etre agregees');
+    assert.equal(r.pagesRead, 2);
+    assert.equal(r.complete, true, 'aucune page ratee, aucun plafond atteint');
+    assert.equal(r.note, null);
+  });
+
+  await ta('★ une page qui ne repond pas NE se lit pas comme la fin de la liste', async () => {
+    let appel = 0;
+    const r = await listEndpoints({ get: async () => (++appel === 1 ? page(2, 'c1') : null) });
+    assert.equal(r.endpoints.length, 2, 'la page 1 reste acquise');
+    assert.equal(r.pagesFailed, 1, 'et l echec est COMPTE');
+    assert.equal(r.complete, false, 'la liste ne peut pas se dire complete');
+    assert.match(r.note, /FLOOR/, 'elle doit se declarer plancher, pas total');
+  });
+
+  await ta('★ une page a la FORME inattendue compte aussi comme non lue', async () => {
+    const r = await listEndpoints({ get: async () => ({ servers: 'pas un tableau' }) });
+    assert.equal(r.pagesFailed, 1);
+    assert.equal(r.complete, false);
+  });
+
+  await ta('★ s arreter au PLAFOND de pages se dit, au lieu de passer pour une fin de liste', async () => {
+    const r = await listEndpoints({ get: async () => page(1, 'encore') });  // un curseur a chaque page
+    assert.equal(r.hitPageCap, true, 'le registre avait encore des pages');
+    assert.equal(r.complete, false);
+    assert.match(r.note, /cap/);
+  });
+
+  await ta('BORNE: un registre REELLEMENT vide est une reponse, pas un echec', async () => {
+    const r = await listEndpoints({ get: async () => ({ servers: [], metadata: {} }) });
+    assert.equal(r.endpoints.length, 0);
+    assert.equal(r.pagesRead, 1, 'la page a bien ete lue');
+    assert.equal(r.pagesFailed, 0);
+    assert.equal(r.complete, true, 'lu et vide: c est complet');
+  });
+
+  await ta('BORNE: les doublons d URL sont fusionnes entre pages', async () => {
+    let appel = 0;
+    const meme = { servers: [{ server: { name: 'a', remotes: [{ type: 'http', url: 'https://meme.test/mcp' }] } }], metadata: { nextCursor: 'c' } };
+    const r = await listEndpoints({ get: async () => (++appel === 1 ? meme : { ...meme, metadata: {} }) });
+    assert.equal(r.endpoints.length, 1, 'la meme URL vue deux fois reste un endpoint');
+  });
+
+  console.log('\n' + pass + ' passed, ' + fail + ' failed');
+  process.exit(fail ? 1 : 0);
+})();
