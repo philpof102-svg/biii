@@ -35,6 +35,42 @@ console.log('\nsilence that is NOT a blackout, and would be a false alarm:');
 t('a merely late run is not a gap — the schedule is hourly', () => {
   assert.equal(detectGap(T0 - 1.4 * H, T0), null);
 });
+/* ⚠️ CE BLOC COUVRE LA DIRECTION INVERSE DE LA THESE DE CE FICHIER. L'en-tete dit qu'un trou NON ECRIT se
+ * lit comme un marche calme — vrai, et couvert. Mais un trou ECRIT QUI N'A JAMAIS EU LIEU coute la meme
+ * chose dans l'autre sens, et ce fichier le dit lui-meme: « a false gap teaches the reader to discount the
+ * real ones ». `newestObservation` en fabriquait un.
+ *
+ * `Date.parse(0)` NE VAUT PAS 0 — il vaut l'an 2000, parce que `Date.parse` coerce en CHAINE et que "0"
+ * parse comme une annee. Le repli `|| 0` ne se declenchait donc jamais (il marche pour "garbage", qui
+ * donne NaN — d'ou l'illusion). Mesure du 2026-07-29: une base dont aucune ligne ne porte d'horodatage
+ * rendait 1999-12-31, soit un trou de 232 957 h ecrit dans blackouts.json, commite toutes les heures. */
+console.log('\nun trou INVENTE coute autant qu un trou manque:');
+t('★ des lignes sans AUCUN horodatage ne fabriquent pas une observation de l an 2000', () => {
+  const n = newestObservation({ a: { outcome: 'live' }, b: { outcome: 'live' } });
+  assert.equal(n, 0, 'aucune observation lisible doit valoir 0, pas Date.parse(0)');
+  assert.equal(detectGap(n, T0), null, 'et donc aucun trou de 26 ans');
+});
+t('★ un horodatage NUMERIQUE n atteint pas Date.parse (c est la coercition qui piegeait)', () => {
+  assert.equal(newestObservation({ a: { lastSeen: 0 } }), 0);
+  assert.equal(newestObservation({ a: { firstSeen: 20260729 } }), 0);
+});
+t('★ BORNE: une ligne sans horodatage n efface pas une vraie observation a cote', () => {
+  const n = newestObservation({ vide: { outcome: 'live' }, vraie: { lastSeen: iso(T0 - 3 * H) } });
+  assert.equal(n, T0 - 3 * H, 'la vraie observation doit gagner le max');
+  assert.ok(detectGap(n, T0), 'et le vrai trou de 3h doit toujours sortir');
+});
+t('★ BORNE: une observation reelle est toujours lue, et firstSeen sert de repli', () => {
+  assert.equal(newestObservation({ a: { lastSeen: iso(T0) } }), T0);
+  assert.equal(newestObservation({ a: { firstSeen: iso(T0) } }), T0);
+  assert.equal(newestObservation({ a: { lastSeen: iso(T0), firstSeen: iso(T0 - 9 * H) } }), T0);
+});
+t('un horodatage illisible reste illisible, sans inventer de date', () => {
+  assert.equal(newestObservation({ a: { lastSeen: 'nawak' } }), 0);
+  assert.equal(newestObservation({ a: { lastSeen: '' } }), 0);
+  assert.equal(newestObservation({}), 0);
+  assert.equal(newestObservation(null), 0);
+});
+
 t('a FIRST run invents nothing', () => {
   // No prior observation is not a nine-hour hole; it is the beginning. A false gap here would teach the
   // reader to discount the real ones.
