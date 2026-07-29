@@ -79,11 +79,32 @@ async function fetchOracle(address) {
 // Reputation for the trust triangle, as ONE composed decision (LOCAL floor wins, else the oracle, else
 // null). The two-lens SPLIT for display lives in till_trust; this helper is what feeds assessTriangle and
 // the withTrust lens. So MainStreet being slow/down can never let a known scammer through — the floor fires.
-async function fetchReputation(address) {
-  const local = screenAddress(address, KNOWN_BAD);
-  if (local.blocked) return { decision: 'BLOCK', score: null, source: 'local-known-bad', reason: local.reason };
-  const o = await fetchOracle(address);
-  if (o.decision != null || o.score != null) return { decision: o.decision, score: o.score, source: 'mainstreet-oracle' };
+/* ⚠️ UNE COUCHE QUI DISTINGUE TROIS CAS, UNE COUCHE AU-DESSUS QUI LES APLATIT SUR UN BOOLEEN.
+ * `screenAddress` fait parfaitement son travail: il rend `available:false` avec la phrase « screening
+ * UNAVAILABLE, not a clean verdict » quand aucune liste known-bad n'est chargee. Cette fonction ne lisait
+ * que `local.blocked` et jetait le reste. Resultat, deux etats de preuve DIFFERENTS sortaient identiques:
+ *
+ *   liste indisponible    + oracle repond OK  ->  { decision:'OK', source:'mainstreet-oracle' }
+ *   liste chargee, absent + oracle repond OK  ->  { decision:'OK', source:'mainstreet-oracle' }
+ *
+ * Dans le premier cas le plancher local n'a JAMAIS tourne — et ce plancher est ce qui tient quand
+ * l'oracle se trompe ou ment. Le defaut n'est visible dans aucun des deux modules pris seul: seulement
+ * en les comparant. Le meme fait est d'ailleurs divulgue ailleurs dans ce codebase
+ * (`wallet-watch.judgeCounterparty` pousse « the local known-bad screen is unavailable »), ce qui rend
+ * l'omission ici d'autant plus nette — la bonne reponse etait deja ecrite, dans un autre fichier.
+ *
+ * `localScreen` voyage donc avec chaque verdict. Et les deux dependances sont injectables: sans joint,
+ * cette fonction etait intestable, ce qui explique qu'aucun test ne l'ait nommee. */
+async function fetchReputation(address, { floor = KNOWN_BAD, oracle = fetchOracle } = {}) {
+  const local = screenAddress(address, floor);
+  const localScreen = { available: local.available === true, reason: local.reason };
+  if (local.blocked) return { decision: 'BLOCK', score: null, source: 'local-known-bad', reason: local.reason, localScreen };
+  const o = await oracle(address);
+  if (o.decision != null || o.score != null) {
+    return { decision: o.decision, score: o.score, source: 'mainstreet-oracle', localScreen,
+      // Un oracle qui dit OK par-dessus un plancher qui n'a pas tourne n'est pas le meme OK.
+      ...(localScreen.available ? {} : { caveat: 'the local known-bad floor did NOT run for this address, so this verdict rests on the advisory oracle ALONE — it is not a floor-backed read.' }) };
+  }
   return null;   // not-locally-known-bad + oracle down ⇒ no live signal. Honest 'unknown', never 'clean'.
 }
 
@@ -818,4 +839,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { callTool, TOOLS, localClassify, handleRpc };
+module.exports = { callTool, TOOLS, localClassify, handleRpc, fetchReputation };
