@@ -220,10 +220,28 @@ t('★ AUCUN financeur identifie rend siblingCount null — 0 se lirait « il n 
   assert.notStrictEqual(aucun.siblingCount, solitaire.siblingCount);
 });
 
-t('un deployeur introuvable refuse au lieu de deviner', async () => {
+/* Le refus est conserve; ce qui change est qu'il DIT laquelle des deux situations il refuse.
+ * Motif: des l'installation de `funderTrace`, la premiere passe reelle du radar (2026-07-29 15:59) a
+ * rendu 8 echecs sur 24, TOUS sous la meme phrase « could not resolve the deploying wallet » — un tiers
+ * des traces, et rien pour savoir s'il fallait lever le pied sur l'explorateur ou changer la question. */
+t('un deployeur introuvable refuse au lieu de deviner — explorateur qui REPOND, sans createur', async () => {
   const r = await tracer({ token: { creator_address_hash: null } });
+  assert.strictEqual(r.ok, false, 'la propriete d origine tient: on refuse, on ne devine pas');
+  assert.strictEqual(r.tokenRead, true, 'la lecture a bien eu lieu — rien a reessayer');
+  assert.match(r.reason, /records no creator/i);
+  assert.ok(!/did not answer/i.test(r.reason), 'ne pas accuser l explorateur qui a repondu');
+});
+
+t('★ explorateur MUET sur le token: refus DISTINCT — il y a quelque chose a reessayer', async () => {
+  const r = await traceFeeder('base', '0xTOKEN', { fetchImpl: async () => null });
   assert.strictEqual(r.ok, false);
-  assert.match(r.reason, /could not resolve/i);
+  assert.strictEqual(r.tokenRead, false, 'rien n a ete lu');
+  assert.match(r.reason, /UNREAD, not unknown/i);
+
+  // et les deux refus ne se confondent plus — c est toute la propriete.
+  const repond = await tracer({ token: { creator_address_hash: null } });
+  assert.notStrictEqual(r.reason, repond.reason);
+  assert.notStrictEqual(r.tokenRead, repond.tokenRead);
 });
 
 t('une chaine non cablee refuse au lieu de taper un explorateur au hasard', async () => {
