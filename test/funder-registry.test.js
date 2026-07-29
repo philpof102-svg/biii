@@ -36,11 +36,28 @@ t('a payer never seen gets no judgement at all', () => {
   assert.equal(a.verdict, 'funder_unseen');
   assert.match(a.reason, /No history means no judgement/i);
 });
-t('an untraceable payer is NOT a clearance, and says so with the number', () => {
+/* Ce cas exigeait « 45% » DANS la phrase — il epinglait donc le chiffre, pas la propriete, et un chiffre
+ * faux le satisfaisait parfaitement. Mesure du 2026-07-29: 373 des 785 tokens suivis n'ont pas de
+ * financeur enregistre, mais 360 de ces 373 n'ont JAMAIS ete traces (plafond par run), 11 ont echoue a
+ * l'explorateur et 2 seulement n'en avaient reellement aucun. Le 45 % decrivait notre budget, pas la
+ * chaine — et token-radar.js l'ecrivait deja en commentaire depuis le 26/07.
+ * On epingle desormais les DEUX proprietes qui comptent, et l'absence de toute statistique de couverture
+ * presentee comme un fait sur les lancements. */
+t('★ un payeur non trace n est ni une absolution NI un constat sur le lancement', () => {
   const a = assess(build([]), null);
   assert.equal(a.verdict, 'funder_untraceable');
-  assert.match(a.reason, /not a clearance/i);
-  assert.match(a.reason, /45%/);
+  assert.match(a.reason, /NOT a clearance/i, 'la premiere propriete: ce n est pas un feu vert');
+  assert.match(a.reason, /not a finding either|never asked|gap in coverage/i,
+    'la seconde: ce n est pas non plus une propriete du lancement');
+  assert.doesNotMatch(a.reason, /\d+% of the launches/i,
+    'aucune statistique de couverture presentee comme un fait sur les lancements');
+});
+
+t('★ LES DEUX BORNES: un financeur CONNU rend toujours son verdict chiffre', () => {
+  const reg = build([tok({ funder: '0xF00D', outcome: 'rugged' })]);
+  const a = assess(reg, '0xF00D');
+  assert.equal(a.verdict, 'funder_has_killed', 'sans cette borne, « tout abstenir » passerait le cas ci-dessus');
+  assert.ok(a.priorRugs >= 1, 'et les compteurs restent des mesures, pas des null');
 });
 t('the case is ignored when matching a funder', () => {
   const reg = build([tok({ funder: '0xAbCdEf', outcome: 'rugged' })]);
