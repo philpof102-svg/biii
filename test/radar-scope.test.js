@@ -63,5 +63,49 @@ t('le test mordrait vraiment — verifie sur le defaut reinjecte', () => {
   assert.equal(found, 1, 'le detecteur doit voir un push injecte avant la declaration');
 });
 
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * `dropPct` CONTIENT UNE FRACTION, PAS UN POURCENTAGE — et ce n'est pas un défaut, c'est un piège.
+ *
+ * Le champ est écrit `t.dropPct = drop` où `drop = 1 - liq/peak`, donc 0,998 pour une pool vidée à
+ * 99,8 %. Le seul lecteur interne le formate correctement (`pct = n => Math.round(n*100) + '%'`), donc
+ * le rapport publié est juste. Rien à corriger côté code.
+ *
+ * ⚠️ LE RISQUE EST DANS L'AVENIR, ET IL EST RÉEL : le nom dit « Pct », la valeur dit « fraction ».
+ * Quelqu'un — moi le lendemain — lira `dropPct: 0.998`, croira à un bug, et « corrigera » l'écriture en
+ * `drop * 100`. À partir de ce moment, `tokens.json` contiendrait des lignes en FRACTIONS (les 448
+ * historiques) et des lignes en POURCENTAGES (les nouvelles), dans le même champ, sans rien pour les
+ * distinguer. Ce serait strictement pire que le nom trompeur d'aujourd'hui : un nom se lit, des unités
+ * mélangées ne se détectent plus.
+ *
+ * Mesuré le 2026-07-29 : ce nom m'a fait conclure à tort que le radar était cassé — j'ai lu une
+ * fraction comme un pourcentage et annoncé une variance nulle qui n'existait pas. Le coût est donc
+ * établi, pas hypothétique. D'où une garde sur LES DONNÉES, là où des unités mélangées apparaîtraient.
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+const DB = path.join(__dirname, '..', 'data', 'token-radar', 'tokens.json');
+t('★ dropPct est une FRACTION partout — aucune ligne en pourcentage', () => {
+  if (!fs.existsSync(DB)) return;                    // pas de base locale: rien à contredire
+  const db = JSON.parse(fs.readFileSync(DB, 'utf8'));
+  const vals = Object.values(db).map((x) => x && x.dropPct).filter((v) => typeof v === 'number');
+  if (!vals.length) return;                          // aucun rug enregistré encore
+  const horsBorne = vals.filter((v) => v > 1);
+  assert.equal(horsBorne.length, 0,
+    horsBorne.length + ' ligne(s) portent un dropPct > 1 : quelqu\'un a converti le champ en pourcentage, '
+    + 'et la base mélange désormais deux unités dans le même champ. Exemples: ' + horsBorne.slice(0, 3).join(', '));
+});
+t('★ et le seuil de rug reste cohérent avec cette unité', () => {
+  if (!fs.existsSync(DB)) return;
+  const db = JSON.parse(fs.readFileSync(DB, 'utf8'));
+  const vals = Object.values(db).filter((x) => x && x.outcome === 'rugged' && typeof x.dropPct === 'number');
+  if (!vals.length) return;
+  // RUG_DROP vaut 0.80 dans token-radar.js : aucune ligne marquée `rugged` ne peut être sous ce seuil.
+  const sousSeuil = vals.filter((x) => x.dropPct < 0.80);
+  assert.equal(sousSeuil.length, 0, sousSeuil.length + ' ligne(s) `rugged` sous le seuil de 0,80');
+});
+t('le formateur du rapport convertit bien la fraction (sinon « 100% » sortirait « 1% »)', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'hermes', 'economy', 'token-radar.js'), 'utf8');
+  assert.match(src, /const pct = \(n\) => Math\.round\(n \* 100\)/,
+    'si ce formateur cesse de multiplier, chaque rapport publié divisera la chute par 100');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
