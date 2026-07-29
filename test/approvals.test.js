@@ -248,6 +248,47 @@ function deps({ logs, allowances, solo = () => null, meta = () => null }) {
       'quatre entrees opposees doivent donner quatre sorties distinguables, pas deux');
   });
 
+  /* ══════════════════════════════════════════════════════════════════════════════════════════════
+   * UNE QUESTION JAMAIS POSEE RENDUE COMME UNE REPONSE RASSURANTE.
+   *
+   * Mesure du 2026-07-29 sur le VRAI serveur MCP, `till_open_approvals` appele avec `{}` :
+   *   { ok: true, chain: "base", scanned: 2, live: [], revoked: 0 }
+   * « on a examine 2 portes, aucune n'est ouverte » — sans proprietaire. Sur l'outil dont le role est
+   * de dire quelles portes de VOTRE wallet restent ouvertes, c'est un feu vert sur rien.
+   *
+   * Le cas vide est pire que l'absent: `pad('')` rend 64 zeros, soit L'ADRESSE ZERO — un wallet reel,
+   * dont les approbations seraient presentees comme celles de l'appelant.
+   * ══════════════════════════════════════════════════════════════════════════════════════════════ */
+  const jamaisAppele = { getLogs: async () => { throw new Error('le reseau ne doit PAS etre touche'); },
+    allowances: async () => { throw new Error('idem'); }, allowanceOne: async () => { throw new Error('idem'); },
+    meta: async () => ({}), sleep: async () => {} };
+
+  for (const [nom, owner] of [['absent', undefined], ['null', null], ['chaine vide', ''],
+    ['espaces', '   '], ['tronque', '0x1234'], ['pas hex', '0x' + 'zz'.repeat(20)]]) {
+    await t('★ owner ' + nom + ' : REFUS, et aucune requete brulee', async () => {
+      const r = await A.checkApprovals('base', owner, { deps: jamaisAppele });
+      assert.strictEqual(r.ok, false, 'ok:true se lirait « verifie »');
+      assert.strictEqual(r.rejectedInput, true);
+      assert.match(r.reason, /NOTHING WAS LOOKED UP/i, 'le refus doit DIRE que rien n a ete regarde');
+      assert.strictEqual(r.live, undefined, 'surtout pas de liste vide a cote d un ok');
+    });
+  }
+
+  await t('★ le refus mentionne l ADRESSE ZERO — le piege que la chaine vide tend', async () => {
+    const r = await A.checkApprovals('base', '', { deps: jamaisAppele });
+    assert.match(r.reason, /zero address/i,
+      'sans cette phrase, personne ne comprend pourquoi un champ blanc est dangereux ici');
+  });
+
+  await t('★ LES DEUX BORNES: une adresse VALIDE passe toujours et rend son rapport', async () => {
+    const r = await A.checkApprovals('base', '0x' + '11'.repeat(20), {
+      deps: { getLogs: async () => ({ result: [] }), allowances: async () => ({}),
+        allowanceOne: async () => null, meta: async () => ({}), sleep: async () => {} } });
+    assert.strictEqual(r.ok, true, 'sans cette borne, « tout refuser » passerait les cas ci-dessus');
+    assert.strictEqual(r.rejectedInput, undefined);
+    assert.strictEqual(r.scanned, 0, 'et un scan REEL qui ne trouve rien reste un resultat');
+  });
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })();

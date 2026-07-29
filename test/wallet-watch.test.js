@@ -305,6 +305,39 @@ t('un explorateur muet reste distinct d\'une reponse vide', async () => {
   assert.notStrictEqual(surLaNature(muet), surLaNature(vide));
 });
 
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * MEME TROU QUE lib/approvals.js — et ici il ECRIT.
+ * `statePath` fabriquait son nom avec `String(owner)`, donc un proprietaire absent produisait
+ * `base-undefined.json`: une ligne de base pour personne, dans le SEUL etat persistant du depot, contre
+ * laquelle tous les runs suivants se seraient compares. Et une chaine vide vise l'adresse ZERO, qui est
+ * un vrai wallet. Sur un moniteur, une liste d'alertes vide se lit « rien n'a bouge chez toi ».
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+const jamaisTouche = { approvals: async () => { throw new Error('le reseau ne doit PAS etre touche'); },
+  json: async () => { throw new Error('idem'); } };
+
+for (const [nom, owner] of [['absent', undefined], ['null', null], ['chaine vide', ''], ['tronque', '0x1234']]) {
+  t('★ owner ' + nom + ' : REFUS, rien de surveille et AUCUNE ligne de base ecrite', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ww-refus-'));
+    const r = await watchWallet('base', owner, { stateDir: dir, deps: jamaisTouche });
+    assert.strictEqual(r.ok, false, 'ok:true se lirait « surveille »');
+    assert.strictEqual(r.rejectedInput, true);
+    assert.match(r.reason, /NOTHING WAS WATCHED/i);
+    assert.strictEqual(r.alerts, undefined, 'surtout pas une liste d alertes vide a cote d un ok');
+    assert.deepStrictEqual(fs.readdirSync(dir), [],
+      'aucun fichier d etat: une ligne de base fausse contaminerait TOUS les runs suivants');
+  });
+}
+
+t('★ LES DEUX BORNES: un owner VALIDE est toujours surveille et ecrit bien sa ligne de base', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ww-ok-'));
+  const r = await watchWallet('base', OWNER, { stateDir: dir, deps: {
+    approvals: async () => ({ ok: true, live: [], unchecked: 0, complete: true }),
+    json: async () => ({ items: [] }) } });
+  assert.strictEqual(r.ok, true, 'sans cette borne, « tout refuser » passerait les cas ci-dessus');
+  assert.strictEqual(r.firstRun, true);
+  assert.strictEqual(fs.readdirSync(dir).length, 1, 'un owner valide DOIT poser sa ligne de base');
+});
+
 (async () => {
   for (const [nom, fn] of files) {
     try { await fn(); pass++; console.log('  ok   ' + nom); }
