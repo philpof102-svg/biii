@@ -96,5 +96,47 @@ t('BASE_CHAIN_ID default is Base mainnet, and a wrong-typed attestation never th
   assert.equal(bindingLens('nope').bound, false);
 });
 
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * L'UNITÉ DE `expiry` ÉCHOUAIT OUVERT — et l'erreur qui l'a révélée était dans MA sonde.
+ *
+ * Le champ est en secondes unix (le schéma MCP le dit) et `bindingLens` multiplie par 1000. J'ai testé
+ * en passant `Date.now()`, donc des millisecondes, et j'ai cru un instant que l'expiration n'était pas
+ * contrôlée du tout. Elle l'était. Mais la mesure a laissé un fait qui compte, sur une attestation
+ * complète et `verified:true` :
+ *
+ *   expiry en secondes,      passé  ->  bound=false   ✓
+ *   expiry en MILLISECONDES, passé  ->  bound=true    ⛔   ← MÊME instant, autre unité
+ *
+ * `Date.now()` est le geste naturel en JavaScript. Écrit ainsi, ~1,7e12 × 1000 tombe ~50 000 ans en
+ * avant : la liaison ne peut PLUS JAMAIS expirer, et une liaison périmée résout vers une adresse de
+ * paiement comme si elle était vivante. Une erreur d'unité plausible sur un champ de sécurité ne doit
+ * pas accorder PLUS que le champ correct.
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+const SEC = () => Math.floor(Date.now() / 1000);
+const complet = (expiry) => ({ npub: NPUB, address: '0x' + '1'.repeat(40), nonce: 'n1',
+  sigNostr: 's'.repeat(128), sigBase: '0x' + 'b'.repeat(130), verified: true, expiry });
+
+t('★ un expiry en MILLISECONDES est REFUSÉ, pas accordé pour l\'éternité', () => {
+  const r = bindingLens(complet(Date.now() - 3600000));      // passé, mais en ms
+  assert.strictEqual(r.bound, false, 'un instant PASSÉ ne peut pas devenir une liaison vivante');
+  assert.match(r.reason, /not unix SECONDS|milliseconds/i, 'la raison doit nommer l\'unité');
+});
+
+t('★ et dans le futur non plus — l\'unité fausse ne passe dans aucun sens', () => {
+  assert.strictEqual(bindingLens(complet(Date.now() + 3600000)).bound, false);
+});
+
+t('★ LES DEUX BORNES: en SECONDES, le passé expire et le futur lie', () => {
+  const passe = bindingLens(complet(SEC() - 3600));
+  assert.strictEqual(passe.bound, false);
+  assert.match(passe.reason, /expired/i, 'et il expire pour la BONNE raison, pas pour l\'unité');
+  // sans cette borne, « refuser tout expiry » satisferait les deux cas ci-dessus
+  assert.strictEqual(bindingLens(complet(SEC() + 3600)).bound, true, 'un futur en secondes DOIT lier');
+});
+
+t('★ `expiry: 0` garde son sens — pas d\'expiration, pas une unité fausse', () => {
+  assert.strictEqual(bindingLens(complet(0)).bound, true);
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
