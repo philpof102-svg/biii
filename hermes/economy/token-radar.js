@@ -338,9 +338,16 @@ function recordBlackout(db, nowIso) {
   //   prefix_impostor -> ARMED. An ordinary ERC-20 that bought a vanity address to wear the compliant standard's
   //                      prefix is impersonating it, and impersonation is the fireable trap here.
   const b20Notes = [];
+  // Une classification qui LEVE laissait le token avec son verdict d'avant — c'est-a-dire non escalade,
+  // donc indiscernable d'un token examine et juge sain. Or c'est precisement ce controle qui arme
+  // `rug_ready` sur un imposteur de prefixe. On persiste la panne au lieu de la taire.
+  let b20Echec = 0;
   for (const c of toJudge) {
     if (!/^0xb200/i.test(c.addr)) continue;
-    let b; try { b = await classifyB20(CHAIN, c.addr); } catch { continue; }
+    let b;
+    try { b = await classifyB20(CHAIN, c.addr); }
+    catch (e) { b20Echec++; if (db[c.addr]) { db[c.addr].b20Check = 'failed'; db[c.addr].b20CheckError = String((e && e.message) || e).slice(0, 120); } continue; }
+    if (db[c.addr]) db[c.addr].b20Check = 'ok';
     const v = verdicts[c.addr];
     if (b.verdict === 'prefix_impostor') {
       b20Notes.push({ c, kind: 'impostor', b });
@@ -426,9 +433,15 @@ function recordBlackout(db, nowIso) {
   // question was already answered by another module in this repository and the radar had simply never
   // asked it. Cheap, and only for tokens whose symbol can be decoded at all.
   const impostors = [];
+  // `symbolVerdict` n'etait pose qu'en cas de reponse. Son absence couvrait donc TROIS choses: symbole
+  // indecodable, token au-dela du plafond, et appel tombe. Seule la troisieme est une panne.
+  let symEchec = 0, symOk = 0;
   for (const c of toJudge.filter((x) => !x.undecodable && x.sym && x.sym.length <= 12).slice(0, IMPOSTOR_MAX)) {
-    let m; try { m = await vetMeme({ symbol: c.sym, chainId: CHAIN, address: c.addr }); } catch { continue; }
-    if (!m) continue;
+    let m;
+    try { m = await vetMeme({ symbol: c.sym, chainId: CHAIN, address: c.addr }); }
+    catch (e) { symEchec++; db[c.addr].symbolCheck = 'failed'; db[c.addr].symbolCheckError = String((e && e.message) || e).slice(0, 120); continue; }
+    if (!m) { symEchec++; db[c.addr].symbolCheck = 'failed'; db[c.addr].symbolCheckError = 'the symbol check returned nothing'; continue; }
+    symOk++; db[c.addr].symbolCheck = 'ok';
     db[c.addr].symbolVerdict = m.status;
     if (m.status === 'impersonation') {
       impostors.push({ ...c, canonical: m.canonical });
@@ -472,9 +485,28 @@ function recordBlackout(db, nowIso) {
   // crawl is how we lose access to it — so we trace the biggest fresh launches and say what we skipped.
   const toTrace = toJudge.slice().sort((a, b) => b.liq - a.liq).slice(0, TRACE_MAX);
   const clusters = [];
+  /* ⚠️ TROIS SORTIES S'ECRIVAIENT PAREIL: RIEN.
+   * `catch { continue }` (la trace a leve), `!f.ok` (l'explorateur a refuse) et `!f.funder` (trace reussie,
+   * aucun financeur trouve) laissaient tous la ligne SANS `funder`, SANS `siblingCount`, SANS
+   * `siblingsRead`. Or les deux premieres sont des PANNES et la troisieme est un RESULTAT.
+   * Mesure du 2026-07-29 sur la base reelle: 360 tokens sur 753 (47,8 %) sans `funder`, dont 214 des
+   * 471 rugs — et AUCUN champ ne disait pourquoi. `siblingsRead === false`: zero ligne, jamais emis.
+   * what-survives.js savait deja lire ce troisieme etat (il rend `null`); c'est le PRODUCTEUR qui ne
+   * l'emettait pas. Le consommateur avait appris la lecon, la source jamais. */
+  let traceOk = 0, traceEchec = 0, traceSansFinanceur = 0;
   for (const c of toTrace) {
-    let f; try { f = await traceFeeder(CHAIN, c.addr); } catch { continue; }
-    if (!f || !f.ok || !f.funder) continue;
+    let f = null, panne = null;
+    try { f = await traceFeeder(CHAIN, c.addr); } catch (e) { panne = (e && e.message) || String(e); }
+    if (!panne && (!f || !f.ok)) panne = (f && f.reason) || 'the explorer did not answer';
+    if (panne) {
+      traceEchec++;
+      db[c.addr].funderTrace = 'failed';          // ≠ absent: on a essaye, on n'a pas pu lire
+      db[c.addr].funderTraceError = String(panne).slice(0, 120);
+      continue;
+    }
+    if (!f.funder) { traceSansFinanceur++; db[c.addr].funderTrace = 'no_funder'; continue; }   // un RESULTAT
+    traceOk++;
+    db[c.addr].funderTrace = 'ok';
     db[c.addr].deployer = f.deployer; db[c.addr].funder = f.funder;
     db[c.addr].siblingCount = f.siblingCount; db[c.addr].freshDeployer = f.freshDeployer;
     /* `siblingCount` vaut desormais `null` quand l'explorateur n'a pas repondu sur l'historique du
@@ -538,7 +570,18 @@ function recordBlackout(db, nowIso) {
       db[c.addr].industrialFunder = f.siblingCount;
     }
   }
-  if (toJudge.length > toTrace.length) lines.push('   (funding traced for the ' + toTrace.length + ' largest of ' + toJudge.length + ' — the rest were skipped, not cleared)');
+  /* La ligne publiee annoncait `toTrace.length`, c'est-a-dire le nombre de tokens TENTES, comme s'il
+   * s'agissait du nombre de tokens TRACES. Vingt tentatives dont dix-sept tombent se lisaient
+   * « funding traced for the 20 largest ». On publie desormais ce qui a REUSSI, et separement ce qui a
+   * echoue — un echec de lecture n'est pas un financeur absent. */
+  if (toTrace.length) {
+    lines.push('   (funding: ' + traceOk + ' traced'
+      + (traceSansFinanceur ? ', ' + traceSansFinanceur + ' with no funder found' : '')
+      + (traceEchec ? ', ' + traceEchec + ' COULD NOT BE READ' : '')
+      + ' — of ' + toTrace.length + ' attempted'
+      + (toJudge.length > toTrace.length ? ', ' + (toJudge.length - toTrace.length) + ' skipped by the cap, not cleared' : '') + ')');
+    if (traceEchec) lines.push('   ⚠️ ' + traceEchec + ' funding trace(s) failed — those tokens are UNREAD, not unfunded');
+  }
 
   // ---------- SCORECARD: what our calls were actually worth --------------------------------------
   // Grading ourselves in three buckets, not two. The first version counted only rug_ready/high_risk as a
@@ -598,6 +641,11 @@ function recordBlackout(db, nowIso) {
       ' — no ERC-20 security record exists for these by construction (logic is a precompile), and their ISSUER ' +
       'holds standard-level freeze-and-burn over any holder. That is a certainty, not a data gap.');
   }
+  /* Les pannes se disent MEME quand la section n'a rien trouve — sinon un run ou tous les controles
+   * tombent est visuellement identique a un run ou tout est propre, ce qui est le contraire de la
+   * verite. Meme regle que pour la recolte: publier les manques a cote des prises. */
+  if (b20Echec) lines.push('   ⚠️ ' + b20Echec + ' B20 classification(s) failed — those prefixed tokens were NOT cleared, they were not read');
+  if (symEchec) lines.push('   ⚠️ ' + symEchec + ' symbol check(s) failed of ' + (symOk + symEchec) + ' attempted — no impersonation verdict exists for those');
 
   for (const a of armed) lines.push('🚩 ' + a.sym + ' ' + a.addr.slice(0, 10) + '… (' + a.source + ', ' + usd(a.liq) + ') — ' + a.v.armed[0]);
   if (survivors.length) {

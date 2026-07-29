@@ -53,6 +53,53 @@ t('les notes de recolte passent par HARVEST_NOTES, qui EXISTE au niveau module',
     'les notes doivent etre VIDEES dans le digest : un pool ecarte en silence ressemble a un pool qui n\'a jamais existe');
 });
 
+/* La regle GENERALE, dont le cas `lines` ci-dessus n'est qu'une instance.
+ *
+ * Le crash de 2026-07-26 n'etait pas propre a `lines`: c'est un identifiant lu dans une branche RAREMENT
+ * PRISE, depuis un bloc ou sa declaration ne vit plus. `node --check` passe, tous les runs passent, et la
+ * ReferenceError attend le jour ou la branche s'execute. Les lignes de divulgation ajoutees le 2026-07-29
+ * (compteurs d'echec: une trace de financement tombee, une classification B20 tombee) sont exactement de
+ * cette forme — elles ne s'executent QUE si un controle echoue.
+ *
+ * Regle correcte pour un `let`: entre la declaration et l'usage, la profondeur d'accolades ne doit jamais
+ * redescendre SOUS celle du bloc declarant. (Comparer les profondeurs seules est faux dans les deux sens:
+ * lire une variable externe depuis un bloc plus profond est legal, et deux blocs FRERES a profondeur egale
+ * ne partagent rien.) */
+t('★ tout compteur `let X = 0` lu dans une ligne publiee vit dans un bloc encore OUVERT', () => {
+  const prof = []; let d = 0;
+  for (const l of lines) {
+    prof.push(d);
+    const nu = l.replace(/'(\\.|[^'\\])*'/g, "''").replace(/"(\\.|[^"\\])*"/g, '""')
+                .replace(/`(\\.|[^`\\])*`/g, '``').replace(/\/\/.*$/, '');
+    for (const ch of nu) { if (ch === '{') d++; else if (ch === '}') d--; }
+  }
+  const horsPortee = [];
+  let examines = 0;                 // ⚠️ un garde qui n'a RIEN a examiner passe en vert: il faut le dire.
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^\s*let\s+([\w\s,=0-9]+);\s*(?:\/\/.*)?$/);
+    if (!m) continue;
+    const noms = m[1].split(',').map((s) => s.split('=')[0].trim()).filter((s) => /^\w+$/.test(s));
+    for (const nom of noms) {
+      const re = new RegExp('(^|[^.\\w])' + nom + '([^\\w]|$)');
+      for (let u = i + 1; u < lines.length; u++) {
+        if (!/lines\.push\(/.test(lines[u]) || !re.test(lines[u])) continue;
+        examines++;
+        let ferme = 0;
+        for (let k = i + 1; k <= u; k++) if (prof[k] < prof[i]) { ferme = k + 1; break; }
+        if (ferme) horsPortee.push(`${nom}: declare L${i + 1}, lu L${u + 1}, bloc referme L${ferme}`);
+      }
+    }
+  }
+  assert.deepStrictEqual(horsPortee, [],
+    'un identifiant publie depuis un bloc ferme = ReferenceError le jour ou la branche s\'execute:\n       '
+    + horsPortee.join('\n       '));
+  /* Mesure du 2026-07-29: ce garde a affiche « 8 passed » sur une version du radar qui ne contenait
+   * AUCUN compteur — il n'avait rien a inspecter et l'a annonce en vert. Un succes vide est une erreur:
+   * c'est le motif meme que ce depot chasse, applique a l'instrument qui le chasse. */
+  assert.ok(examines >= 3, 'succes VIDE: seulement ' + examines + ' couple(s) declaration/publication inspecte(s). '
+    + 'Soit les compteurs de divulgation ont disparu du radar, soit ce garde ne les reconnait plus.');
+});
+
 t('le test mordrait vraiment — verifie sur le defaut reinjecte', () => {
   // Un test qu'on n'a jamais vu echouer n'a rien demontre. On rejoue le fichier tel qu'il etait.
   const broken = lines.slice();
