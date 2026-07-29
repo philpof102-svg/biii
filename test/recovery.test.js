@@ -245,6 +245,41 @@ const sortant = (eth) => ({ to: { hash: '0x' + 'ff'.repeat(20) }, value: ETH(eth
     assert.match(lu.chainEvidence.note, /Absence of a pattern is NOT evidence of legitimacy/i);
   });
 
+  /* Le garde d'origine testait la PRESENCE d'un corps, jamais sa FORME. Un corps sans tableau `items`
+   * — derive de schema, page d'erreur en JSON, reponse tronquee — passait donc pour « read », et les
+   * `|| []` juste en dessous rendaient `distinctSenders: 0, inboundCount: 0` comme des faits mesures.
+   * La PROSE restait couverte; c'est `chainEvidence`, la partie que lit une machine, qui affirmait un
+   * comptage qui n'avait pas eu lieu. Meme angle mort ferme le meme jour dans lib/feeder.js. */
+  const deforme = await assessRecoveryOffer({ address: ADR, fetchImpl: async (url) =>
+    /\/transactions\?filter=/.test(url) ? { message: 'rate limited' } : { hash: ADR } });
+
+  await t('★ un corps SANS tableau `items` est illisible, pas « lu et vide »', async () => {
+    assert.strictEqual(deforme.chainRead, 'unreadable', 'la presence d un corps n est pas une lecture');
+    assert.doesNotMatch(deforme.reason, /shows nothing conclusive/i);
+    // et surtout: aucun comptage presente comme une mesure
+    assert.match(deforme.chainEvidence.note, /not a measurement/i);
+  });
+
+  /* Une mutation a SURVECU au premier jet: ne verifier la forme que du sens ENTRANT. Ma fixture deformait
+   * les deux appels a la fois, donc le test ne pouvait pas dire lequel etait controle — trou de couverture
+   * reel, pas no-op semantique: le sens SORTANT nourrit `oneWay`, donc `readsAsHarvesting`, donc un verdict
+   * `high_risk`. Un sens deforme a la fois, chacun son cas. */
+  const deformeSortant = await assessRecoveryOffer({ address: ADR, fetchImpl: async (url) =>
+    /filter=from/.test(url) ? { message: 'rate limited' }
+      : /filter=to/.test(url) ? { items: [] } : { hash: ADR } });
+
+  await t('★ un seul des deux sens deforme suffit — le SORTANT compte autant que l entrant', async () => {
+    assert.strictEqual(deformeSortant.chainRead, 'unreadable',
+      'le flux sortant porte `oneWay`, donc le verdict harvesting: on ne peut pas le compter a zero');
+    assert.doesNotMatch(deformeSortant.reason, /shows nothing conclusive/i);
+  });
+
+  await t('★ il ne se confond avec AUCUN des quatre autres etats', async () => {
+    const sig = (r) => r.chainRead + '|' + r.reason;
+    assert.notStrictEqual(sig(deforme), sig(lu), 'surtout pas avec « lu et vide »');
+    assert.strictEqual(sig(deforme), sig(illisible), 'il rejoint « illisible », qui est la verite');
+  });
+
   /* `await` HORS de `t()`, assertion synchrone dedans — la forme du fichier, et la seule qui echoue
    * vraiment. Ecrit `await` dans le callback au premier jet: le parseur l'a refuse, ce qui vaut mieux
    * qu'un harnais qui l'aurait avale en silence. */
