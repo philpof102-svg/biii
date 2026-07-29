@@ -58,17 +58,48 @@ const SURFACES = [
  * A module that exports its tool list is the authority on its own length, and requiring it cannot miscount. The
  * regex survives only as a fallback for a file that exports nothing.
  */
+/* ⚠️ LE DEFAUT QUE CETTE DOCSTRING DIT AVOIR CORRIGE ETAIT TOUJOURS ATTEIGNABLE — par le repli.
+ * Mesure du 2026-07-29, meme fichier a 3 outils portant aussi un bloc `serverInfo = { name: … }`:
+ *
+ *   exporte TOOLS                        -> 3   correct
+ *   sans module.exports (repli regex)    -> 4   la regex compte le `name:` de serverInfo
+ *   exporte TOOLS mais JETTE au require  -> 4   repli SILENCIEUX vers la regex fautive
+ *
+ * Le troisieme est le vrai probleme: un fichier qui exporte parfaitement `TOOLS`, mais dont le
+ * chargement echoue (dependance absente, effet de bord, erreur dans un module importe), retombait sans
+ * un mot sur la methode que ce fichier declare imprecise — et rendait un nombre indiscernable d'un
+ * nombre faisant autorite. Ce nombre alimente le controle de DERIVE, et une derive fantome est
+ * exactement ce que cet en-tete decrit: « a check that is red forever is a check everyone learns to skip ».
+ *
+ * Deux corrections, pas une:
+ *   - un `require` qui JETTE n'est plus un fichier « sans exports ». C'est un fichier ILLISIBLE, et il
+ *     se dit tel quel au lieu d'etre approxime.
+ *   - le nombre voyage avec SA METHODE. Un comptage regex reste possible (c'est la seule option pour un
+ *     fichier qui n'exporte rien) mais il se declare approximatif, et l'appelant refuse d'en tirer une
+ *     accusation de derive.
+ */
 function toolsInSource(file) {
-  try {
-    const m = require(path.resolve(file));
-    if (m && Array.isArray(m.TOOLS)) return m.TOOLS.length;
-  } catch { /* not requireable, or exports no TOOLS: fall through to the text scan */ }
+  let m = null, erreurChargement = null;
+  try { m = require(path.resolve(file)); }
+  catch (e) { erreurChargement = (e && e.message) || String(e); }
+
+  if (m && Array.isArray(m.TOOLS)) return { count: m.TOOLS.length, method: 'module', exact: true, reason: null };
+
+  if (erreurChargement) {
+    return { count: null, method: 'unreadable', exact: false,
+      reason: 'the module could not be loaded (' + erreurChargement.slice(0, 120) + '), so its tool count is UNKNOWN — '
+        + 'not approximated, because an approximation here would read as a deploy drift that is not there' };
+  }
   try {
     const src = fs.readFileSync(file, 'utf8');
     const names = new Set();
-    for (const m of src.matchAll(/\{\s*name:\s*'([a-z0-9_]+)'/gi)) names.add(m[1]);
-    return names.size || null;
-  } catch { return null; }
+    for (const x of src.matchAll(/\{\s*name:\s*'([a-z0-9_]+)'/gi)) names.add(x[1]);
+    return { count: names.size || null, method: 'regex', exact: false,
+      reason: 'counted by text scan because the module exports no TOOLS — APPROXIMATE: it also matches any '
+        + 'other `name:` literal, which is how a phantom drift of 1 was once produced' };
+  } catch (e) {
+    return { count: null, method: 'unreadable', exact: false, reason: 'the file could not be read: ' + ((e && e.message) || e) };
+  }
 }
 
 /**
@@ -133,11 +164,16 @@ if (require.main === module) (async () => {
     let r = null;
     try { r = await vetAgent({ url: s.url }); } catch (e) { r = { verdict: 'unreachable', reason: e.message }; }
     const live = (r.surface && r.surface.toolCount) || 0;
-    const inRepo = s.repo ? toolsInSource(s.repo) : null;
+    /* Le comptage voyage avec sa methode. Un chiffre APPROXIMATIF ne doit pas fonder une accusation de
+     * derive: c'est ainsi qu'on obtient un controle rouge en permanence, que tout le monde apprend a
+     * sauter. Il est imprime quand meme — cache, il redeviendrait un angle mort. */
+    const source = s.repo ? toolsInSource(s.repo) : null;
+    const inRepo = source && source.exact ? source.count : null;
     rows.push({
       name: s.name, url: s.url, what: s.what,
       verdict: r.verdict, liveTools: live,
       repoTools: inRepo,
+      sourceCount: source,   // count + method + exact + reason — l'appelant doit pouvoir juger la qualite du chiffre
       drift: inRepo != null && live > 0 && inRepo !== live ? inRepo - live : 0,
       listable: r.verdict !== 'unreachable' && live > 0,
       // Carried through so a listing never quietly omits it: a surface that can move value must say so.
@@ -159,6 +195,12 @@ if (require.main === module) (async () => {
     if (x.drift < 0) console.log('      âš ï¸ DRIFT: the endpoint serves ' + (-x.drift) + ' more than this source file declares â€” the deployed build is not this file.');
     if (x.paymentSurface.length) console.log('      âš ï¸ payment surface an agent can fire alone: ' + x.paymentSurface.join(', '));
     if (x.gatedPayment) for (const g of x.gatedPayment) console.log('      Â· ' + g);
+    /* Un comptage NON EXACT se dit, sans compter comme une derive. Le taire ferait un angle mort;
+     * l'appeler « derive » ferait un rouge permanent — les deux fautes que ce fichier combat. */
+    if (x.sourceCount && !x.sourceCount.exact) {
+      console.log('      i SOURCE COUNT NOT EXACT (' + x.sourceCount.method + '): ' + x.sourceCount.reason);
+      console.log('        no drift is claimed here — an approximate count cannot accuse a deployment.');
+    }
     if (x.listable) console.log('      "' + x.what + '"');
     console.log('');
   }
