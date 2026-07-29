@@ -158,6 +158,68 @@ t('aucun financement trouve: on le DIT, on ne nomme personne', async () => {
   assert.match(r.note, /no incoming value transfer/i);
 });
 
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * LA MEME FAUTE QUE POUR LA FRATRIE, UN CRAN PLUS HAUT — sur la lecture qui IDENTIFIE le financeur.
+ *
+ * `(inc && inc.items) || []` repliait l'explorateur MUET et un deployeur REELLEMENT sans transfert
+ * entrant sur le meme tableau vide. Mesure du 2026-07-29, en appelant traceFeeder avec un explorateur
+ * injecte: les deux reponses etaient egales a `JSON.stringify` pres —
+ *
+ *   ok:true · funder:null · siblingCount:0 · « no incoming value transfer found for the deployer »
+ *
+ * Une panne reseau rendue comme un CONSTAT sur la chaine, et `till_launch_funder` (outil MCP) la servait
+ * brute a des agents. Ce fichier avait corrige exactement cela pour `siblingsRead` la veille.
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+const explorateurMuetSurEntrants = async (url) => {
+  if (/\/transactions\/0x/.test(url)) return { timestamp: '2026-01-01T12:00:00Z' };
+  if (url.includes('/transactions?filter=to')) return null;          // l'explorateur ne repond pas
+  if (url.includes('/addresses/')) return { creator_address_hash: '0xDEPLOYEUR', creation_transaction_hash: '0xcreation' };
+  return null;
+};
+
+t('★ un explorateur MUET sur les entrants REFUSE — il n atteste pas une absence de financement', async () => {
+  const r = await traceFeeder('base', '0xTOKEN', { fetchImpl: explorateurMuetSurEntrants });
+  assert.strictEqual(r.ok, false, 'une non-reponse ne peut pas produire un resultat');
+  assert.strictEqual(r.fundingRead, false);
+  assert.match(r.reason, /UNREAD, not absent/i, 'la raison doit nommer la difference');
+  assert.ok(!/no incoming value transfer found/i.test(r.note || ''),
+    'surtout pas la phrase du cas reellement vide');
+});
+
+t('★ LES DEUX BORNES: un deployeur REELLEMENT sans entrant dit toujours exactement ce qu il disait', async () => {
+  const r = await tracer({ entrant: { items: [] } });
+  assert.strictEqual(r.ok, true, 'lu-et-vide reste un resultat, pas un refus');
+  assert.strictEqual(r.funder, null);
+  assert.match(r.note, /no incoming value transfer/i);
+  assert.strictEqual(r.fundingRead, true, 'et il DIT que la lecture a bien eu lieu');
+});
+
+t('★ un `items` absent compte comme une non-reponse (derive de schema, fail-closed)', async () => {
+  const r = await traceFeeder('base', '0xTOKEN', { fetchImpl: async (url) => {
+    if (/\/transactions\/0x/.test(url)) return { timestamp: '2026-01-01T12:00:00Z' };
+    if (url.includes('/transactions?filter=to')) return { resultat: [] };     // forme inattendue
+    if (url.includes('/addresses/')) return { creator_address_hash: '0xDEPLOYEUR', creation_transaction_hash: '0xcreation' };
+    return null;
+  } });
+  assert.strictEqual(r.ok, false, 'ici le silence se lirait autrement comme une innocence');
+});
+
+t('★ AUCUN financeur identifie rend siblingCount null — 0 se lirait « il n a paye personne »', async () => {
+  const aucun = await tracer({ entrant: { items: [] } });
+  assert.strictEqual(aucun.siblingCount, null, 'rien n a ete compte: aucun financeur a compter');
+  assert.strictEqual(aucun.siblingsRead, null, 'et la question n a meme pas pu etre posee');
+
+  // BORNE D ACCEPTATION — un financeur IDENTIFIE qui n a paye personne garde son 0, qui est une mesure.
+  const solitaire = await tracer({ entrant: { items: [entree('0xFINANCEUR', 1, '2026-01-01T10:00:00Z')] },
+    sortant: { items: [] } });
+  assert.strictEqual(solitaire.funder, '0xFINANCEUR');
+  assert.strictEqual(solitaire.siblingCount, 0, 'lu-et-vide reste 0: c est un resultat');
+  assert.strictEqual(solitaire.siblingsRead, true);
+
+  // et les deux ne se confondent plus — c est toute la propriete.
+  assert.notStrictEqual(aucun.siblingCount, solitaire.siblingCount);
+});
+
 t('un deployeur introuvable refuse au lieu de deviner', async () => {
   const r = await tracer({ token: { creator_address_hash: null } });
   assert.strictEqual(r.ok, false);
