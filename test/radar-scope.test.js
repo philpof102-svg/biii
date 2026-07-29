@@ -111,6 +111,48 @@ t('le test mordrait vraiment — verifie sur le defaut reinjecte', () => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * LE TITRE EST LA LIGNE LA PLUS LUE DU PRODUIT — et le ✓ ne couvrait que la moitié du travail.
+ *
+ * `UNANSWERED` n'est alimenté que par `getJSON`, donc par la RÉCOLTE. Les appels de JUGEMENT
+ * (traceFeeder, classifyB20, vetMeme) portent leur propre HTTP. Avec une récolte parfaite et tout le
+ * jugement tombé, `armed` restait vide — parce que rien n'avait pu être escaladé — et le titre sortait :
+ *
+ *   « ✓ token-radar: 40 fresh base launches judged, none with a fireable rug power. »
+ *
+ * Mesuré le 2026-07-29 en évaluant l'expression elle-même. C'était le troisième retour de cette forme
+ * dans ce fichier, qui documente pourtant sa correction juste au-dessus du ternaire.
+ *
+ * ⚠️ CE TEST ÉVALUE LA SOURCE, PAS UNE RECOPIE. Une constante recopiée ici dériverait du fichier sans
+ * que rien ne le signale, et le test continuerait à passer sur du code qui n'existe plus.
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+t('★ le ✓ du titre se retire quand le JUGEMENT n\'a pas pu regarder, pas seulement la récolte', () => {
+  const bloc = (src.match(/const jugementMuet[\s\S]*?fireable rug power\.';/) || [])[0];
+  assert.ok(bloc, 'le calcul du titre est introuvable — extraction à réparer avant de conclure quoi que ce soit');
+  const titre = (ctx) => new Function('armed', 'UNANSWERED', 'toJudge', 'CHAIN',
+    'traceEchec', 'b20Echec', 'symEchec', bloc + ' return head;')(
+    ctx.armed, ctx.UNANSWERED, ctx.toJudge, 'base', ctx.traceEchec, ctx.b20Echec, ctx.symEchec);
+  const base = { armed: [], UNANSWERED: [], toJudge: new Array(40), traceEchec: 0, b20Echec: 0, symEchec: 0 };
+
+  // BORNE D'ACCEPTATION — sans elle, « toujours avertir » passerait ce test.
+  assert.ok(titre(base).startsWith('✓'), 'un run réellement propre doit garder son ✓');
+
+  // BORNE DE REFUS — le jugement muet retire le ✓ et se NOMME.
+  const j = titre({ ...base, traceEchec: 20, b20Echec: 3, symEchec: 10 });
+  assert.ok(!j.startsWith('✓'), 'jugement tombé: le ✓ est un faux feu vert');
+  assert.match(j, /judgement/, 'et le titre doit dire QUELLE couche, sinon il n\'est pas actionnable');
+
+  // La récolte garde son propre libellé: les deux pannes n'appellent pas la même action.
+  const r = titre({ ...base, UNANSWERED: [{}, {}] });
+  assert.ok(!r.startsWith('✓'));
+  assert.match(r, /harvest/);
+
+  // Une alarme réelle reste une alarme, mais son compte devient un PLANCHER si on n'a pas tout vu.
+  const a = titre({ ...base, armed: [{}], symEchec: 5 });
+  assert.match(a, /^🚩/, 'une prise réelle reste annoncée en premier');
+  assert.match(a, /FLOOR/, 'et le compte se déclare incomplet');
+});
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
  * `dropPct` CONTIENT UNE FRACTION, PAS UN POURCENTAGE — et ce n'est pas un défaut, c'est un piège.
  *
  * Le champ est écrit `t.dropPct = drop` où `drop = 1 - liq/peak`, donc 0,998 pour une pool vidée à
