@@ -57,6 +57,41 @@ t('issuer-verified ONLY (no aggregator file) ⇒ ships green with zero Coingecko
   assert.equal(assessAsset({ token: ADDR }, { registry: r.entries }).provenance, 'issuer-official');
 });
 
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * `complete` EST A TROIS ETATS, et c'est le troisieme qui porte la propriete.
+ * Le drapeau autorise (ou non) le verdict a ACCUSER un contrat sur son absence du registre. Lire
+ * `agg.complete !== false` replierait le troisieme etat — un fichier ecrit avant l'existence du champ —
+ * sur « oui, complet », ce qui est exactement la lecture-ratee-qui-passe-pour-une-lecture-reussie que ce
+ * drapeau existe pour casser. Seul un `true` explicite peut licencier une accusation.
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+t('★ complete: un ingest complet remonte true (borne d\'acceptation — sans elle, "toujours null" passerait)', () => {
+  write('rwa-registry.json', { generatedFrom: 'coingecko (free)', complete: true,
+    entries: [{ issuer: 'Ondo', symbol: 'OUSG', address: OTHER, source: 'coingecko:ondo' }] });
+  assert.equal(loadAssetRegistry({ dir: DIR }).complete, true);
+});
+
+t('★ complete: un ingest ampute remonte false, et la RAISON voyage avec', () => {
+  write('rwa-registry.json', { generatedFrom: 'coingecko (free)', complete: false,
+    incomplete: { failed: [{ category: 'ondo-tokenized-assets', page: 1, error: 'ECONNRESET' }], truncated: [] },
+    entries: [{ issuer: 'Ondo', symbol: 'OUSG', address: OTHER, source: 'coingecko:ondo' }] });
+  const r = loadAssetRegistry({ dir: DIR });
+  assert.equal(r.complete, false);
+  assert.equal(r.incomplete.failed[0].category, 'ondo-tokenized-assets',
+    'sans la raison, « incomplet » n\'est pas actionnable');
+});
+
+t('★ complete: un fichier SANS le champ remonte null — inconnu, et surtout PAS true', () => {
+  write('rwa-registry.json', { generatedFrom: 'coingecko (free)',   // ancien format: pas de `complete`
+    entries: [{ issuer: 'Ondo', symbol: 'OUSG', address: OTHER, source: 'coingecko:ondo' }] });
+  const r = loadAssetRegistry({ dir: DIR });
+  assert.strictEqual(r.complete, null, 'un champ manquant ne devient pas une garantie de completude');
+  assert.notStrictEqual(r.complete, true);
+});
+
+t('★ complete: aucun fichier du tout ⇒ null aussi (rien lu ne vaut pas tout lu)', () => {
+  assert.strictEqual(loadAssetRegistry({ dir: path.join(DIR, 'nope') }).complete, null);
+});
+
 try { fs.rmSync(DIR, { recursive: true, force: true }); } catch {}
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

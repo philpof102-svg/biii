@@ -52,10 +52,25 @@ t('IMPERSONATION (claim mismatch): a real contract labelled as the WRONG asset i
 });
 
 t('IMPERSONATION (the FBI lookalike): an unknown address CLAIMING to be BUIDL points back to the genuine one', () => {
-  const r = assessAsset({ token: FAKE, claimedSymbol: 'BUIDL' }, { registry: REGISTRY });
+  // REGISTRY est un litteral ecrit ici meme: il EST complet par construction, donc le declarer est exact.
+  const r = assessAsset({ token: FAKE, claimedSymbol: 'BUIDL' }, { registry: REGISTRY, registryComplete: true });
   assert.equal(r.status, 'impersonation'); assert.equal(r.safeToAcquire, false);
   assert.equal(r.genuineAddress, BUIDL, 'names the real contract so a human/agent can compare');
   assert.match(r.reason, /genuine BlackRock BUIDL is/);
+  assert.equal(r.confirmed, true, 'sur un registre prouve complet, l\'accusation est etablie');
+});
+
+t('★ LA MEME PRISE, registre NON prouve complet: on refuse toujours, mais on n\'affirme plus la fraude', () => {
+  // Meme entree, meme registre — seule la COMPLETUDE n'est plus declaree. C'est le cas par defaut, donc
+  // celui que rencontre tout appelant qui ne sait pas si son ingest est alle au bout (mesure 2026-07-29:
+  // une categorie Coingecko tombee suffisait a amputer le registre sans que personne ne le sache).
+  const r = assessAsset({ token: FAKE, claimedSymbol: 'BUIDL' }, { registry: REGISTRY });
+  assert.equal(r.status, 'impersonation', 'le refus est CONSERVE — fail-closed, l\'argent ne bouge pas');
+  assert.equal(r.safeToAcquire, false);
+  assert.equal(r.genuineAddress, BUIDL, 'et on nomme toujours l\'adresse connue, pour comparaison');
+  assert.equal(r.confirmed, false, 'mais ce n\'est plus presente comme une fraude etablie');
+  assert.ok(!/genuine BlackRock BUIDL is/.test(r.reason), 'le mot « genuine » n\'est pas merite ici');
+  assert.match(r.reason, /not established as complete/i, 'et la raison dit exactement ce qui manque');
 });
 
 t('UNSAFE: a denylisted contract overrides everything (scam / known-bad)', () => {

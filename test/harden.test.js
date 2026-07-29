@@ -10,7 +10,14 @@ const L = require('../lib/ledger');
 
 let pass = 0, fail = 0;
 const t = (n, fn) => { try { fn(); pass++; console.log('  ✓ ' + n); } catch (e) { fail++; console.log('  ✗ ' + n + '\n      ' + (e && e.message)); } };
-const tA = async (n, fn) => { try { await fn(); pass++; console.log('  ✓ ' + n); } catch (e) { fail++; console.log('  ✗ ' + n + '\n      ' + (e && e.message)); } };
+/* ⚠️ `tA` etait appele SANS await, et le process.exit final tombait avant la resolution: ce fichier
+ * declarait 9 cas et en rapportait 8, en vert, exit 0. Le cas perdu etait celui qui verifie que
+ * findPayment lit le DESTINATAIRE du log — la propriete « un evenement n'est pas une transaction ».
+ * Mesure du 2026-07-29. Les promesses sont desormais collectees et attendues. */
+const enCours = [];
+const tA = (n, fn) => { enCours.push((async () => {
+  try { await fn(); pass++; console.log('  ✓ ' + n); } catch (e) { fail++; console.log('  ✗ ' + n + '\n      ' + (e && e.message)); }
+})()); };
 
 const M = '0x' + 'ab'.repeat(20);
 const okFact = (v) => ({ txHash: '0x' + 'cd'.repeat(32), chainId: 8453, token: T.USDC_BASE, to: M, from: '0x' + 'ee'.repeat(20), valueMicro: String(v), confirmations: 3, blockTime: 1 });
@@ -88,5 +95,20 @@ t('ledger.appendReceipt dedups a txHash case-insensitively (books cannot be padd
   assert.equal(dup.rows.length, 1);
 });
 
-console.log(`\n${pass} passed · ${fail} failed`);
-process.exit(fail ? 1 : 0);
+// Chien de garde SANS .unref() — un unref laisserait Node sortir sur une promesse jamais resolue,
+// c'est-a-dire exactement la panne surveillee.
+const CAS_ATTENDUS = 9;
+const chien = setTimeout(() => {
+  console.error(`\n✗ HARNAIS BLOQUE — ${pass + fail}/${CAS_ATTENDUS} cas termines.`);
+  process.exit(1);
+}, 30000);
+
+Promise.all(enCours).then(() => {
+  clearTimeout(chien);
+  console.log(`\n${pass} passed · ${fail} failed`);
+  if (pass + fail !== CAS_ATTENDUS) {
+    console.error(`✗ ${pass + fail} cas comptes pour ${CAS_ATTENDUS} attendus — un cas ne s'est pas execute.`);
+    process.exit(1);
+  }
+  process.exit(fail ? 1 : 0);
+});

@@ -54,6 +54,7 @@ const fs = require('node:fs'), path = require('node:path');
 // UNDER-verify (a non-registry token reads 'unknown', never a false 'genuine'). Same loader the server uses.
 const _assetReg = loadAssetRegistry();
 const RWA_REGISTRY = _assetReg.entries, RWA_SOURCE = _assetReg.source;
+const RWA_COMPLETE = _assetReg.complete;   // true | false | null(unknown) — null must never read as true
 
 // DECENTRALIZED known-bad floor: a LOCAL, public, open-licensed list (data/known-bad.json). The node
 // screens against it with zero network, so a known-bad address BLOCKs even when the MainStreet oracle is
@@ -587,10 +588,16 @@ async function callTool(name, a = {}) {
       receipt: verdict.paid === true ? I.invoiceReceipt(invoice, verdict, { merchantName: a.merchantName }) : null };
   }
   if (name === 'till_vet_asset') {
+    // registryComplete travels WITH the registry: without it the verdict would keep asserting that a
+    // contract absent from a knowingly-truncated file is an impersonator.
     const verdict = assessAsset({ token: a.token, claimedIssuer: a.claimedIssuer, claimedSymbol: a.claimedSymbol },
-      RWA_REGISTRY ? { registry: RWA_REGISTRY } : {});
+      RWA_REGISTRY ? { registry: RWA_REGISTRY, registryComplete: RWA_COMPLETE } : { registryComplete: RWA_COMPLETE });
     return { verdict, triangleReputation: assetVertex(verdict),
       registrySource: RWA_REGISTRY ? `${RWA_SOURCE} (${RWA_REGISTRY.length} contracts)` : 'seed only (run `node scripts/biii-rwa-registry.js` — free Coingecko source, no key needed)',
+      registryComplete: RWA_COMPLETE,
+      ...(RWA_COMPLETE === true ? {} : { registryCaveat: RWA_COMPLETE === false
+        ? 'the registry file records its own ingest as INCOMPLETE — rows are missing, so an absent contract is not an absent asset'
+        : 'the registry does not state whether its ingest completed, so completeness is UNKNOWN — absence proves nothing' }),
       note: 'ADVISORY. genuine = the contract matches a verified issuer address; impersonation/unknown fail closed.' };
   }
   if (name === 'till_vet_meme') {

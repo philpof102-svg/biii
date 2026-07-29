@@ -136,6 +136,41 @@ t('aucun harnais synchrone ne pilote de test async', () => {
     'harnais synchrone + corps async = des tests qui ne peuvent pas echouer: ' + JSON.stringify(coupables));
 });
 
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * LE MIROIR DU GARDE PRECEDENT — et il fallait le mesurer pour le voir.
+ *
+ * Le cas ci-dessus attrape un harnais SYNCHRONE pilotant des corps async. Le defaut symetrique est un
+ * harnais ASYNC, parfaitement ecrit, dont l'appelant n'attend jamais la promesse: `process.exit` part
+ * avant la resolution et le cas n'est ni compte, ni execute, ni rapporte.
+ *
+ * Mesure du 2026-07-29 — les deux fichiers touches sont EXACTEMENT ceux que le garde precedent avait
+ * du exclure comme faux positifs (voir son commentaire):
+ *   test/harden.test.js        9 cas declares -> « 8 passed · 0 failed », exit 0
+ *   test/rwa-registry.test.js  8 cas declares -> « 7 passed · 0 failed », exit 0
+ * Les cas perdus etaient celui qui verifie le DESTINATAIRE d'un log de paiement, et le seul qui couvre
+ * la pagination de fetchAll — dont la troncature silencieuse a effectivement survecu jusqu'a ce jour.
+ * Un test mort est indiscernable d'un test vert: c'est le motif du depot, applique a l'instrument.
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+t('aucun harnais async ne voit ses cas perdus par une sortie synchrone', () => {
+  const coupables = [];
+  for (const f of fs.readdirSync(__dirname).filter((x) => /\.(c?js|mjs)$/.test(x))) {
+    const src = fs.readFileSync(path.join(__dirname, f), 'utf8');
+    const decl = (src.match(/^\s*const\s+(\w+)\s*=\s*async\s*\(/m) || []);
+    if (!decl.length) continue;
+    const nom = decl[1];
+    /* Un harnais sur COLLECTE ses promesses dans sa propre declaration (push) — la forme corrigee. */
+    if (/\.push\(/.test(decl[0])) continue;
+    /* Les appels en debut de ligne: c'est ainsi que les cas sont ecrits. `await NOM(` est sur. */
+    const appels = (src.match(new RegExp('^' + nom + '\\(', 'gm')) || []).length;
+    const attendus = (src.match(new RegExp('^\\s*await\\s+' + nom + '\\(', 'gm')) || []).length;
+    /* Et la sortie: un process.exit en COLONNE 0 s'execute avant toute promesse en vol. */
+    const sortieSync = /^process\.exit\(/m.test(src);
+    if (appels > attendus && sortieSync) coupables.push(`${f} (${appels - attendus} cas \`${nom}\` perdu(s))`);
+  }
+  assert.deepStrictEqual(coupables, [],
+    'harnais async + sortie synchrone = des cas qui ne s\'executent jamais, en vert: ' + JSON.stringify(coupables));
+});
+
 console.log('\n' + fichiers.length + ' fichier(s) de test verifie(s)');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

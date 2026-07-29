@@ -62,11 +62,21 @@ function buildRegistry(tokens, assets, { chains = DEFAULT_CHAINS } = {}) {
   return { entries, seen, dropped };
 }
 
-/** Fetch every page of a v4 endpoint (assets | tokens) with the operator's Bearer key. */
+/**
+ * Fetch every page of a v4 endpoint (assets | tokens) with the operator's Bearer key.
+ *
+ * ⚠️ RETURNS { rows, pages, hitPageCap } — deliberately NOT a bare array. Falling out of the loop at
+ * `maxPages` and reaching a genuinely short last page used to return the same flat array, so a
+ * TRUNCATED ingest was indistinguishable from a complete one. Measured 2026-07-29: 300 rows stopped at
+ * the cap and 107 rows at a real last page came back identically shaped, and the caller then published
+ * a count as though the source had been exhausted. `hitPageCap` starts TRUE and is only cleared by a
+ * short page — the one thing that actually proves exhaustion.
+ */
 async function fetchAll(endpoint, { apiKey, fetchImpl, baseUrl = 'https://api.rwa.xyz', perPage = 100, maxPages = 60, timeoutMs = 20000, sort } = {}) {
   if (!apiKey) throw new Error('RWA_XYZ_API_KEY required (RWA.xyz API is the authoritative source)');
   const f = fetchImpl || fetch;
   const all = [];
+  let pages = 0, hitPageCap = true;   // assume truncation until a short page PROVES the source is spent
   for (let page = 1; page <= maxPages; page++) {
     const query = JSON.stringify({ ...(sort ? { sort } : {}), pagination: { page, perPage } });
     const url = `${baseUrl}/v4/${endpoint}?query=${encodeURIComponent(query)}`;
@@ -77,17 +87,26 @@ async function fetchAll(endpoint, { apiKey, fetchImpl, baseUrl = 'https://api.rw
     if (!res || res.ok === false) throw new Error(`rwa.xyz /${endpoint} HTTP ` + (res && res.status));
     const j = await res.json();
     const batch = Array.isArray(j) ? j : (j.data || j.results || j[endpoint] || []);
+    pages++;
     all.push(...batch);
-    if (batch.length < perPage) break;   // last page
+    if (batch.length < perPage) { hitPageCap = false; break; }   // short page = source exhausted
   }
-  return all;
+  return { rows: all, pages, hitPageCap };
 }
 
-/** Fetch tokens + assets and build the registry. */
+/**
+ * Fetch tokens + assets and build the registry.
+ * Reports its own COMPLETENESS: a registry that lost pages is not a smaller registry, it is a registry
+ * whose absences no longer mean anything (see the warning on assessAsset's symbol-collision branch).
+ */
 async function ingestRegistry(opts = {}) {
   const tokens = await fetchAll('tokens', opts);
   const assets = await fetchAll('assets', { ...opts, sort: { field: 'circulating_market_value_dollar', direction: 'desc' } });
-  return buildRegistry(tokens, assets, opts);
+  const built = buildRegistry(tokens.rows, assets.rows, opts);
+  const truncated = [];
+  if (tokens.hitPageCap) truncated.push({ endpoint: 'tokens', stoppedAtPage: tokens.pages });
+  if (assets.hitPageCap) truncated.push({ endpoint: 'assets', stoppedAtPage: assets.pages });
+  return { ...built, failed: [], truncated, complete: truncated.length === 0 };
 }
 
 // ── FREE alternative source: Coingecko (no API key) ──────────────────────────────────────────────
@@ -152,30 +171,46 @@ function buildRegistryFromCoingecko(members, platformList, { chains = DEFAULT_CH
   return { entries, seen, dropped };
 }
 
-/** Ingest the registry from Coingecko (free, no key needed — a demo key just raises the rate limit). */
+/**
+ * Ingest the registry from Coingecko (free, no key needed — a demo key just raises the rate limit).
+ *
+ * ⚠️ A CATEGORY THAT FAILS IS NOT A CATEGORY THAT IS EMPTY. The old `catch { break }` swallowed the
+ * error whole: the coins never reached `members`, so `buildRegistryFromCoingecko` skipped them before
+ * ever incrementing `seen` or `dropped`. Measured 2026-07-29 on this exact code — one ECONNRESET turned
+ * `entries=2 seen=2 dropped=0` into `entries=0 seen=0 dropped=0`, byte-for-byte what a legitimately
+ * empty category produces. The script then printed that count as a finished ingest.
+ * The failure is now CARRIED OUT of the function, because the caller's registry is what pays for it.
+ */
 async function ingestFromCoingecko(opts = {}) {
   const cats = opts.categories || CG_CATEGORIES;
   const members = new Map();
   const catEntries = Object.entries(cats);
+  const catMax = opts.catMaxPages || 4;
+  const failed = [], truncated = [];
   let firstCall = true;
   for (const [catId, issuer] of catEntries) {
-    for (let page = 1; page <= (opts.catMaxPages || 4); page++) {   // paginate — real-world-assets-rwa exceeds 250
-      if (!firstCall && !opts.fetchImpl) await sleep(2500);         // space real calls under the free-tier limit
+    for (let page = 1; page <= catMax; page++) {                   // paginate — real-world-assets-rwa exceeds 250
+      if (!firstCall && !opts.fetchImpl) await sleep(2500);        // space real calls under the free-tier limit
       firstCall = false;
       let coins;
-      try { coins = await cg(`/coins/markets?vs_currency=usd&category=${encodeURIComponent(catId)}&per_page=250&page=${page}`, opts); } catch { break; }
-      if (!Array.isArray(coins) || !coins.length) break;
+      try { coins = await cg(`/coins/markets?vs_currency=usd&category=${encodeURIComponent(catId)}&per_page=250&page=${page}`, opts); }
+      catch (e) { failed.push({ category: catId, page, error: e.message }); break; }
+      // A non-array body is SCHEMA DRIFT, not an empty category — the same two cases again, one line apart.
+      if (!Array.isArray(coins)) { failed.push({ category: catId, page, error: 'response was not an array (schema drift?)' }); break; }
+      if (!coins.length) break;                                    // genuinely empty — nothing to report
       for (const c of coins) {
         if (!c || !c.id) continue;
         const prev = members.get(c.id);
         if (!prev || (!prev.issuer && issuer)) members.set(c.id, { issuer, category: catId, name: c.name });  // specific issuer wins
       }
       if (coins.length < 250) break;                               // last page for this category
+      if (page === catMax) truncated.push({ category: catId, stoppedAtPage: page });  // full page AT the cap
     }
   }
   if (!opts.fetchImpl) await sleep(2500);
   const platformList = await cg('/coins/list?include_platform=true', opts);  // ~one big call, all coins+platforms
-  return buildRegistryFromCoingecko(members, platformList, opts);
+  const built = buildRegistryFromCoingecko(members, platformList, opts);
+  return { ...built, failed, truncated, complete: !failed.length && !truncated.length };
 }
 
 module.exports = { buildRegistry, fetchAll, ingestRegistry, toChainId, CHAIN_IDS, DEFAULT_CHAINS,
@@ -191,15 +226,28 @@ if (require.main === module) {
       const useRwaxyz = !!process.env.RWA_XYZ_API_KEY;
       const src = useRwaxyz ? 'rwa.xyz/v4 (tokens⋈assets)' : 'coingecko (free)';
       console.log(`[rwa-registry] sourcing from ${src}…`);
-      const { entries, seen, dropped } = useRwaxyz
+      const { entries, seen, dropped, complete, failed = [], truncated = [] } = useRwaxyz
         ? await ingestRegistry({ apiKey: process.env.RWA_XYZ_API_KEY })
         : await ingestFromCoingecko({ apiKey: process.env.COINGECKO_API_KEY });
       const dir = path.join(__dirname, '..', 'data'); fs.mkdirSync(dir, { recursive: true });
       const out = path.join(dir, 'rwa-registry.json');
-      fs.writeFileSync(out, JSON.stringify({ generatedFrom: src, count: entries.length, entries }, null, 2) + '\n');
+      // `complete` is WRITTEN INTO THE FILE, not just logged: the consumer that decides genuine vs
+      // impersonation reads the file, never this console. An absence in an incomplete registry is not
+      // evidence — and only this flag lets the reader tell the two apart.
+      fs.writeFileSync(out, JSON.stringify({ generatedFrom: src, complete, count: entries.length,
+        incomplete: complete ? null : { failed, truncated,
+          note: 'Rows are MISSING from this registry. A contract absent here may be perfectly genuine and '
+              + 'merely un-ingested: absence is NOT evidence of impersonation.' },
+        entries }, null, 2) + '\n');
       console.log(`[rwa-registry] ${entries.length} verified contracts written to ${out} (${seen} seen, ${dropped} dropped as off-chain/unvalidated)`);
       if (entries.length) console.log('[rwa-registry] sample:', JSON.stringify(entries.slice(0, 3)));
       else console.warn('[rwa-registry] EMPTY — confirm the source response shape.');
+      if (!complete) {
+        for (const f of failed) console.warn(`[rwa-registry] ⚠️ category "${f.category}" p${f.page} FAILED: ${f.error} — its contracts are missing, not absent`);
+        for (const t of truncated) console.warn(`[rwa-registry] ⚠️ ${t.category || t.endpoint} stopped at the page cap (p${t.stoppedAtPage}) — more rows exist upstream`);
+        console.warn('[rwa-registry] registry marked INCOMPLETE. Downstream must not read a missing contract as an impersonator.');
+        process.exit(3);        // a third outcome: we wrote a file, and it is knowingly partial
+      }
       process.exit(0);
     } catch (e) { console.error('[rwa-registry] failed:', e.message); process.exit(1); }
   })();

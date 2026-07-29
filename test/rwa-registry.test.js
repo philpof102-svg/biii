@@ -2,12 +2,23 @@
 // BIII RWA registry ingest — joins RWA.xyz /v4/tokens ⋈ /v4/assets, fail-safe.
 // Run: node test/rwa-registry.test.js
 const assert = require('node:assert');
-const { buildRegistry, fetchAll, toChainId, buildRegistryFromCoingecko } = require('../scripts/biii-rwa-registry');
+const { buildRegistry, fetchAll, toChainId, buildRegistryFromCoingecko,
+  ingestFromCoingecko, ingestRegistry } = require('../scripts/biii-rwa-registry');
 const { assessAsset } = require('../lib/asset');
 
+/* ⚠️ CE HARNAIS NE SE COMPTAIT PAS LUI-MEME — mesure du 2026-07-29 sur la version commitee:
+ *   « 7 passed · 0 failed », exit 0 ... pour un fichier qui contenait HUIT cas.
+ * `tA` etait appele SANS `await`, et le `process.exit` final s'executait avant que la promesse ne se
+ * resolve. Le seul cas couvrant fetchAll (pagination, en-tete Bearer, rejet sans cle) n'a donc jamais
+ * tourne — ce qui explique pourquoi la troncature a `maxPages` a survecu jusqu'ici: son test etait mort,
+ * et un test mort ressemble exactement a un test vert. Les promesses sont desormais COLLECTEES et
+ * attendues, et le total est compare a un nombre attendu. */
 let pass = 0, fail = 0;
+const enCours = [];
 const t = (n, fn) => { try { fn(); pass++; console.log('  ✓ ' + n); } catch (e) { fail++; console.log('  ✗ ' + n + '\n      ' + (e && e.message)); } };
-const tA = async (n, fn) => { try { await fn(); pass++; console.log('  ✓ ' + n); } catch (e) { fail++; console.log('  ✗ ' + n + '\n      ' + (e && e.message)); } };
+const tA = (n, fn) => { enCours.push((async () => {
+  try { await fn(); pass++; console.log('  ✓ ' + n); } catch (e) { fail++; console.log('  ✗ ' + n + '\n      ' + (e && e.message)); }
+})()); };
 
 const BUIDL_ETH = '0x' + '11'.repeat(20);
 const BUIDL_BASE = '0x' + '22'.repeat(20);
@@ -106,12 +117,123 @@ tA('fetchAll sends the Bearer key, uses the v4 query= param, paginates, returns 
     return { ok: true, json: async () => (page === 1 ? full : last) };
   };
   const all = await fetchAll('tokens', { apiKey: 'KEY123', fetchImpl: fakeFetch });
-  assert.equal(all.length, 101);
+  assert.equal(all.rows.length, 101);
+  assert.equal(all.hitPageCap, false, 'a short page PROVES the source is exhausted');
   assert.equal(calls.length, 2, 'stopped after the short page');
   assert.match(calls[0].auth, /Bearer KEY123/);
   assert.match(calls[0].url, /\/v4\/tokens\?query=.*pagination/i, 'uses /v4/<endpoint> with the query= param');
   await assert.rejects(() => fetchAll('assets', { apiKey: '', fetchImpl: fakeFetch }), /API_KEY required/);
 });
 
-console.log(`\n${pass} passed · ${fail} failed`);
-process.exit(fail ? 1 : 0);
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * UNE LECTURE QUI ECHOUE NE DOIT PAS RESSEMBLER A UNE LECTURE VIDE.
+ * Les trois cas ci-dessous ont ete MESURES en defaut le 2026-07-29 avant correction; chacun porte donc
+ * sa borne d'acceptation a cote de sa borne de refus, sinon « tout marquer incomplet » les satisferait.
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+const rep = (o) => ({ ok: true, status: 200, json: async () => o });
+const COIN = { id: 'ondo-us-dollar-yield', symbol: 'ousg', name: 'Ondo Short-Term US Gov',
+  platforms: { ethereum: '0x' + 'a'.repeat(40), base: '0x' + 'b'.repeat(40) } };
+const CATS = { 'ondo-tokenized-assets': 'Ondo', 'tokenized-treasuries': null };
+const reseau = ({ casse = false, nonTableau = false } = {}) => async (url) => {
+  if (url.includes('/coins/list')) return rep([COIN]);
+  if (url.includes('category=ondo-tokenized-assets')) {
+    if (casse) throw new Error('ECONNRESET');
+    if (nonTableau) return rep({ error: 'rate limited' });     // derive de schema, PAS une categorie vide
+    return rep([COIN]);
+  }
+  return rep([]);                                              // les autres categories: vraiment vides
+};
+
+tA('★ une categorie qui ECHOUE est signalee — elle ne se confond plus avec une categorie vide', async () => {
+  const sain = await ingestFromCoingecko({ fetchImpl: reseau(), categories: CATS });
+  const casse = await ingestFromCoingecko({ fetchImpl: reseau({ casse: true }), categories: CATS });
+
+  // BORNE D'ACCEPTATION — un ingest sain doit se declarer COMPLET, sinon le drapeau ne dit plus rien.
+  assert.equal(sain.complete, true, 'un reseau sain doit produire un registre complet');
+  assert.equal(sain.failed.length, 0);
+  assert.ok(sain.entries.length > 0, 'et des entrees reelles');
+
+  // BORNE DE REFUS — la panne doit etre PORTEE dehors, pas avalee.
+  assert.equal(casse.complete, false, 'un ECONNRESET ne peut pas produire un registre "complet"');
+  assert.equal(casse.failed.length, 1, 'la categorie tombee doit etre nommee');
+  assert.equal(casse.failed[0].category, 'ondo-tokenized-assets');
+  assert.match(casse.failed[0].error, /ECONNRESET/);
+  // ce qui rendait le defaut invisible: entries/seen/dropped sont IDENTIQUES a une categorie vide.
+  assert.equal(casse.entries.length, 0);
+  assert.equal(casse.seen, 0);
+  assert.equal(casse.dropped, 0);
+});
+
+tA('★ un corps qui n\'est pas un tableau est une DERIVE DE SCHEMA, pas une categorie vide', async () => {
+  const r = await ingestFromCoingecko({ fetchImpl: reseau({ nonTableau: true }), categories: CATS });
+  assert.equal(r.complete, false);
+  assert.match(r.failed[0].error, /not an array/i);
+});
+
+tA('★ la pagination au plafond se distingue d\'une source epuisee', async () => {
+  const pleine = (n) => Array.from({ length: n }, (_, i) => ({ address: '0x' + String(i).padStart(40, '0'),
+    network_name: 'base', ticker: 'T' + i, asset_id: 'a' + i }));
+  const jamaisFini = async () => rep({ data: pleine(100) });
+  const cap = await fetchAll('tokens', { apiKey: 'k', fetchImpl: jamaisFini, perPage: 100, maxPages: 3 });
+  assert.equal(cap.rows.length, 300);
+  assert.equal(cap.hitPageCap, true, 'arret au plafond: la source n\'est PAS prouvee epuisee');
+  assert.equal(cap.pages, 3);
+
+  // BORNE D'ACCEPTATION deja couverte plus haut (hitPageCap === false sur page courte), et ingestRegistry
+  // doit propager le plafond jusqu'au drapeau publie.
+  const ing = await ingestRegistry({ apiKey: 'k', fetchImpl: jamaisFini, perPage: 100, maxPages: 2 });
+  assert.equal(ing.complete, false, 'un ingest tronque ne peut pas se declarer complet');
+  assert.ok(ing.truncated.some((t) => t.endpoint === 'tokens'));
+});
+
+/* Et le maillon qui donne son poids a tout ce qui precede: ce que le registre ampute fait au VRAI
+ * contrat. Sans ce cas, les drapeaux ci-dessus ne seraient que de la comptabilite. */
+t('★ un contrat AUTHENTIQUE absent d\'un registre incomplet n\'est plus ACCUSE de fraude', () => {
+  const ETH = '0x' + 'a'.repeat(40), BASE = '0x' + 'b'.repeat(40);
+  const complet = [{ issuer: 'Ondo', symbol: 'OUSG', chainId: 1, address: ETH, source: 'coingecko:ondo' },
+                   { issuer: 'Ondo', symbol: 'OUSG', chainId: 8453, address: BASE, source: 'coingecko:ondo' }];
+  const ampute = [complet[0]];                        // la ligne Base a saute pendant l'ingest
+  const demande = { token: BASE, claimedSymbol: 'OUSG', claimedIssuer: 'Ondo' };
+
+  // BORNE D'ACCEPTATION — registre complet: le vrai contrat reste genuine. Sans ce cas, « ne jamais
+  // rien certifier » passerait le test.
+  assert.equal(assessAsset(demande, { registry: complet, registryComplete: true }).status, 'genuine');
+
+  // La prise qui compte reste vivante: une COLLISION DE SYMBOLE sur un registre reputé complet
+  // s'affirme encore comme une usurpation etablie.
+  const usurpateur = assessAsset({ token: '0x' + 'c'.repeat(40), claimedSymbol: 'OUSG', claimedIssuer: 'Ondo' },
+    { registry: complet, registryComplete: true });
+  assert.equal(usurpateur.status, 'impersonation');
+  assert.equal(usurpateur.confirmed, true, 'registre complet => l\'accusation est etablie');
+  assert.ok(!/not established as complete/i.test(usurpateur.reason), 'et elle ne s\'excuse pas');
+
+  // BORNE DE REFUS — registre ampute: on REFUSE toujours (l'argent ne bouge pas) mais on n'AFFIRME plus.
+  const v = assessAsset(demande, { registry: ampute, registryComplete: false });
+  assert.equal(v.safeToAcquire, false, 'fail-closed: le refus est conserve');
+  assert.equal(v.confirmed, false, 'mais il n\'est PAS presente comme une fraude etablie');
+  assert.match(v.reason, /not established as complete/i, 'et la raison DIT pourquoi');
+
+  // Le troisieme etat: completude INCONNUE ne vaut pas completude PROUVEE.
+  assert.equal(assessAsset(demande, { registry: ampute }).confirmed, false,
+    'par defaut (registryComplete absent) on n\'accuse pas non plus');
+});
+
+/* Le chien de garde n'a PAS de .unref() : un unref laisserait Node sortir proprement sur une promesse
+ * qui ne se resout jamais — exactement la panne qu'il surveille. */
+const CAS_ATTENDUS = 12;
+const chien = setTimeout(() => {
+  console.error(`\n✗ HARNAIS BLOQUE — ${pass + fail}/${CAS_ATTENDUS} cas termines. Une promesse ne s'est jamais resolue.`);
+  process.exit(1);
+}, 30000);
+
+Promise.all(enCours).then(() => {
+  clearTimeout(chien);
+  const total = pass + fail;
+  console.log(`\n${pass} passed · ${fail} failed`);
+  if (total !== CAS_ATTENDUS) {
+    console.error(`✗ ${total} cas comptes pour ${CAS_ATTENDUS} attendus — un cas ne s'est pas execute. `
+      + `C'est une ERREUR, pas un detail: un cas absent est indiscernable d'un cas vert.`);
+    process.exit(1);
+  }
+  process.exit(fail ? 1 : 0);
+});
