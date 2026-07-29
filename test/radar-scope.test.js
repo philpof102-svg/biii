@@ -170,22 +170,45 @@ t('★ le ✓ du titre se retire quand le JUGEMENT n\'a pas pu regarder, pas seu
  * fraction comme un pourcentage et annoncé une variance nulle qui n'existait pas. Le coût est donc
  * établi, pas hypothétique. D'où une garde sur LES DONNÉES, là où des unités mélangées apparaîtraient.
  * ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+/* ⚠️ CES DEUX GARDES S'ESQUIVAIENT EN SILENCE — et je les ai ecrits ce matin.
+ * `if (!fs.existsSync(DB)) return;` rendait « ok » sans avoir rien inspecte, indiscernable d'une passe
+ * ayant verifie 785 lignes. Mesure du 2026-07-29 en pointant DB sur un chemin inexistant:
+ *
+ *   ok   ★ dropPct est une FRACTION partout — aucune ligne en pourcentage
+ *   ok   ★ et le seuil de rug reste cohérent avec cette unité       ->  « 9 passed, 0 failed »
+ *
+ * Or `data/token-radar/` est explicitement DE-IGNORE dans .gitignore: la base est suivie, donc son
+ * absence est un checkout casse, pas une condition normale a absorber. Le garde ecrit contre la derive
+ * d'un chiffre publie ne doit pas etre le seul endroit du depot ou un succes vide passe. */
 const DB = path.join(__dirname, '..', 'data', 'token-radar', 'tokens.json');
+const lireBase = () => {
+  assert.ok(fs.existsSync(DB), 'base du radar introuvable (' + DB + '). Elle est SUIVIE par git — son '
+    + 'absence est un checkout casse, pas « rien a contredire ». Un test qui s\'esquive ici rend « ok ».');
+  const rows = Object.values(JSON.parse(fs.readFileSync(DB, 'utf8')));
+  assert.ok(rows.length > 0, 'succes VIDE: la base est presente mais ne contient aucune ligne.');
+  return rows;
+};
+
 t('★ dropPct est une FRACTION partout — aucune ligne en pourcentage', () => {
-  if (!fs.existsSync(DB)) return;                    // pas de base locale: rien à contredire
-  const db = JSON.parse(fs.readFileSync(DB, 'utf8'));
-  const vals = Object.values(db).map((x) => x && x.dropPct).filter((v) => typeof v === 'number');
-  if (!vals.length) return;                          // aucun rug enregistré encore
+  const rows = lireBase();
+  const vals = rows.map((x) => x && x.dropPct).filter((v) => typeof v === 'number');
+  /* Tout `rugged` DOIT porter un dropPct numerique. Sans ce croisement, le champ pourrait disparaitre
+   * entierement et le garde resterait vert en n'inspectant plus rien — la panne d'a cote. */
+  const rugs = rows.filter((x) => x && x.outcome === 'rugged');
+  const rugsSansDrop = rugs.filter((x) => typeof x.dropPct !== 'number');
+  assert.equal(rugsSansDrop.length, 0, rugsSansDrop.length + ' ligne(s) `rugged` sans dropPct numerique : '
+    + 'le champ que ce garde surveille a disparu de la base, et le garde ne garde plus rien.');
+  assert.ok(vals.length > 0, 'succes VIDE: aucune valeur dropPct inspectee sur ' + rows.length + ' ligne(s).');
+
   const horsBorne = vals.filter((v) => v > 1);
   assert.equal(horsBorne.length, 0,
     horsBorne.length + ' ligne(s) portent un dropPct > 1 : quelqu\'un a converti le champ en pourcentage, '
     + 'et la base mélange désormais deux unités dans le même champ. Exemples: ' + horsBorne.slice(0, 3).join(', '));
 });
+
 t('★ et le seuil de rug reste cohérent avec cette unité', () => {
-  if (!fs.existsSync(DB)) return;
-  const db = JSON.parse(fs.readFileSync(DB, 'utf8'));
-  const vals = Object.values(db).filter((x) => x && x.outcome === 'rugged' && typeof x.dropPct === 'number');
-  if (!vals.length) return;
+  const vals = lireBase().filter((x) => x && x.outcome === 'rugged' && typeof x.dropPct === 'number');
+  assert.ok(vals.length > 0, 'succes VIDE: aucune ligne `rugged` chiffree a confronter au seuil.');
   // RUG_DROP vaut 0.80 dans token-radar.js : aucune ligne marquée `rugged` ne peut être sous ce seuil.
   const sousSeuil = vals.filter((x) => x.dropPct < 0.80);
   assert.equal(sousSeuil.length, 0, sousSeuil.length + ' ligne(s) `rugged` sous le seuil de 0,80');
