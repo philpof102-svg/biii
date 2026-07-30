@@ -39,6 +39,34 @@ t('verified!==true → bound:false: a claim is NOT a binding (BIII does not veri
   assert.ok(r.reVerify.message && r.reVerify.check, 'still ships the re-verify pointer + the exact message');
 });
 
+// ── a REFUSED result must not hand back a "verify me" instruction over an unvalidated message ──
+// bound:false was always honest; reVerify.check was not — it came out byte-identical on refusal and on
+// success, telling the caller to verify signatures that were null. These pin the PROPERTY (what the field
+// says), not its presence: `assert.ok(check)` passes for any non-empty string, including the wrong one.
+t('a REFUSED binding tells the caller NOT to sign the message it hands back', () => {
+  const r = bindingLens({});
+  assert.equal(r.bound, false);
+  assert.match(r.reVerify.check, /do NOT sign/i, 'the instruction must contradict signing, not invite it');
+  assert.doesNotMatch(r.reVerify.check, /^reconstruct/i, 'it must not be the success instruction verbatim');
+});
+
+t('the refusal instruction DIFFERS from the success one (else the field carries no information)', () => {
+  const refuse = bindingLens({}).reVerify.check;
+  const bound = bindingLens(ok()).reVerify.check;
+  assert.notEqual(refuse, bound, 'identical text on both outcomes = the caller cannot tell them apart');
+  // BORNE OPPOSÉE: without this, replacing every check with "REFUSED" would satisfy the assertion above.
+  assert.match(bound, /^reconstruct/i, 'a bound result must still ship the real re-verify instruction');
+  assert.equal(bindingLens(ok()).bound, true, 'and must still actually bind');
+});
+
+t('an empty call still yields a constant, nonce-free message — so the refusal must name that', () => {
+  const a = bindingLens({}), b = bindingLens({});
+  assert.equal(a.message, b.message, 'two empty calls are byte-identical (this is the replay shape)');
+  assert.match(a.message, /^BIII-IDENTITY-BINDING-v1\n/, 'and it carries the canonical v1 header');
+  assert.ok(a.message, 'message is KEPT on refusal — it shows what WOULD be signed (non-breaking)');
+  assert.match(a.reVerify.check, /constant|nonce-free|replayable/i, 'the refusal names why it is dangerous');
+});
+
 t('a ONE-SIDED binding (missing a signature) is refused — each key + the Base key must sign', () => {
   assert.equal(bindingLens(ok({ sigBase: null })).bound, false);
   assert.match(bindingLens(ok({ sigBase: null })).reason, /base signature|bidirectional/i);
