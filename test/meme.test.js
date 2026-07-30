@@ -73,6 +73,26 @@ t('8453 en CHAINE de caracteres marche aussi — JSON-RPC transporte souvent des
     candidatesFrom(PAIRES, 'DEGEN', 8453).map((x) => x.address));
 });
 
+/* ★ LA PAIRE QUI AVAIT DIVERGÉ — et c'est la seule qui manquait.
+ *
+ * Les deux cas ci-dessus vérifient chacun leur forme contre `DEGEN_BASE`, mais rien ne comparait les deux
+ * ENSEMBLES entre eux. Or le défaut du 2026-07-27 n'était pas « une forme est cassée » : c'était une
+ * DIVERGENCE entre les deux, chacune fausse dans un sens opposé —
+ *
+ *   chainId:'base'  ->  filtre mort, un contrat SOLANA certifié « genuine »
+ *   chainId:8453    ->  tout écarté, « thin » sur un token qui existe
+ *
+ * Un garde contre une divergence se pose sur la comparaison directe, pas sur deux assertions parallèles :
+ * deux cas qui vérifient la même borne peuvent glisser ensemble sans que rien ne le dise.
+ * Vérifié au runtime le 2026-07-30 via vetMeme : les deux formes rendent `genuine`/`base`/1 candidat. */
+t('★ 8453 et « base » rendent le MÊME ensemble — la divergence est ce qui avait cassé', () => {
+  const parId = candidatesFrom(PAIRES, 'DEGEN', 8453);
+  const parSlug = candidatesFrom(PAIRES, 'DEGEN', 'base');
+  assert.deepStrictEqual(parId.map((x) => x.address + '@' + x.chain), parSlug.map((x) => x.address + '@' + x.chain),
+    'les deux écritures de la même chaîne doivent être indiscernables en sortie');
+  assert.ok(parId.length > 0, 'et non pas identiquement VIDES: deux ensembles vides seraient « égaux » sans rien prouver');
+});
+
 t('la casse du slug est sans importance', () => {
   assert.strictEqual(candidatesFrom(PAIRES, 'DEGEN', 'BASE').length, DEGEN_BASE);
 });
