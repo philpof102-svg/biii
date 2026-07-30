@@ -831,8 +831,28 @@ async function handleRpc(m) {
       return { jsonrpc: '2.0', id, error: { code: -32601,
         message: `unknown tool "${params && params.name}" — it does not exist on this server; call tools/list for the current set` } };
     }
-    // stable, non-leaky error (CWE-209): the detail is in the server log, not the JSON-RPC reply.
-    const msg = method === 'tools/call' ? `tool "${params && params.name}" failed — check arguments` : 'request failed';
+    /* ⚠️ « CHECK ARGUMENTS » N'EST PAS VAGUE, C'EST UNE ATTRIBUTION — et elle était fausse la moitié du
+     * temps. CWE-209 demande de ne pas divulguer le DÉTAIL interne (traces, chemins, erreur amont) ; il
+     * ne demande pas de désigner un coupable. Mesuré le 2026-07-30, arguments VALIDES et BASE_RPC_URL
+     * mort :
+     *
+     *   TypeError: fetch failed  ->  «tool "till_check_payment" failed — check arguments»
+     *
+     * Sur l'outil qui répond « ai-je été payé ? », un marchand dont le nœud est tombé s'entend donc dire
+     * que ses données de paiement sont fausses. Les deux causes appellent des actions OPPOSÉES : une
+     * erreur d'entrée se corrige en changeant la requête, une panne amont se corrige en réessayant plus
+     * tard. Ce fichier avait déjà corrigé exactement ça pour `till_trust` (28/07) — mais outil par outil,
+     * avec un try/catch local. Le catch générique continuait d'attribuer pour tous les autres.
+     * On ne nomme donc plus de cause : on dit que l'appel n'a pas abouti, et que les deux hypothèses
+     * restent ouvertes. Aucune information nouvelle ne sort ; une fausse accusation disparaît. */
+    const msg = method === 'tools/call'
+      // « failed » RESTE: c'est la categorie stable qu'un client peut router (et un test l'epingle a
+      // juste titre). Ce n'est pas une attribution — l'appel a bel et bien echoue. C'est « check
+      // arguments » qui designait un coupable, et c'est cela seul qui part.
+      ? `tool "${params && params.name}" failed — it exists and was reached. The cause may be `
+        + `the arguments OR an upstream/network failure on our side; the detail is in the server log, not `
+        + `in this reply. Retry once before changing the request.`
+      : 'request failed';
     return { jsonrpc: '2.0', id, error: { code: -32000, message: msg } };
   }
 }

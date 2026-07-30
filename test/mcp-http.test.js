@@ -80,6 +80,30 @@ const getStatus = (s, path) => new Promise((resolve) => { const a = s.address();
       'never send someone to debug arguments for a tool that was never implemented');
   });
 
+  await t('★ un outil qui LÈVE n\'accuse plus l\'appelant — la panne amont et l\'erreur d\'entrée sont indiscernables ici', async () => {
+    /* « check arguments » n'est pas vague, c'est une ATTRIBUTION — et elle était fausse la moitié du temps.
+     * CWE-209 demande de ne pas divulguer le DÉTAIL interne ; il ne demande pas de désigner un coupable.
+     * Mesuré le 2026-07-30, arguments VALIDES et BASE_RPC_URL mort :
+     *   TypeError: fetch failed  ->  «tool "till_check_payment" failed — check arguments»
+     * Sur l'outil qui répond « ai-je été payé ? », un marchand dont le nœud est tombé s'entendait dire que
+     * ses données de paiement étaient fausses. Les deux causes appellent des actions OPPOSÉES : changer la
+     * requête, ou réessayer plus tard. Le catch générique ne peut pas les distinguer — donc il ne doit
+     * trancher NI dans un sens NI dans l'autre. (Le cas voisin, l'outil inconnu, garde son -32601 : lui,
+     * on sait.) */
+    const r = await rpc(s, { jsonrpc: '2.0', id: 7, method: 'tools/call',
+      params: { name: 'till_check_payment', arguments: {} } });
+    assert.ok(r.body.error, 'un outil qui lève doit rendre une erreur JSON-RPC');
+    assert.strictEqual(r.body.error.code, -32000, 'l\'outil EXISTE: -32000, pas -32601');
+    assert.ok(!/check arguments/i.test(r.body.error.message),
+      'ne jamais attribuer la faute a l\'appelant quand on ne sait pas de quel cote elle est');
+    assert.match(r.body.error.message, /may be the arguments OR an upstream/i,
+      'les DEUX hypotheses doivent rester ouvertes, sinon on accuse');
+    assert.match(r.body.error.message, /server log/i, 'et dire ou vit le detail');
+    // CWE-209 tient toujours: rien d'interne ne sort.
+    assert.ok(!/\\|\/Users\/|at [A-Za-z]+ \(|TypeError|ECONNREFUSED/.test(r.body.error.message),
+      'aucun chemin, aucune trace, aucun texte d\'erreur amont dans la reponse');
+  });
+
   s.close();
   console.log(`\n${n} passed · ${f} failed`);
   if (f) process.exit(1);
