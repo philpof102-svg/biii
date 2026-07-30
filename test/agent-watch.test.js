@@ -24,6 +24,11 @@ const t = (n, fn) => { try { fn(); pass++; console.log('  ✓ ' + n); } catch (e
 const E = { name: 'demo/mcp', url: 'https://demo.example/mcp' };
 const surface = ({ moves = [], secret = [] } = {}) => ({
   toolCount: moves.length + secret.length + 1,
+  // ⚠️ `callerSigned` et `witnessesPayment` sont ICI pour une raison: la ligne `names` les OUBLIAIT.
+  // Elle énumérait quatre seaux sur six, donc un outil dont l'appelant doit signer (EIP-712) n'était
+  // jamais nommé — une omission, pas une fausse valeur, et une omission ne se voit pas.
+  callerSigned: [{ name: 'tipSigned', verb: 'tip' }],
+  witnessesPayment: [{ name: 'watchPay', verb: 'watch' }],
   readOnly: ['ping'],
   movesValue: moves.map((name) => ({ name })),
   namedButNoSurface: [],
@@ -43,6 +48,24 @@ t('★ une surface NON LUE rend null sur les deux champs qui portent le propos',
    * connaissait la forme et ne l avait appliquée qu à la moitié des champs. */
   assert.strictEqual(PAS_LU.tools, null);
   assert.strictEqual(PAS_LU.names, null);
+});
+
+/* ⚠️ `names` ÉNUMÉRAIT QUATRE SEAUX SUR SIX — mesuré le 2026-07-30.
+ * `callerSigned` (l appelant doit produire une signature EIP-712, donc l agent seul ne déplace rien) et
+ * `witnessesPayment` étaient absents de la liste. Un outil qui existe mais n est pas nommé se lit comme
+ * un outil qui n existe pas — et c est une OMISSION, plus dure à voir qu une fausse valeur parce qu il
+ * n y a rien à regarder. Trouvé en vérifiant une affirmation tirée d un grep: le grep donne la forme,
+ * pas le compte. La ligne DÉRIVE maintenant les seaux au lieu de les énumérer, donc ce test garde aussi
+ * le septième seau que personne n a encore écrit. */
+t('★ `names` porte TOUS les seaux — un outil signé par l appelant est nommé, pas oublié', () => {
+  const noms = LU_VIDE.names.split(',');
+  assert.ok(noms.includes('tipSigned'), 'callerSigned était le seau oublié: vu = ' + LU_VIDE.names);
+  assert.ok(noms.includes('watchPay'), 'witnessesPayment aussi');
+  // BORNES: rien n a été perdu au passage, et le tri tient.
+  assert.ok(noms.includes('ping'), 'readOnly (des CHAÎNES, pas des objets) doit survivre');
+  assert.deepStrictEqual(noms, [...noms].sort(), 'la liste reste triée');
+  // Et le champ séparé ne doit PAS se mettre à tout ramasser.
+  assert.deepStrictEqual(LU_PAIE.movesValue, ['send'], 'movesValue ne liste QUE movesValue');
 });
 
 t('LES DEUX BORNES: une surface LUE ET VIDE reste un tableau vide, pas null', () => {

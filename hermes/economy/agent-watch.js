@@ -119,8 +119,23 @@ function fingerprint(r) {
   return {
     verdict: r.verdict,
     tools: s ? s.toolCount : null,
-    names: s ? [...s.readOnly, ...s.movesValue.map((x) => x.name), ...s.namedButNoSurface.map((x) => x.name),
-      ...s.wantsSecret.map((x) => x.name)].sort().join(',') : null,
+    /* ⚠️ CETTE LIGNE ÉNUMÉRAIT QUATRE SEAUX QUAND `agent-vet` EN REND SIX.
+     * Manquaient `callerSigned` et `witnessesPayment` — donc un outil où l'appelant doit produire une
+     * signature EIP-712 (l'agent seul ne peut rien déplacer) n'apparaissait PAS dans cette liste.
+     * Un outil qui existe mais n'est pas nommé se lit comme un outil qui n'existe pas, et c'est une
+     * OMISSION: plus difficile à voir qu'une fausse valeur, parce qu'il n'y a rien à regarder.
+     *
+     * Mesuré le 2026-07-30 en vérifiant une affirmation que j'avais tirée d'un `grep`: je l'annonçais
+     * comme un risque futur du prochain correctif, c'était déjà vrai. Le grep donne la forme, pas le
+     * compte — quatre contre six ne se voit qu'en ouvrant le fichier.
+     *
+     * On DÉRIVE désormais au lieu d'énumérer: `surface` = les seaux (des tableaux) + `toolCount` (un
+     * nombre), donc filtrer sur `Array.isArray` rend exactement les seaux, et un seau ajouté plus tard
+     * est pris automatiquement. `readOnly` porte des chaînes, les cinq autres des objets `{name,…}`:
+     * les deux formes sont traitées ici plutôt que supposées. */
+    names: s ? Object.values(s).filter(Array.isArray).flat()
+      .map((x) => (typeof x === 'string' ? x : x && x.name)).filter(Boolean)
+      .sort().join(',') : null,
     movesValue: s ? s.movesValue.map((x) => x.name).sort() : null,
     wantsSecret: s ? s.wantsSecret.map((x) => x.name).sort() : null,
   };
