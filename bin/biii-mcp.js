@@ -573,6 +573,16 @@ async function callTool(name, a = {}) {
      * la surface MCP — le correctif de lib/invoice.js ne servait qu'a un appelant qui importe le module
      * en direct. Troisieme fois dans la journee que le lecteur precede l'ecrivain; ici la chaine etait
      * rompue en deux points a la fois. */
+    /* ⚠️ LE MÊME TROU QUE `till_check_payment`, trouvé en allant voir le voisin JUSTE APRÈS l'avoir
+     * bouché — `to` et `totalMicro` partaient non validés jusqu'à `findPayment`, et l'exception
+     * ressortait en `-32000 « check arguments »`. Sur l'outil qui dit si une FACTURE est payée, accuser
+     * l'appelant d'une panne amont est la même faute, avec un montant en jeu. */
+    const gi = exigeAdresse(a.to, 'to'); if (gi.error) return gi;
+    if (!/^\d+$/.test(String(a.totalMicro || ''))) {
+      return { error: 'REJECTED INPUT: `totalMicro` is ' + (a.totalMicro == null ? 'missing' : JSON.stringify(String(a.totalMicro)).slice(0, 24))
+        + ' — it must be an integer number of USDC micro-units (6 decimals, e.g. "1500000" for $1.50). '
+        + 'NOTHING WAS CHECKED ON CHAIN — this is not a verdict that the invoice is unpaid.' };
+    }
     const invoice = { kind: 'biii-invoice', number: a.number || null, dueDateMs: a.dueDateMs || null,
       rail: T.railOf(a.rail).rail,
       merchant: { name: a.merchantName || null, address: String(a.to || '').toLowerCase() },
