@@ -725,6 +725,21 @@ async function callTool(name, a = {}) {
       asksForSeedOrKey: a.asksForSeedOrKey, asksToInstall: a.asksToInstall });
   }
   if (name === 'till_receipt') {
+    /* ⚠️ TROISIÈME EXEMPLAIRE DU MÊME TROU (après till_check_payment 7c9520c et till_check_invoice
+     * 946b9d7). `createCharge` lève sur un montant ou une adresse malformés, l'exception ressortait en
+     * `-32000 « check arguments »`, et c'est ici l'outil qui DÉLIVRE UN REÇU : dire à quelqu'un que sa
+     * demande est fautive alors que le nœud est tombé, sur la pièce qui atteste un paiement, est la
+     * pire version de cette confusion.
+     * Note de méthode: cet outil était le seul jamais mesuré, exclu par prudence de la sonde à entrée
+     * vide au cas où il écrirait. Il ne mute RIEN — createCharge est un constructeur pur, findPayment
+     * lit la chaîne, receipt formate. La lecture lève l'exclusion; la prudence n'était pas inutile,
+     * elle était juste non résolue. */
+    const gr = exigeAdresse(a.to, 'to'); if (gr.error) return gr;
+    if (!(Number(a.amountUsd) > 0)) {
+      return { error: 'REJECTED INPUT: `amountUsd` is ' + (a.amountUsd == null ? 'missing' : JSON.stringify(String(a.amountUsd)).slice(0, 24))
+        + ' — it must be a positive number of dollars (e.g. 1.50). NOTHING WAS CHECKED ON CHAIN — this '
+        + 'is not a statement that no payment exists, and no receipt was withheld on the evidence.' };
+    }
     const charge = T.createCharge({ to: a.to, amountUsd: a.amountUsd, label: a.label, nowMs: Date.now() });
     const fact = await findPayment({ to: charge.to, minMicro: charge.amountMicro, lookbackBlocks: a.lookbackBlocks || 900 });
     const verdict = T.verifyPayment(charge, fact);
