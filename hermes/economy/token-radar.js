@@ -493,14 +493,24 @@ function recordBlackout(db, nowIso) {
    * 471 rugs — et AUCUN champ ne disait pourquoi. `siblingsRead === false`: zero ligne, jamais emis.
    * what-survives.js savait deja lire ce troisieme etat (il rend `null`); c'est le PRODUCTEUR qui ne
    * l'emettait pas. Le consommateur avait appris la lecon, la source jamais. */
-  let traceOk = 0, traceEchec = 0, traceSansFinanceur = 0;
+  let traceOk = 0, traceEchec = 0, traceSansFinanceur = 0, traceSansCreateur = 0;
   for (const c of toTrace) {
     let f = null, panne = null;
     try { f = await traceFeeder(CHAIN, c.addr); } catch (e) { panne = (e && e.message) || String(e); }
     if (!panne && (!f || !f.ok)) panne = (f && f.reason) || 'the explorer did not answer';
     if (panne) {
-      traceEchec++;
-      db[c.addr].funderTrace = 'failed';          // ≠ absent: on a essaye, on n'a pas pu lire
+      /* ⚠️ « ECHEC » RECOUVRAIT DEUX CHOSES OPPOSEES — mesure du 2026-07-30, 99 lignes marquees `failed`:
+       *     91x  « the explorer answered but records no creator for this address »
+       *      8x  l'explorateur ne repond pas
+       * Les 91 ne sont PAS des pannes: l'explorateur a repondu, correctement, et cette adresse n'a
+       * aucun createur indexe (pool, proxy, deploiement non attribue). C'est un CONSTAT definitif.
+       * Les 8 sont reessayables. Un compteur qui melange les deux annonce 46 % de pannes la ou il y en
+       * a 4 %, et envoie chercher un probleme reseau qui n'existe pas — j'ai failli le faire.
+       * `feeder.js` porte deja la distinction depuis ce matin (`tokenRead`): elle etait dans le MESSAGE
+       * et pas dans le CLASSEMENT, et c'est le classement que lisent les machines. */
+      const litSansCreateur = !!(f && f.tokenRead === true);
+      if (litSansCreateur) traceSansCreateur++; else traceEchec++;
+      db[c.addr].funderTrace = litSansCreateur ? 'no_creator' : 'failed';
       db[c.addr].funderTraceError = String(panne).slice(0, 120);
       continue;
     }
@@ -577,6 +587,9 @@ function recordBlackout(db, nowIso) {
   if (toTrace.length) {
     lines.push('   (funding: ' + traceOk + ' traced'
       + (traceSansFinanceur ? ', ' + traceSansFinanceur + ' with no funder found' : '')
+      /* `no creator on chain` est un CONSTAT, pas une panne: il ne se reessaie pas et ne doit pas
+       * gonfler le taux d'echec. Les melanger annoncait 46 % de pannes la ou il y en a 4 %. */
+      + (traceSansCreateur ? ', ' + traceSansCreateur + ' with no creator recorded on chain (a finding, not a failure)' : '')
       + (traceEchec ? ', ' + traceEchec + ' COULD NOT BE READ' : '')
       + ' — of ' + toTrace.length + ' attempted'
       + (toJudge.length > toTrace.length ? ', ' + (toJudge.length - toTrace.length) + ' skipped by the cap, not cleared' : '') + ')');
