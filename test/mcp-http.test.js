@@ -90,8 +90,21 @@ const getStatus = (s, path) => new Promise((resolve) => { const a = s.address();
      * requête, ou réessayer plus tard. Le catch générique ne peut pas les distinguer — donc il ne doit
      * trancher NI dans un sens NI dans l'autre. (Le cas voisin, l'outil inconnu, garde son -32601 : lui,
      * on sait.) */
-    const r = await rpc(s, { jsonrpc: '2.0', id: 7, method: 'tools/call',
-      params: { name: 'till_check_payment', arguments: {} } });
+    /* ⚠️ CE CAS PILOTAIT `arguments: {}` — un RACCOURCI, pas le scénario que son propre commentaire
+     * décrit. Depuis que `till_check_payment` valide ses entrées (2026-07-30), `{}` rend un REFUS propre
+     * et ne lève plus : le véhicule du test avait disparu, pas son sujet. On le rend fidèle au défaut
+     * documenté — ARGUMENTS VALIDES + nœud mort — ce qui est aussi le seul montage où la confusion
+     * mesurée peut se produire. Un test dont l'instrument diverge de ce qu'il prétend mesurer finit par
+     * garder autre chose que ce qu'on croit. */
+    const rpcAvant = process.env.BASE_RPC_URL;
+    process.env.BASE_RPC_URL = 'http://127.0.0.1:1';        // port mort: la lecture chaîne LÈVERA
+    let r;
+    try {
+      r = await rpc(s, { jsonrpc: '2.0', id: 7, method: 'tools/call',
+        params: { name: 'till_check_payment', arguments: { to: '0x' + '1'.repeat(40), amountMicro: '1500000' } } });
+    } finally {
+      if (rpcAvant === undefined) delete process.env.BASE_RPC_URL; else process.env.BASE_RPC_URL = rpcAvant;
+    }
     assert.ok(r.body.error, 'un outil qui lève doit rendre une erreur JSON-RPC');
     assert.strictEqual(r.body.error.code, -32000, 'l\'outil EXISTE: -32000, pas -32601');
     assert.ok(!/check arguments/i.test(r.body.error.message),

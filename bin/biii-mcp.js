@@ -377,6 +377,20 @@ async function callTool(name, a = {}) {
       note: 'Execute this EIP-681 intent with YOUR OWN wallet (basetill signs nothing). Then till_check_payment.' };
   }
   if (name === 'till_check_payment') {
+    /* ⚠️ SANS GARDE, `{}` PARTAIT SUR LA CHAÎNE ET L'EXCEPTION S'ÉCHAPPAIT EN `-32000 tool failed —
+     * check arguments`. Mesuré le 2026-07-30 sur le vrai serveur. Trois défauts dans un :
+     *   · l'appel RPC était BRÛLÉ avant toute validation (valider d'abord, dépenser ensuite) ;
+     *   · le message générique ne dit pas QUEL champ est fautif, donc il n'est pas actionnable ;
+     *   · une exception n'est pas un refus — un appelant ne peut pas distinguer « entrée invalide »
+     *     d'une panne du serveur, et sur un outil de VÉRIFICATION DE PAIEMENT c'est la confusion
+     *     qu'il faut le moins.
+     * Le garde `exigeAdresse` existait déjà dans ce fichier et n'avait pas été posé ici. */
+    const g = exigeAdresse(a.to, 'to'); if (g.error) return g;
+    if (!/^\d+$/.test(String(a.amountMicro || ''))) {
+      return { error: 'REJECTED INPUT: `amountMicro` is ' + (a.amountMicro == null ? 'missing' : JSON.stringify(String(a.amountMicro)).slice(0, 24))
+        + ' — it must be an integer number of USDC micro-units (6 decimals, e.g. "1500000" for $1.50). '
+        + 'NOTHING WAS CHECKED ON CHAIN — this is not a verdict that the payment is missing.' };
+    }
     const charge = { to: String(a.to || '').toLowerCase(), amountMicro: String(a.amountMicro || ''), amountUsd: T.microToUsd(String(a.amountMicro || '0')), token: T.USDC_BASE, chainId: 8453 };
     const fact = await findPayment({ to: charge.to, minMicro: charge.amountMicro, lookbackBlocks: a.lookbackBlocks || 900 });
     const out = { verdict: T.verifyPayment(charge, fact), fact: fact || null };
