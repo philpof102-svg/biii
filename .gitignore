@@ -26,3 +26,9 @@ hermes/agents/*/cache/
 
 # x402 anti-replay runtime store (not source)
 data/x402-consumed.json
+
+# Repertoires fantomes: Git Bash reecrit un chemin POSIX absolu (/root/x) en D:/PROG/Git/root/x et le
+# cree dans le repertoire courant. Un arbre vide "D:/PROG/Git/root/.hermes-biii" a ainsi vecu ici du
+# 25/07 au 30/07 et polluait en permanence `git status`, qui est le garde lu avant chaque commit.
+# Le nom contient U+F03A (substitution Windows du ":" interdit), pas un deux-points ASCII.
+[A-Za-z]/
