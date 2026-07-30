@@ -138,5 +138,51 @@ t('★ `expiry: 0` garde son sens — pas d\'expiration, pas une unité fausse',
   assert.strictEqual(bindingLens(complet(0)).bound, true);
 });
 
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * UNE LIAISON QUI N'EXPIRE JAMAIS EST UN JUSTIFICATIF PERMANENT — et il était SILENCIEUX.
+ *
+ * Mesure du 2026-07-30 : ce module refuse une liaison sans nonce (« replayable, refusing ») et acceptait
+ * sans un mot une liaison à `expiry: 0` ou sans `expiry`. Même classe de risque, deux traitements, à
+ * quelques lignes d'écart — l'heuristique « bien résolu ici, mal résolu là » À L'INTÉRIEUR d'une seule
+ * fonction, donc invisible en lisant le garde d'à côté.
+ *
+ * On ne décide pas la politique : `bound` reste `true` (le changer casserait les appelants). Ce qui
+ * change, c'est que le permanent se DÉCLARE, et que `requireExpiry` permet de le refuser.
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+const OK = { npub: 'a'.repeat(64), address: '0x' + '1'.repeat(40), nonce: 'n1',
+  sigNostr: 's', sigBase: 's', verified: true };
+const MAINTENANT = 1750000000000;
+const FUTUR = Math.floor(MAINTENANT / 1000) + 3600;
+
+t('★ sans expiry: la liaison reste valide (aucun appelant cassé) mais le PERMANENT est déclaré', () => {
+  for (const [nom, exp] of [['expiry 0', 0], ['expiry absent', undefined]]) {
+    const r = bindingLens({ ...OK, expiry: exp }, { now: MAINTENANT });
+    assert.strictEqual(r.bound, true, nom + ': la politique ne change pas sans qu on le demande');
+    assert.strictEqual(r.expiresAt, null, nom + ': `expiresAt` dit explicitement qu il n y en a pas');
+    assert.match(r.disclosure, /NO EXPIRY/, nom + ': le permanent doit être VISIBLE, pas déduit');
+    assert.match(r.disclosure, /requireExpiry/, nom + ': et la sortie doit dire comment le refuser');
+  }
+});
+
+t('★ requireExpiry refuse le permanent — et SEULEMENT lui', () => {
+  const sansExp = bindingLens({ ...OK, expiry: 0 }, { now: MAINTENANT, requireExpiry: true });
+  assert.strictEqual(sansExp.bound, false, 'une liaison permanente doit pouvoir être refusée sur demande');
+  assert.match(sansExp.reason, /never expires|NO expiry/i, 'et la raison doit nommer le vrai motif');
+
+  /* BORNE D'ACCEPTATION — sans elle, « requireExpiry refuse tout » passerait le cas ci-dessus. */
+  const avecExp = bindingLens({ ...OK, expiry: FUTUR }, { now: MAINTENANT, requireExpiry: true });
+  assert.strictEqual(avecExp.bound, true, 'une liaison DATÉE doit passer, même sous requireExpiry');
+  assert.strictEqual(avecExp.expiresAt, FUTUR);
+  assert.doesNotMatch(avecExp.disclosure, /NO EXPIRY/, 'et ne pas hériter de l avertissement du permanent');
+});
+
+t('★ les deux régimes restent DISTINGUABLES en sortie', () => {
+  const a = bindingLens({ ...OK, expiry: 0 }, { now: MAINTENANT });
+  const b = bindingLens({ ...OK, expiry: FUTUR }, { now: MAINTENANT });
+  assert.notStrictEqual(a.disclosure, b.disclosure, 'permanent et daté ne doivent pas se lire pareil');
+  assert.notStrictEqual(a.expiresAt, b.expiresAt);
+  assert.strictEqual(a.bound, b.bound, 'mais la DÉCISION, elle, est la même — c est voulu');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
