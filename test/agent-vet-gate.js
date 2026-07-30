@@ -82,9 +82,59 @@ const CASES = [
     name: 'settle_signed',
     inputSchema: { type: 'object', properties: { amount: {}, txHash: {}, signature: {} },
       required: ['amount', 'txHash', 'signature'] } }],
+
+  /* ══════════════════════════════════════════════════════════════════════════════════════════════
+   * UN NOM QU'ON NE SAIT PAS LIRE N'EST PAS UN NOM LU ET JUGE INOFFENSIF.
+   * `tokenize` filtre [^A-Za-z0-9]: un nom non-latin rend [] ou perd sa moitie porteuse de sens, aucun
+   * VALUE_VERB ne peut matcher, et l'outil tombait dans `readOnly` — une AFFIRMATION.
+   * Mesure du 2026-07-30: 送金 -> [] · перевод -> [] · 送金Amount -> ["amount"] (residu "送金").
+   * 送金 signifie litteralement « envoyer de l'argent » et etait classe lecture seule.
+   * ══════════════════════════════════════════════════════════════════════════════════════════════ */
+  ['★ un nom entierement non-latin est INCLASSABLE, pas lecture seule', 'unclassifiable', {
+    name: '送金',
+    inputSchema: { type: 'object', properties: { to: {}, amount: {} }, required: ['to', 'amount'] } }],
+  ['★ cyrillique aussi — ce n est pas propre au CJK', 'unclassifiable', {
+    name: 'перевод',
+    inputSchema: { type: 'object', properties: { amount: {} }, required: ['amount'] } }],
+  /* Le cas PARTIEL: la moitie latine survit, la moitie porteuse du VERBE est effacee. Il retombait
+   * dans readOnly — meme sur-affirmation, juste plus discrete, donc plus dure a contester. */
+  ['★ nom PARTIELLEMENT illisible: le verbe a pu etre dans ce qui a saute', 'unclassifiable', {
+    name: '送金Amount',
+    inputSchema: { type: 'object', properties: { to: {}, amount: {} }, required: ['to', 'amount'] } }],
+
+  /* LES BORNES D'ACCEPTATION — sans elles, « tout marquer inclassable » passerait les trois cas ci-dessus. */
+  ['BORNE: un vrai lecture-seule latin RESTE lecture-seule', 'readOnly', {
+    name: 'getBalance',
+    inputSchema: { type: 'object', properties: { address: {} }, required: ['address'] } }],
+  /* ⚠️ ASYMETRIE VOULUE: un verbe TROUVE est une preuve POSITIVE, et elle ne devient pas fausse parce
+   * qu'une autre partie du nom est illisible. On ne bascule que sur l'ABSENCE de verbe. */
+  ['BORNE: verbe trouve MALGRE un residu illisible -> le classement tient', 'movesValue', {
+    name: 'tip_送金',
+    inputSchema: { type: 'object', properties: { to: {}, amount: {} }, required: ['to', 'amount'] } }],
+  /* Les separateurs usuels ne sont PAS des caracteres effaces: mesure, ils ne laissent aucun residu. */
+  ['BORNE: un separateur ordinaire ne declenche rien', 'movesValue', {
+    name: 'send_payment',
+    inputSchema: { type: 'object', properties: { to: {}, amount: {} }, required: ['to', 'amount'] } }],
+  /* ⚠️ LE CROISEMENT DES DEUX BORNES, ajoute apres qu'une mutation a SURVECU.
+   * `send_payment` a un separateur mais AUSSI un verbe: il sort avant le test du residu.
+   * `getBalance` n'a pas de verbe mais est en camelCase: aucun separateur.
+   * Aucune des deux ne pouvait donc detecter « les separateurs comptent comme effaces ».
+   * Il fallait leur INTERSECTION: pas de verbe ET un separateur. Deux bornes couvrant chacune une
+   * moitie ne couvrent pas leur croisement — c'est la ou les mutations survivent. */
+  ['BORNE (croisement): lecture-seule AVEC separateur reste lecture-seule', 'readOnly', {
+    name: 'get_balance',
+    inputSchema: { type: 'object', properties: { address: {} }, required: ['address'] } }],
 ];
 
-const BUCKETS = ['movesValue', 'callerSigned', 'witnessesPayment', 'namedButNoSurface', 'wantsSecret', 'readOnly'];
+/* ⚠️ CETTE LISTE ETAIT ECRITE A LA MAIN, ET ELLE A VIEILLI LE JOUR MEME.
+ * Six seaux enumeres; `auditTools` en rend sept depuis l'ajout d'`unclassifiable`. Un outil qui y
+ * atterrit rendait `undefined` sur le `.find()` ci-dessous, donc un cas ECHOUAIT sans que le message
+ * dise pourquoi — et un cas ajoute pour un nouveau seau n'aurait jamais pu passer.
+ * C'est la troisieme fois en une journee que le meme motif mord: hermes/economy/agent-watch.js listait
+ * quatre seaux sur six (corrige 526f20e), et ce test en listait six sur sept.
+ * On DERIVE: les seaux sont les champs-TABLEAU du retour, donc un huitieme sera pris tout seul.
+ * L'ordre d'insertion de l'objet est conserve, donc le comportement des cas existants ne bouge pas. */
+const bucketDe = (r) => Object.keys(r).find((b) => Array.isArray(r[b]) && r[b].length);
 /* `lances` compte les cas REELLEMENT atteints — la mesure qui manquait quand un `process.exit` place
  * trop haut a rendu onze assertions inatteignables ici meme (voir la note plus bas). Le fichier imprimait
  * alors « all cases hold » et sortait 0: rien dans sa sortie ne pouvait reveler qu'il en avait saute la
@@ -92,7 +142,7 @@ const BUCKETS = ['movesValue', 'callerSigned', 'witnessesPayment', 'namedButNoSu
 let failed = 0, lances = 0;
 for (const [label, expected, tool] of CASES) {
   const r = auditTools([tool]);
-  const got = BUCKETS.find((b) => (r[b] || []).length);
+  const got = bucketDe(r);
   const ok = got === expected;
   lances++;
   if (!ok) failed++;
