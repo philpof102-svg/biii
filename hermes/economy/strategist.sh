@@ -10,7 +10,14 @@ DATA=$(bash /root/.hermes-biii/scripts/market-data.sh 2>/dev/null)
 
 PROMPT="You are the strategist of a lean living economy on Base: BIII (non-custodial safe-to-pay + token-genuineness verdicts, LIVE, paid per call via x402 \$0.25, hosted /mcp) + a keyless on-chain trust sentinel + a market-watch agent. LIVE market data now:
 $DATA
-Write exactly 2 SHORT, CONCRETE ideas or next actions for the economy — grounded, zero hype, each 1-2 lines. Where relevant, name a SPECIFIC on-chain data source or endpoint we could turn into signal (Base RPC logs, USDC transfers, DEX pools, a contract's events — these can be gold). Then one line: the single highest-leverage next step. Be terse and specific."
+
+ARCHITECTURE CONSTRAINT — read before proposing anything. Our classifier runs LOCALLY at the caller, with NO network call in the payment path. That property is the only defensible thing we have, and it is what buyers actually asked for ('pluggable, self-hostable'). Three separate outreach attempts were rejected for the SAME reason: they put a live third-party network call inside the payment path. So do NOT propose: gating a paid verdict on a live price/DEX/oracle lookup, streaming events to pause a session mid-payment, or any design where a settlement waits on an external endpoint. Enrichment computed OUT of band and cached locally is fine; a blocking call at pay time is not.
+
+EVIDENCE CONSTRAINT — never write a contract address, tx hash or identifier you have not resolved in this run from the data above. Do not reproduce one from memory: a near-miss address is worse than no address, and past passes emitted factory addresses that carry no code on Base and one belonging to a different chain. If you want to reference a contract you cannot resolve, describe it in words instead.
+
+NOVELTY CONSTRAINT — you are one pass in a long series appending to the same file. If your idea is the shape 'index/stream/poll on-chain events X to feed verdict Y', it has already been written more than a dozen times and adds nothing. Go somewhere else: distribution, pricing, packaging, what makes a stranger's agent call us a second time, what we could stop doing.
+
+Write exactly 2 SHORT, CONCRETE ideas or next actions — grounded, zero hype, each 1-2 lines. Then one line: the single highest-leverage next step. Be terse and specific."
 
 BODY=$(node -e 'process.stdout.write(JSON.stringify({model:"tencent/hy3",messages:[{role:"user",content:process.argv[1]}]}))' "$PROMPT")
 RESP=$(curl -s -m 60 https://openrouter.ai/api/v1/chat/completions -H "Authorization: Bearer $OPENROUTER_API_KEY" -H "content-type: application/json" -d "$BODY")
