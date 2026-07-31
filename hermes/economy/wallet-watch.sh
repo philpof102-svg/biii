@@ -4,4 +4,5 @@
 export PATH=/usr/local/bin:/usr/bin:/bin:${PATH:-}
 . /root/.hermes-biii/scripts/verify-payload.sh
 verify_payload "/mnt/d/Users/VolKov/veilleIA/biii/hermes/economy/wallet-watch.js" || exit 1
-exec node /mnt/d/Users/VolKov/veilleIA/biii/hermes/economy/wallet-watch.js
+/root/.hermes-biii/scripts/egress-allowlist.sh apply >/dev/null || { echo "[egress] allowlist non appliquee — refus de lancer sans confinement reseau" >&2; exit 1; }
+exec setpriv --reuid=hermesjob --regid=hermesjob --clear-groups node /mnt/d/Users/VolKov/veilleIA/biii/hermes/economy/wallet-watch.js

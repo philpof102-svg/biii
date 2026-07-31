@@ -4,4 +4,4 @@
 export PATH=/usr/local/bin:/usr/bin:/bin:${PATH:-}
 . /root/.hermes-biii/scripts/verify-payload.sh
 verify_payload "/mnt/d/Users/VolKov/veilleIA/biii/hermes/economy/agent-watch.js" || exit 1
-exec node /mnt/d/Users/VolKov/veilleIA/biii/hermes/economy/agent-watch.js
+exec setpriv --reuid=hermesprobe --regid=hermesprobe --clear-groups node /mnt/d/Users/VolKov/veilleIA/biii/hermes/economy/agent-watch.js
