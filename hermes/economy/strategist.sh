@@ -41,14 +41,31 @@ VERDICT=$(printf '%s' "$IDEAS" | grep -oiE '0x[0-9a-f]{40}' | sort -fu | while r
   esac
 done)
 
-{
+if {
   echo ""; echo "## $STAMP — strategist"; echo ""; echo "$IDEAS"; echo ""
   if [ -n "$VERDICT" ]; then
     echo "**Address check (automated, against Base at write time):**"; echo ""
     echo "$VERDICT"; echo ""
   fi
   echo "---"
-} >> "$VAULT"
+} >> "$VAULT"; then APPEND_OK=1; else APPEND_OK=0; fi
+
 echo "strategist appended to IDEAS-agent.md @ $STAMP:"
 echo "$IDEAS"
-[ -n "$VERDICT" ] && { echo ""; echo "address check:"; echo "$VERDICT"; }
+if [ -n "$VERDICT" ]; then echo ""; echo "address check:"; echo "$VERDICT"; fi
+
+# Le code de sortie doit dire UNE chose: l'idee a-t-elle ete enregistree.
+#
+# Avant, la derniere commande etait `[ -n "$VERDICT" ] && { ... }`. Sans adresse a verifier — c'est-a-dire
+# quand le modele se comporte BIEN — le test est faux, le && court-circuite, et le script sortait en 1.
+# La passe du 2026-07-31 12:37Z, la premiere reussie sous les nouvelles contraintes, a ete enregistree
+# `status: error` pour cette seule raison. Un statut d'erreur sur un travail reussi apprend a ignorer les
+# statuts d'erreur, ce qui coute plus cher que le bug lui-meme.
+#
+# Et l'inverse etait vrai aussi: l'ancien script se terminait par un `echo`, donc il sortait 0 meme quand
+# la redirection vers le vault echouait. Le statut ne portait aucune information dans les deux sens.
+if [ "$APPEND_OK" != "1" ]; then
+  echo "[strategist] ECHEC: impossible d'ecrire dans le vault ($VAULT). L'idee n'est PAS enregistree." >&2
+  exit 1
+fi
+exit 0
