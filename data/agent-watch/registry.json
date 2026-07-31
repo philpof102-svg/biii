@@ -439,7 +439,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.aviado/health",
-      "lastSeen": "2026-07-31T10:39:16.863Z"
+      "lastSeen": "2026-07-31T14:41:03.012Z"
     },
     "https://mcp.neuroautomata.axonagentic.ai/mcp": {
       "verdict": "unauditable",
@@ -448,7 +448,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.axonagentic/neuroautomata",
-      "lastSeen": "2026-07-31T10:39:18.228Z"
+      "lastSeen": "2026-07-31T14:41:04.353Z"
     },
     "https://mcp.backengine.ai/mcp": {
       "verdict": "unreachable",
@@ -457,43 +457,43 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.backengine/backengine-mcp",
-      "lastSeen": "2026-07-31T12:38:25.241Z"
+      "lastSeen": "2026-07-31T14:41:05.383Z"
     },
     "https://backengine.ai/mcp": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.backengine/backengine-mcp",
-      "lastSeen": "2026-07-31T12:38:26.133Z"
+      "lastSeen": "2026-07-31T14:41:06.593Z"
     },
     "https://backengine-prod.backengine.ai/mcp": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.backengine/backengine-mcp",
-      "lastSeen": "2026-07-31T12:38:26.964Z"
+      "lastSeen": "2026-07-31T14:41:07.772Z"
     },
     "https://mcp-server-295985738387.europe-west1.run.app/mcp": {
-      "verdict": "unreachable",
-      "tools": null,
-      "names": null,
-      "movesValue": null,
-      "wantsSecret": null,
+      "verdict": "answers",
+      "tools": 20,
+      "names": "bank_accounts,crypto_fx_rates,crypto_price,crypto_price_lite,currency_convert,currency_convert_lite,currency_convert_open,currency_fx_lite,currency_rates,financial_calculator,financial_calculator_lite,finnhub_stock_quote,open_banking_transactions,platform_tool_finder,stock_price_lite,stripe_payment_records,stripe_payments,timezone_convert,web_news_headlines,web_url_reader",
+      "movesValue": [],
+      "wantsSecret": [],
       "name": "ai.bankee/inferventis-mcp",
-      "lastSeen": "2026-07-31T12:38:27.862Z"
+      "lastSeen": "2026-07-31T14:41:09.101Z"
     },
     "https://api.bareun.ai/mcp": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.bareun/bareun",
-      "lastSeen": "2026-07-31T12:38:28.882Z"
+      "lastSeen": "2026-07-31T14:41:10.527Z"
     },
     "https://api.baselight.app/mcp": {
       "verdict": "unreachable",
@@ -502,61 +502,61 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.baselight/baselight",
-      "lastSeen": "2026-07-31T12:38:29.792Z"
+      "lastSeen": "2026-07-31T14:41:11.407Z"
     },
     "https://mcp.basethread.ai/mcp": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.basethread/basethread",
-      "lastSeen": "2026-07-31T12:38:30.607Z"
+      "lastSeen": "2026-07-31T14:41:12.611Z"
     },
     "https://mcp.bassethound.ai/mcp": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.bassethound/bassethound",
-      "lastSeen": "2026-07-31T12:38:31.570Z"
+      "lastSeen": "2026-07-31T14:41:14.012Z"
     },
     "https://beatbandit.ai/api/mcp": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.beatbandit/beatbandit",
-      "lastSeen": "2026-07-31T12:38:32.603Z"
+      "lastSeen": "2026-07-31T14:41:15.138Z"
     },
     "https://b4-index.vercel.app/mcp": {
-      "verdict": "unreachable",
-      "tools": null,
-      "names": null,
-      "movesValue": null,
-      "wantsSecret": null,
+      "verdict": "answers",
+      "tools": 5,
+      "names": "b4_audit,b4_browse,b4_compare,b4_recommend,b4_score",
+      "movesValue": [],
+      "wantsSecret": [],
       "name": "ai.benroberts/b4-index",
-      "lastSeen": "2026-07-31T12:38:33.559Z"
+      "lastSeen": "2026-07-31T14:41:16.422Z"
     },
     "https://betterpost.ai/mcp": {
-      "verdict": "unreachable",
-      "tools": null,
-      "names": null,
-      "movesValue": null,
-      "wantsSecret": null,
+      "verdict": "answers",
+      "tools": 23,
+      "names": "betterpost_add_source,betterpost_add_story,betterpost_create_project,betterpost_delete_content,betterpost_delete_project,betterpost_derive_content,betterpost_expand_coverage,betterpost_generate_content,betterpost_get_content,betterpost_get_project,betterpost_get_settings,betterpost_get_usage,betterpost_hide_story,betterpost_humanize,betterpost_list_content,betterpost_list_projects,betterpost_list_sources,betterpost_list_stories,betterpost_remove_source,betterpost_suggest_topics,betterpost_unhide_story,betterpost_update_project,betterpost_update_settings",
+      "movesValue": [],
+      "wantsSecret": [],
       "name": "ai.betterpost/server",
-      "lastSeen": "2026-07-31T12:38:34.593Z"
+      "lastSeen": "2026-07-31T14:41:17.986Z"
     },
     "https://app.bezal.ai/api/mcp": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.bezal/local-commerce",
-      "lastSeen": "2026-07-31T12:38:35.570Z"
+      "lastSeen": "2026-07-31T14:41:19.998Z"
     },
     "https://biddeed.ai/api/mcp": {
       "verdict": "unreachable",
@@ -565,52 +565,52 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.biddeed/biddeed-mcp",
-      "lastSeen": "2026-07-31T12:38:36.535Z"
+      "lastSeen": "2026-07-31T14:41:20.927Z"
     },
     "https://mcp.biddeed.ai/api/mcp": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.biddeed/biddeed-mcp",
-      "lastSeen": "2026-07-31T12:38:37.621Z"
+      "lastSeen": "2026-07-31T14:41:21.995Z"
     },
     "https://mcp.biel.ai/v2/{project_slug}/mcp": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.biel/biel-ai",
-      "lastSeen": "2026-07-31T12:38:38.675Z"
+      "lastSeen": "2026-07-31T14:41:23.406Z"
     },
     "https://bittlebits.ai/mcp": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.bittlebits/bittlebits",
-      "lastSeen": "2026-07-31T12:38:40.806Z"
+      "lastSeen": "2026-07-31T14:41:24.627Z"
     },
     "https://blast-radius.ai/mcp": {
-      "verdict": "unreachable",
-      "tools": null,
-      "names": null,
-      "movesValue": null,
-      "wantsSecret": null,
+      "verdict": "answers",
+      "tools": 7,
+      "names": "ask_blast_radius,assess_against_frontier_line,get_diligence_checklist,get_igv_quote,get_latest_update,get_thesis,subscribe",
+      "movesValue": [],
+      "wantsSecret": [],
       "name": "ai.blast-radius/blast-radius",
-      "lastSeen": "2026-07-31T12:38:41.772Z"
+      "lastSeen": "2026-07-31T14:41:25.706Z"
     },
     "https://mcp.bloopo.ai/mcp": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.bloopo/bloopo",
-      "lastSeen": "2026-07-31T12:38:42.790Z"
+      "lastSeen": "2026-07-31T14:41:27.015Z"
     },
     "https://api.bluenexus.ai/mcp": {
       "verdict": "unreachable",
@@ -739,5 +739,5 @@
       "lastSeen": "2026-07-31T12:40:06.805Z"
     }
   },
-  "offset": 52
+  "offset": 72
 }
