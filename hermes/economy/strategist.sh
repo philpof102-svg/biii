@@ -23,6 +23,32 @@ BODY=$(node -e 'process.stdout.write(JSON.stringify({model:"tencent/hy3",message
 RESP=$(curl -s -m 60 https://openrouter.ai/api/v1/chat/completions -H "Authorization: Bearer $OPENROUTER_API_KEY" -H "content-type: application/json" -d "$BODY")
 IDEAS=$(printf '%s' "$RESP" | node -e 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{try{const c=JSON.parse(d).choices[0].message.content;process.stdout.write(c)}catch(e){process.stdout.write("(no output — "+e.message+")")}})')
 
-{ echo ""; echo "## $STAMP — strategist"; echo ""; echo "$IDEAS"; echo ""; echo "---"; } >> "$VAULT"
+# Resolve every 0x… address the model wrote, against the chain it was attributed to. The prompt ASKS the
+# model not to invent identifiers; this CHECKS it. An instruction is obeyed until it isn't, and past
+# passes emitted a Uniswap factory address with no code on Base (one hex run off the real one) and a
+# mainnet-Ethereum pool address presented as Base. Those blocks feed the vault, so an unverified address
+# becomes a future session's starting truth. Cheap: one eth_getCode per distinct address, and the
+# annotation goes INTO the appended block so the reader sees the verdict next to the claim.
+VERDICT=$(printf '%s' "$IDEAS" | grep -oiE '0x[0-9a-f]{40}' | sort -fu | while read -r ADDR; do
+  [ -z "$ADDR" ] && continue
+  CODE_BASE=$(curl -s -m 15 https://mainnet.base.org -H 'content-type: application/json' \
+    -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getCode\",\"params\":[\"$ADDR\",\"latest\"],\"id\":1}" \
+    | node -e 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{try{const r=JSON.parse(d).result;process.stdout.write(r===undefined?"ERR":(r==="0x"?"none":String((r.length-2)/2)))}catch(e){process.stdout.write("ERR")}})')
+  case "$CODE_BASE" in
+    ERR)  echo "- \`$ADDR\` — ⚠️ could not be resolved (RPC unreachable). Unverified, not disproven." ;;
+    none) echo "- \`$ADDR\` — ❌ **no code on Base.** Do not act on this address without resolving it yourself." ;;
+    *)    echo "- \`$ADDR\` — ✅ contract on Base ($CODE_BASE bytes). Identity NOT verified, only existence." ;;
+  esac
+done)
+
+{
+  echo ""; echo "## $STAMP — strategist"; echo ""; echo "$IDEAS"; echo ""
+  if [ -n "$VERDICT" ]; then
+    echo "**Address check (automated, against Base at write time):**"; echo ""
+    echo "$VERDICT"; echo ""
+  fi
+  echo "---"
+} >> "$VAULT"
 echo "strategist appended to IDEAS-agent.md @ $STAMP:"
 echo "$IDEAS"
+[ -n "$VERDICT" ] && { echo ""; echo "address check:"; echo "$VERDICT"; }
