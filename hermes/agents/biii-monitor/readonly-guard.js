@@ -28,6 +28,23 @@ const DENY = new Set([
   // the list predates seeing that server's real tool names. No wallet MCP is mounted in this fleet; this
   // stays a pre-emptive block, which is the only kind worth having before the server appears.
   'send', 'swap', 'sign', 'send_calls', 'fund', 'initiate_x402_request', 'complete_x402_request',
+  // Paybox ("the first non-custodial wallet your AI apps can operate on your behalf"), audited
+  // 2026-07-31 against its real tool list. Of its 16 tools this guard caught 3: pay_x402,
+  // request_transfer and world_buy_outcome. It MISSED request_swap, request_wallet_sign,
+  // request_secret, request_payment, claim_payment_credentials and request_account_change —
+  // because DENY holds bare verbs (`swap`, `sign`) while the splitter never breaks on a single
+  // underscore, so `request_swap` yields no `swap` segment; and MONEY_VERB needs a whole token, so
+  // `pay` hits `pay_x402` but not `request_payment`.
+  //
+  // Adding the observed names is exact-match, hence zero false positives — and it fixes only what we
+  // have now SEEN. That is the honest limit of a name list, and the reason ARGUMENT-GUARD-DESIGN.md
+  // exists: the next vendor arrives with different words and walks straight through.
+  //
+  // Not added on purpose: get_portfolio, list_credentials, list_requests, get_request,
+  // discover_services. Those are reads, and a guard that blocks reads gets switched off.
+  'request_transfer', 'request_swap', 'request_wallet_sign', 'request_payment', 'request_secret',
+  'claim_payment_credentials', 'request_account_change', 'use_service', 'pay_x402',
+  'world_buy_outcome', 'world_change_position', 'world_redeem',
   // lawbor — the agent-to-agent economy WRITES (post/offer/bid/settle/block). Descriptor-only, but an
   // unattended monitor must not autonomously speak, list, bid, lock a price, or bind a settlement.
   'lawbor_say', 'lawbor_bot_say', 'lawbor_offer', 'lawbor_post_job', 'lawbor_bid', 'lawbor_confirm',
