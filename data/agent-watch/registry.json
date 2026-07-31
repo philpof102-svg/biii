@@ -88,7 +88,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.adside/adside",
-      "lastSeen": "2026-07-31T12:39:46.995Z"
+      "lastSeen": "2026-07-31T18:43:54.432Z"
     },
     "https://mcp.adweave.ai/meta-ads-mcp": {
       "verdict": "unauditable",
@@ -97,151 +97,153 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.adweave/meta-ads-mcp",
-      "lastSeen": "2026-07-31T12:39:48.614Z"
+      "lastSeen": "2026-07-31T18:43:55.747Z"
     },
     "https://agentberg.ai/mcp": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agentberg/agentberg",
-      "lastSeen": "2026-07-31T12:40:07.780Z"
+      "lastSeen": "2026-07-31T18:43:58.640Z"
     },
     "https://api.agentdm.ai/api/v1/grid": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agentdm/agentdm",
-      "lastSeen": "2026-07-31T12:40:08.606Z"
+      "lastSeen": "2026-07-31T18:43:59.787Z"
     },
     "https://api.agentdm.ai/mcp/v1/grid": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agentdm/agentdm",
-      "lastSeen": "2026-07-31T12:40:09.365Z"
+      "lastSeen": "2026-07-31T18:44:00.684Z"
     },
     "https://api.agentic-news.ai/mcp": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agentic-news/mcp",
-      "lastSeen": "2026-07-31T12:40:10.177Z"
+      "lastSeen": "2026-07-31T18:44:01.788Z"
     },
     "https://agenticfabricationnetwork.ai/mcp": {
-      "verdict": "unreachable",
-      "tools": null,
-      "names": null,
-      "movesValue": null,
-      "wantsSecret": null,
+      "verdict": "answers",
+      "tools": 9,
+      "names": "create_checkout,finalize_quote,get_fabrication_quote,get_material_guide,get_order_status,leave_review,list_orders,poll_quote,refine_quote",
+      "movesValue": [],
+      "wantsSecret": [],
       "name": "ai.agenticfabricationnetwork/ufp",
-      "lastSeen": "2026-07-31T12:40:11.904Z"
+      "lastSeen": "2026-07-31T18:44:09.363Z"
     },
     "https://api.agenticshelf.ai/m/graffeo/mcp": {
-      "verdict": "unreachable",
-      "tools": null,
-      "names": null,
-      "movesValue": null,
-      "wantsSecret": null,
+      "verdict": "answers",
+      "tools": 7,
+      "names": "add_to_cart,check_stock,create_checkout,get_price,get_product_details,list_products,search_products",
+      "movesValue": [],
+      "wantsSecret": [],
       "name": "ai.agenticshelf/graffeo",
-      "lastSeen": "2026-07-31T12:40:12.860Z"
+      "lastSeen": "2026-07-31T18:44:11.149Z"
     },
     "https://api.agenticshelf.ai/mcp": {
-      "verdict": "unreachable",
-      "tools": null,
-      "names": null,
-      "movesValue": null,
-      "wantsSecret": null,
+      "verdict": "answers",
+      "tools": 7,
+      "names": "add_to_cart,check_stock,create_checkout,get_price,get_product_details,list_products,search_products",
+      "movesValue": [],
+      "wantsSecret": [],
       "name": "ai.agenticshelf/mcp",
-      "lastSeen": "2026-07-31T12:40:13.564Z"
+      "lastSeen": "2026-07-31T18:44:12.180Z"
     },
     "https://api.agenticshelf.ai/m/puroair/mcp": {
-      "verdict": "unreachable",
-      "tools": null,
-      "names": null,
-      "movesValue": null,
-      "wantsSecret": null,
+      "verdict": "answers",
+      "tools": 7,
+      "names": "add_to_cart,check_stock,create_checkout,get_price,get_product_details,list_products,search_products",
+      "movesValue": [],
+      "wantsSecret": [],
       "name": "ai.agenticshelf/puroair",
-      "lastSeen": "2026-07-31T12:40:14.269Z"
+      "lastSeen": "2026-07-31T18:44:13.445Z"
     },
     "https://mcp.agenticterminal.ai/mcp": {
-      "verdict": "unreachable",
-      "tools": null,
-      "names": null,
-      "movesValue": null,
-      "wantsSecret": null,
+      "verdict": "answers",
+      "tools": 6,
+      "names": "get_merchant,list_categories,list_rails,search_merchants,verify_payment_endpoint,whoami",
+      "movesValue": [],
+      "wantsSecret": [],
       "name": "ai.agenticterminal/directory",
-      "lastSeen": "2026-07-31T12:40:15.097Z"
+      "lastSeen": "2026-07-31T18:44:15.053Z"
     },
     "https://ai-akari.ai/mcp-trust": {
-      "verdict": "unreachable",
-      "tools": null,
-      "names": null,
-      "movesValue": null,
-      "wantsSecret": null,
+      "verdict": "answers",
+      "tools": 1,
+      "names": "get_agent_trust_receipt",
+      "movesValue": [],
+      "wantsSecret": [],
       "name": "ai.ai-akari/agent-trust-receipt",
-      "lastSeen": "2026-07-31T12:40:16.168Z"
+      "lastSeen": "2026-07-31T18:44:16.835Z"
     },
     "https://ai-akari.ai/mcp": {
-      "verdict": "unreachable",
-      "tools": null,
-      "names": null,
-      "movesValue": null,
-      "wantsSecret": null,
+      "verdict": "high_risk",
+      "tools": 3,
+      "names": "audit_result_claim,get_one_minute_support,list_one_minute_states",
+      "movesValue": [
+        "audit_result_claim"
+      ],
+      "wantsSecret": [],
       "name": "ai.ai-akari/one-minute-akari",
-      "lastSeen": "2026-07-31T12:40:16.968Z"
+      "lastSeen": "2026-07-31T18:44:18.157Z"
     },
     "https://www.ai-portal.ai/mcp": {
-      "verdict": "unreachable",
-      "tools": null,
-      "names": null,
-      "movesValue": null,
-      "wantsSecret": null,
+      "verdict": "answers",
+      "tools": 4,
+      "names": "get_latest_news,list_regulations,list_releases,search_glossary",
+      "movesValue": [],
+      "wantsSecret": [],
       "name": "ai.ai-portal/ai-portal",
-      "lastSeen": "2026-07-31T12:40:17.864Z"
+      "lastSeen": "2026-07-31T18:44:19.593Z"
     },
     "https://aient.ai/mcp": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.aient/mcp",
-      "lastSeen": "2026-07-31T12:40:18.761Z"
+      "lastSeen": "2026-07-31T18:44:20.777Z"
     },
     "https://mcp.airshelf.ai/mcp": {
-      "verdict": "unreachable",
-      "tools": null,
-      "names": null,
-      "movesValue": null,
-      "wantsSecret": null,
+      "verdict": "answers",
+      "tools": 7,
+      "names": "compare_products,explain_product,find_products,get_product,list_merchants,request_quote,search_catalog",
+      "movesValue": [],
+      "wantsSecret": [],
       "name": "ai.airshelf/catalog",
-      "lastSeen": "2026-07-31T12:40:19.577Z"
+      "lastSeen": "2026-07-31T18:44:22.512Z"
     },
     "https://api.aisecuritygateway.ai/mcp": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.aisecuritygateway/mcp-gateway",
-      "lastSeen": "2026-07-31T12:40:20.441Z"
+      "lastSeen": "2026-07-31T18:44:23.709Z"
     },
     "https://mcp.alphacreek.ai/mcp": {
-      "verdict": "unreachable",
-      "tools": null,
-      "names": null,
-      "movesValue": null,
-      "wantsSecret": null,
+      "verdict": "answers",
+      "tools": 4,
+      "names": "get_filing_toc,get_latest_filing,list_filings,read_node_content",
+      "movesValue": [],
+      "wantsSecret": [],
       "name": "ai.alphacreek/alphacreek-mcp",
-      "lastSeen": "2026-07-31T12:40:21.258Z"
+      "lastSeen": "2026-07-31T18:44:25.440Z"
     },
     "https://mcp.alpic.ai": {
       "verdict": "unreachable",
@@ -712,13 +714,13 @@
       "lastSeen": "2026-07-31T16:42:18.786Z"
     },
     "https://mcp.agenticaffiliate.ai/mcp": {
-      "verdict": "unreachable",
+      "verdict": "unauditable",
       "tools": null,
       "names": null,
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agenticaffiliate/affiliate-networks-mcp",
-      "lastSeen": "2026-07-31T12:40:11.009Z"
+      "lastSeen": "2026-07-31T18:44:07.419Z"
     },
     "https://analyticslegends.ai/mcp": {
       "verdict": "answers",
@@ -730,14 +732,14 @@
       "lastSeen": "2026-07-31T12:40:56.097Z"
     },
     "https://afmr.ai/api/rpc": {
-      "verdict": "unreachable",
-      "tools": null,
-      "names": null,
-      "movesValue": null,
-      "wantsSecret": null,
+      "verdict": "answers",
+      "tools": 4,
+      "names": "discover_afmr,get_lift_evidence_contract,get_reputation_attestation_contract,lookup_failure_mode",
+      "movesValue": [],
+      "wantsSecret": [],
       "name": "ai.afmr/discovery",
-      "lastSeen": "2026-07-31T12:40:06.805Z"
+      "lastSeen": "2026-07-31T18:43:57.046Z"
     }
   },
-  "offset": 10
+  "offset": 30
 }
