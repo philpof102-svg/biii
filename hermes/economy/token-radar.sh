@@ -13,6 +13,8 @@
 export PATH=/usr/local/bin:/usr/bin:/bin:${PATH:-}
 cd /mnt/d/Users/VolKov/veilleIA/biii || { echo "token-radar: cannot reach the repo — nothing ran."; exit 1; }
 
+. /root/.hermes-biii/scripts/verify-payload.sh
+verify_payload "/mnt/d/Users/VolKov/veilleIA/biii/hermes/economy/token-radar.js" || exit 1
 node hermes/economy/token-radar.js
 radar_status=$?
 
