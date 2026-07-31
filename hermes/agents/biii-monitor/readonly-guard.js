@@ -21,8 +21,13 @@ const DENY = new Set([
   'repo_create', 'pr_create', 'pr_review', 'pr_merge', 'issue_create', 'issue_comment',
   'bounty_create', 'bounty_claim', 'bounty_submit', 'task_create', 'task_claim', 'task_complete',
   'webhook_create', 'webhook_delete', 'agent_register', 'ucan_delegate', 'identity_sign',
-  // base-mcp (if ever added) — the absolute never-autonomous set
-  'send', 'swap', 'sign', 'send_calls',
+  // base-mcp (if ever added) — the absolute never-autonomous set.
+  // 2026-07-31: `fund`, `initiate_x402_request` and `complete_x402_request` added after enumerating the
+  // Base MCP toolset actually offered today. `fund` moves value into the wallet and the x402 pair settles
+  // a payment — they belong in the same class as send/swap/sign, and were simply not in the list because
+  // the list predates seeing that server's real tool names. No wallet MCP is mounted in this fleet; this
+  // stays a pre-emptive block, which is the only kind worth having before the server appears.
+  'send', 'swap', 'sign', 'send_calls', 'fund', 'initiate_x402_request', 'complete_x402_request',
   // lawbor — the agent-to-agent economy WRITES (post/offer/bid/settle/block). Descriptor-only, but an
   // unattended monitor must not autonomously speak, list, bid, lock a price, or bind a settlement.
   'lawbor_say', 'lawbor_bot_say', 'lawbor_offer', 'lawbor_post_job', 'lawbor_bid', 'lawbor_confirm',
@@ -34,9 +39,30 @@ const DENY = new Set([
 // per call — an unattended monitor must never trigger them. Read verbs (discover/inspect/list/get/…) pass.
 const MONEY_VERB = /(^|_)(run|pay|buy|purchase|order|checkout|charge|spend|exec|execute|withdraw|deposit|transfer|remit|topup)($|_)/i;
 
+/* Journal des FORMES observees (jamais les valeurs — un payload peut porter un secret). Le fail-closed
+ * ci-dessous est correct mais aveugle: si Hermes renomme le champ, le garde bloquera TOUT et on
+ * apprendra la nouvelle forme par une panne. En enregistrant les cles a chaque refus d'identification,
+ * on apprend la forme reelle AVANT qu'elle ne casse quoi que ce soit — l'hypothese devient une mesure.
+ * L'ecriture ne peut jamais decider d'un appel: toute erreur ici est avalee. */
+const JOURNAL = process.env.READONLY_GUARD_LOG || '/root/.hermes-biii/hooks/observed-shapes.log';
+function noteForme(etiquette, cles) {
+  try {
+    require('fs').appendFileSync(JOURNAL, `${new Date().toISOString()} ${etiquette} keys=${cles}\n`);
+  } catch { /* le journal ne bloque ni n'autorise rien */ }
+}
+
 let raw = '';
 process.stdin.on('data', (c) => { raw += c; });
+process.stdin.on('error', () => {
+  // stdin illisible = on ne verra jamais l'appel. Meme regle que partout ici: refuser, pas supposer.
+  process.stdout.write(JSON.stringify({
+    action: 'block',
+    message: 'biii-monitor is READ-ONLY: the hook could not read the tool call (stdin error). Blocking — a guard that cannot see the call must not authorise it.',
+  }));
+  process.exit(0);
+});
 process.stdin.on('end', () => {
+ try {
   /* ⚠️ « MALFORMED → TREAT AS UNKNOWN » VOULAIT DIRE AUTORISE.
    * L'ancien code laissait `tool = ''` sur un payload illisible, et la fin du fichier pose « silence =
    * allow ». Mesure du 2026-07-28 en executant CE script:
@@ -58,6 +84,10 @@ process.stdin.on('end', () => {
     ? (charge.tool_name ?? charge.toolName ?? charge.tool ?? charge.name) : undefined;
   const tool = typeof nomBrut === 'string' ? nomBrut : '';
   if (illisible || !tool.trim()) {
+    // On refuse, ET on enregistre la forme: c'est le seul endroit ou la forme reelle du payload se
+    // manifeste. Sans ce journal, un renommage de champ se decouvre par un agent muet.
+    noteForme(illisible ? 'UNPARSEABLE' : 'NO_TOOL_NAME',
+      charge && typeof charge === 'object' ? Object.keys(charge).join('|') : '(none)');
     process.stdout.write(JSON.stringify({
       action: 'block',
       message: 'biii-monitor is READ-ONLY and could NOT identify this tool call'
@@ -90,4 +120,14 @@ process.stdin.on('end', () => {
     }));
   }
   process.exit(0);                                   // silence = allow
+ } catch (e) {
+  /* Une exception DANS le garde produisait un process mort sans stdout — et « silence = allow » plus
+   * bas signifie que l'appel passait. Le seul moment ou ce garde a le droit d'etre indulgent, c'est
+   * jamais: un garde casse doit refuser. */
+  process.stdout.write(JSON.stringify({
+    action: 'block',
+    message: `biii-monitor is READ-ONLY: the guard itself failed (${e && e.message}). Blocking — a broken guard must fail closed, never wave the call through.`,
+  }));
+  process.exit(0);
+ }
 });
