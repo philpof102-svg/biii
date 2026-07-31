@@ -51,6 +51,40 @@ function noteForme(etiquette, cles) {
   } catch { /* le journal ne bloque ni n'autorise rien */ }
 }
 
+/* ── MESURE BORNEE 48h (fin: 2026-08-02T12:00Z) ──────────────────────────────────────────────────
+ * On veut concevoir un controle sur les ARGUMENTS (voir ARGUMENT-GUARD-DESIGN.md). Il repose sur une
+ * hypothese non mesuree: que ce hook voit les arguments. Indices: le binaire Hermes contient
+ * `tool_input` ET `toolInput` (3 fois chacun) et ne contient ni `arguments` ni `params` — mais aucun
+ * payload REEL n'a jamais ete observe, parce que le journal ci-dessus n'enregistre que les appels
+ * NON identifies, et aucun n'a echoue.
+ *
+ * On enregistre donc la FORME de chaque appel: noms de cles de premier niveau, et si un champ
+ * d'arguments existe, ses noms de champs et leur nombre. JAMAIS les valeurs — un payload peut porter
+ * exactement le secret que ce controle existera pour proteger, et un journal qui les capture serait
+ * l'exfiltration qu'il pretend empecher.
+ *
+ * La borne est en dur et depassee = plus rien n'est ecrit. Une mesure sans fin devient un fichier que
+ * personne ne relit; celle-ci a une date de lecture. */
+const FIN_MESURE = Date.parse('2026-08-02T12:00:00Z');
+function mesurerForme(charge, tool) {
+  try {
+    if (!(Date.now() < FIN_MESURE)) return;              // borne depassee → silence total
+    if (!charge || typeof charge !== 'object') return;
+    const cles = Object.keys(charge).join('|');
+    const args = charge.tool_input ?? charge.toolInput ?? charge.tool_args ?? charge.input;
+    let desc;
+    if (args === undefined) desc = 'args=ABSENT';
+    else if (args === null) desc = 'args=null';
+    else if (typeof args !== 'object') desc = `args=${typeof args}`;
+    else {
+      const noms = Object.keys(args);
+      desc = `args=object n=${noms.length} fields=${noms.join(',') || '(none)'}`;
+    }
+    require('fs').appendFileSync(JOURNAL,
+      `${new Date().toISOString()} SHAPE tool=${tool} keys=${cles} ${desc}\n`);
+  } catch { /* mesurer ne doit jamais decider d'un appel */ }
+}
+
 let raw = '';
 process.stdin.on('data', (c) => { raw += c; });
 process.stdin.on('error', () => {
@@ -97,6 +131,7 @@ process.stdin.on('end', () => {
     }));
     process.exit(0);
   }
+  mesurerForme(charge, tool);   // observation seule — n'influence aucune decision ci-dessous
   const segments = tool.split(/__|[.:/\s]/).filter(Boolean);
   const seg = segments[segments.length - 1];        // strip server namespace (., :, /, ws, or __), keep single _ in names
   // Supervised spend opt-in: MONID_ALLOW_SPEND=1 lets THIS run use monid's paid tools (the x-devradar
