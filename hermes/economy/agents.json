@@ -6,7 +6,7 @@
       "role": "Base trust sentinel (the SOUL) — scan the watchlist through BIII, flag known-bad/impersonation, delegate follow-ups.",
       "kind": "script",
       "script": "biii-scan.sh",
-      "schedule": "30m",
+      "schedule": "every 30m",
       "cost": "free ($0, no_agent)",
       "enabled": true
     },
@@ -17,7 +17,7 @@
       "model": "tencent/hy3",
       "toolsets": "biii,recall",
       "prompt": "You are DeskWatch, a read-only market analyst. LIVE market data is provided above. Give a terse read: direction, one key level to watch, one risk. Trust ONLY the provided numbers — never invent a figure. You never trade, never move funds. 4 lines max.",
-      "schedule": "4h",
+      "schedule": "every 4h",
       "cost": "LLM (hy3, ~$0.02/run)",
       "dataScript": "market-data.sh",
       "enabled": true
@@ -29,7 +29,7 @@
       "model": "tencent/hy3",
       "toolsets": "biii,lawbor,recall",
       "prompt": "You are our revenue scout. Using recall (our memory) and the biii/lawbor tools, propose ONE concrete, real B2B lead or channel for BIII safe-to-pay verdicts. No hype; only real, actionable. You never send anything — you propose.",
-      "schedule": "1d",
+      "schedule": "every 1d",
       "cost": "LLM (hy3, ~$0.02/run)",
       "enabled": false
     },
@@ -40,7 +40,7 @@
       "model": "tencent/hy3",
       "toolsets": "gitlawb,recall",
       "prompt": "Check and report, in one terse line, the health of our gitlawb node and any of our repos on it. Read-only; never write.",
-      "schedule": "6h",
+      "schedule": "every 6h",
       "cost": "LLM (hy3, ~$0.01/run)",
       "enabled": false
     },
@@ -51,7 +51,7 @@
       "model": "tencent/hy3",
       "toolsets": "recall",
       "prompt": "Use memory_search (READ-ONLY) on our persistent memory. Surface ONE fact that looks stale, contradictory, or worth re-verifying, with its memory name/pointer and why. Do not change anything. 3 lines max.",
-      "schedule": "1d",
+      "schedule": "every 1d",
       "cost": "LLM (hy3, ~$0.01/run)",
       "enabled": true
     },

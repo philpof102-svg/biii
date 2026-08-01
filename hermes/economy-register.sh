@@ -16,6 +16,24 @@ command -v jq >/dev/null || { echo "jq required"; exit 1; }
 # and a checker that cries wolf gets ignored, which is how the real three survived. Everything is
 # reduced to minutes; anything unrecognised is returned unchanged so it can only compare equal to an
 # identical string, never silently to something else.
+# 2026-08-01, proven in an isolated HERMES_HOME rig: `hermes cron create "4h"` creates a job that
+# fires ONCE and deletes itself ("once in 4h", repeat {times: 1}); `hermes cron create "every 4h"`
+# creates an interval that repeats for ever. The word `every` is load-bearing, and omitting it is
+# silent — the job appears in `cron list`, runs once, and is simply gone the next time you look.
+# That is what happened to market-watch and memory-keeper: both declared a bare schedule, both fired
+# on 30 July, both vanished, and nothing reported it. biii-watch — the SENTINEL — also declared a bare
+# "30m" and survives only because it was registered by hand as an interval; re-registering it from the
+# file would have quietly turned the sentinel into a one-shot.
+# Every agent here is a repeating agent, so a bare schedule is always a mistake. It is corrected and
+# announced, never corrected quietly.
+ensure_interval() {
+  case "$1" in
+    every\ *|*\ *\ *) printf '%s' "$1" ;;          # already 'every X', or a cron expression
+    [0-9]*[mhd]) printf 'every %s' "$1" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
 norm_sched() {
   printf '%s' "$1" | tr -d ' ' | tr 'A-Z' 'a-z' | sed 's/^every//' | awk '
     /^[0-9]+m$/ { sub(/m/,""); print $0 "m"; next }
@@ -35,6 +53,13 @@ for i in $(seq 0 $((n - 1))); do
   kind=$(jq -r ".agents[$i].kind" "$CFG")
   sched=$(jq -r ".agents[$i].schedule" "$CFG")
   cost=$(jq -r ".agents[$i].cost" "$CFG")
+
+  fixed=$(ensure_interval "$sched")
+  if [ "$fixed" != "$sched" ]; then
+    echo "  ~ $name : schedule '$sched' has no 'every' — that creates a ONE-SHOT that fires once and"
+    echo "      deletes itself. Using '$fixed'. Fix agents.json so the file says what it means."
+    sched="$fixed"
+  fi
 
   if [ "$enabled" != "true" ]; then echo "  - $name : OFF ($cost) — enable in agents.json to schedule"; off=$((off+1)); continue; fi
 
@@ -84,9 +109,12 @@ for i in $(seq 0 $((n - 1))); do
   fi
 
   # The reason a registration failed used to go to /dev/null, so "FAILED to schedule (agent)" was the
-  # whole report. Measured the same day: market-watch and memory-keeper are enabled=true and absent
-  # from the scheduler entirely, because both are kind=agent and the gateway has no LLM key set —
-  # a one-line error that this redirect had been discarding. Captured and printed now.
+  # whole report — a failure with its cause deleted. Captured and printed now.
+  #
+  # (Correction to an earlier version of this comment: it blamed a missing OPENROUTER_API_KEY for
+  # market-watch and memory-keeper being absent. That was wrong. The key IS configured — 73 chars in
+  # $HERMES_HOME/.env, mode 600 — and I had checked the gateway's process environ, which is a proxy,
+  # not the source hermes reads. The real cause is the bare-schedule one-shot documented above.)
   err=$(mktemp)
   if [ "$kind" = "script" ]; then
     script=$(jq -r ".agents[$i].script" "$CFG")

@@ -32,8 +32,8 @@ echo   Fleet agents are declared in hermes\economy\agents.json — but read the
 echo   register output above, not that file: an agent already scheduled keeps its
 echo   OLD schedule, and the ~ lines tell you which ones no longer match.
 echo.
-echo   The free sentinel (biii-watch) is ON. LLM agents cannot start at all until
-echo   an OpenRouter key is set on the gateway - without one they fail to register
-echo   and the ! line above says so. Set the key, then LLM runs cost credits.
+echo   The free sentinel (biii-watch) is ON. The LLM agents (market-watch,
+echo   memory-keeper) cost OpenRouter credits per run - the key is configured,
+echo   so once scheduled they WILL spend. Cost is the number of passes.
 echo.
 pause
