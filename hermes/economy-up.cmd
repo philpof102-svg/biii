@@ -28,8 +28,12 @@ echo   Console   : http://localhost:4799     grid + spend + sessions + journal
 echo   Dashboard : http://localhost:4711     Hermes native (sessions/config)
 echo   Sell srv  : biii-production.up.railway.app   LIVE, x402 0.25 USDC
 echo.
-echo   Fleet agents are declared in hermes\economy\agents.json.
-echo   The free sentinel (biii-watch) is ON. LLM agents are OFF by default
-echo   (each run costs OpenRouter credits) - flip "enabled" to true to schedule.
+echo   Fleet agents are declared in hermes\economy\agents.json — but read the
+echo   register output above, not that file: an agent already scheduled keeps its
+echo   OLD schedule, and the ~ lines tell you which ones no longer match.
+echo.
+echo   The free sentinel (biii-watch) is ON. LLM agents cannot start at all until
+echo   an OpenRouter key is set on the gateway - without one they fail to register
+echo   and the ! line above says so. Set the key, then LLM runs cost credits.
 echo.
 pause

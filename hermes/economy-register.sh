@@ -11,9 +11,22 @@ CFG=/mnt/d/Users/VolKov/veilleIA/biii/hermes/economy/agents.json
 [ -f "$CFG" ] || { echo "no agents.json at $CFG"; exit 1; }
 command -v jq >/dev/null || { echo "jq required"; exit 1; }
 
+# Both sides spell the same interval differently — agents.json says "every 1h", the scheduler prints
+# "every 60m". Comparing the raw strings would have reported five divergences where only three exist,
+# and a checker that cries wolf gets ignored, which is how the real three survived. Everything is
+# reduced to minutes; anything unrecognised is returned unchanged so it can only compare equal to an
+# identical string, never silently to something else.
+norm_sched() {
+  printf '%s' "$1" | tr -d ' ' | tr 'A-Z' 'a-z' | sed 's/^every//' | awk '
+    /^[0-9]+m$/ { sub(/m/,""); print $0 "m"; next }
+    /^[0-9]+h$/ { sub(/h/,""); print $0 * 60 "m"; next }
+    /^[0-9]+d$/ { sub(/d/,""); print $0 * 1440 "m"; next }
+    { print }'
+}
+
 existing=$("$H" cron list 2>/dev/null)
 n=$(jq '.agents | length' "$CFG")
-reg=0; skip=0; off=0
+reg=0; skip=0; off=0; div=0; failed=0
 echo "== registering the economy fleet from agents.json ($n declared) =="
 
 for i in $(seq 0 $((n - 1))); do
@@ -46,27 +59,65 @@ for i in $(seq 0 $((n - 1))); do
     fi
   done
 
-  if printf '%s' "$existing" | grep -qiF "$name"; then echo "  = $name : already scheduled ($cost)"; skip=$((skip+1)); continue; fi
+  # 2026-08-01: "already scheduled" was being read as "scheduled AS DECLARED". This check matched on
+  # the NAME alone, so once an agent was registered, editing its schedule in agents.json changed
+  # nothing — for ever. Measured live the day this was written: biii-watch declares 30m and runs every
+  # 90m (the SENTINEL, at a third of its intended rate), strategist declares 12h and runs every 120m,
+  # meme-watch declares 6h and runs every 30m — twelve times what the file says. agents.json had
+  # quietly stopped being the truth about what this machine does, and nothing anywhere said so.
+  #
+  # Re-registering automatically would be worse: it would silently change a live schedule, and cost is
+  # the number of scheduled passes. So the divergence is REPORTED and the operator decides.
+  if printf '%s' "$existing" | grep -qiF "$name"; then
+    livesched=$(printf '%s' "$existing" | awk -v n="$name" '
+      $1=="Name:" { cur=($2==n) }
+      cur && $1=="Schedule:" { $1=""; sub(/^ +/,""); print; exit }')
+    if [ -n "$livesched" ] && [ "$(norm_sched "$sched")" != "$(norm_sched "$livesched")" ]; then
+      echo "  ~ $name : SCHEDULE DIVERGED — agents.json says '$sched', the scheduler runs '$livesched'."
+      echo "      agents.json is NOT the truth for this agent. To adopt the declared value:"
+      echo "      hermes cron delete $name && re-run this script. Cost is the number of passes — check before you do."
+      div=$((div+1))
+    else
+      echo "  = $name : already scheduled $livesched ($cost)"
+    fi
+    skip=$((skip+1)); continue
+  fi
 
+  # The reason a registration failed used to go to /dev/null, so "FAILED to schedule (agent)" was the
+  # whole report. Measured the same day: market-watch and memory-keeper are enabled=true and absent
+  # from the scheduler entirely, because both are kind=agent and the gateway has no LLM key set —
+  # a one-line error that this redirect had been discarding. Captured and printed now.
+  err=$(mktemp)
   if [ "$kind" = "script" ]; then
     script=$(jq -r ".agents[$i].script" "$CFG")
-    "$H" cron create "$sched" --name "$name" --script "$script" --no-agent >/dev/null 2>&1 \
+    "$H" cron create "$sched" --name "$name" --script "$script" --no-agent >"$err" 2>&1 \
       && { echo "  + $name : scheduled $sched ($cost)"; reg=$((reg+1)); } \
-      || echo "  ! $name : FAILED to schedule (script)"
+      || { echo "  ! $name : FAILED to schedule (script) — $(tr '\n' ' ' <"$err" | cut -c1-200)"; failed=$((failed+1)); }
   else
     prompt=$(jq -r ".agents[$i].prompt" "$CFG")
     dscript=$(jq -r ".agents[$i].dataScript // empty" "$CFG")
     if [ -n "$dscript" ]; then
       # agent + a data script: the script's stdout (live data) is injected into the prompt each run.
-      "$H" cron create "$sched" "$prompt" --name "$name" --script "$dscript" >/dev/null 2>&1 \
+      "$H" cron create "$sched" "$prompt" --name "$name" --script "$dscript" >"$err" 2>&1 \
         && { echo "  + $name : scheduled $sched ($cost) — LLM + live data ($dscript)"; reg=$((reg+1)); } \
-        || echo "  ! $name : FAILED to schedule (agent+data)"
+        || { echo "  ! $name : FAILED to schedule (agent+data) — $(tr '\n' ' ' <"$err" | cut -c1-200)"; failed=$((failed+1)); }
     else
-      "$H" cron create "$sched" "$prompt" --name "$name" >/dev/null 2>&1 \
+      "$H" cron create "$sched" "$prompt" --name "$name" >"$err" 2>&1 \
         && { echo "  + $name : scheduled $sched ($cost) — LLM"; reg=$((reg+1)); } \
-        || echo "  ! $name : FAILED to schedule (agent)"
+        || { echo "  ! $name : FAILED to schedule (agent) — $(tr '\n' ' ' <"$err" | cut -c1-200)"; failed=$((failed+1)); }
     fi
   fi
+  rm -f "$err"
 done
 
-echo "== fleet: $reg newly scheduled, $skip already up, $off off (declared but not enabled) =="
+# A summary that only counts successes is how two missing agents went unnoticed. Every enabled agent
+# ends in exactly one bucket, and the buckets are printed even when they are zero.
+echo "== fleet: $reg newly scheduled, $skip already up, $div DIVERGED from agents.json, $failed FAILED, $off off (declared but not enabled) =="
+if [ "$failed" -gt 0 ]; then
+  echo "== $failed enabled agent(s) are declared but NOT running. The reason is printed above, on the ! line. =="
+fi
+if [ "$div" -gt 0 ]; then
+  echo "== $div agent(s) run on a schedule agents.json does not describe. Reading that file will mislead you until this is resolved. =="
+fi
+[ "$failed" -gt 0 ] && exit 1
+exit 0
