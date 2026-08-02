@@ -142,7 +142,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agenticfabricationnetwork/ufp",
-      "lastSeen": "2026-08-02T03:06:27.012Z"
+      "lastSeen": "2026-08-02T13:12:37.272Z"
     },
     "https://api.agenticshelf.ai/m/graffeo/mcp": {
       "verdict": "answers",
@@ -151,7 +151,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agenticshelf/graffeo",
-      "lastSeen": "2026-08-02T03:06:28.353Z"
+      "lastSeen": "2026-08-02T13:12:38.947Z"
     },
     "https://api.agenticshelf.ai/mcp": {
       "verdict": "answers",
@@ -160,7 +160,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agenticshelf/mcp",
-      "lastSeen": "2026-08-02T03:06:29.386Z"
+      "lastSeen": "2026-08-02T13:12:40.029Z"
     },
     "https://api.agenticshelf.ai/m/puroair/mcp": {
       "verdict": "answers",
@@ -169,7 +169,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agenticshelf/puroair",
-      "lastSeen": "2026-08-02T05:07:21.017Z"
+      "lastSeen": "2026-08-02T13:12:41.270Z"
     },
     "https://mcp.agenticterminal.ai/mcp": {
       "verdict": "answers",
@@ -178,7 +178,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agenticterminal/directory",
-      "lastSeen": "2026-08-02T05:07:22.593Z"
+      "lastSeen": "2026-08-02T13:12:42.874Z"
     },
     "https://ai-akari.ai/mcp-trust": {
       "verdict": "answers",
@@ -187,7 +187,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.ai-akari/agent-trust-receipt",
-      "lastSeen": "2026-08-02T05:07:25.350Z"
+      "lastSeen": "2026-08-02T13:12:45.869Z"
     },
     "https://ai-akari.ai/mcp": {
       "verdict": "high_risk",
@@ -198,7 +198,7 @@
       ],
       "wantsSecret": [],
       "name": "ai.ai-akari/one-minute-akari",
-      "lastSeen": "2026-08-02T05:07:26.405Z"
+      "lastSeen": "2026-08-02T13:12:46.907Z"
     },
     "https://www.ai-portal.ai/mcp": {
       "verdict": "answers",
@@ -207,7 +207,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.ai-portal/ai-portal",
-      "lastSeen": "2026-08-02T05:07:27.845Z"
+      "lastSeen": "2026-08-02T13:12:48.349Z"
     },
     "https://aient.ai/mcp": {
       "verdict": "unauditable",
@@ -216,7 +216,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.aient/mcp",
-      "lastSeen": "2026-08-02T05:07:30.875Z"
+      "lastSeen": "2026-08-02T13:12:51.893Z"
     },
     "https://mcp.airshelf.ai/mcp": {
       "verdict": "answers",
@@ -225,7 +225,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.airshelf/catalog",
-      "lastSeen": "2026-08-02T05:07:32.635Z"
+      "lastSeen": "2026-08-02T13:12:53.640Z"
     },
     "https://api.aisecuritygateway.ai/mcp": {
       "verdict": "unauditable",
@@ -234,7 +234,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.aisecuritygateway/mcp-gateway",
-      "lastSeen": "2026-08-02T05:07:33.661Z"
+      "lastSeen": "2026-08-02T13:12:54.760Z"
     },
     "https://mcp.alphacreek.ai/mcp": {
       "verdict": "answers",
@@ -243,7 +243,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.alphacreek/alphacreek-mcp",
-      "lastSeen": "2026-08-02T05:07:35.284Z"
+      "lastSeen": "2026-08-02T13:12:56.469Z"
     },
     "https://mcp.alpic.ai": {
       "verdict": "unauditable",
@@ -252,7 +252,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.alpic.mcp/alpic-mcp",
-      "lastSeen": "2026-08-02T05:07:36.398Z"
+      "lastSeen": "2026-08-02T13:12:57.577Z"
     },
     "https://test.alpic.ai/": {
       "verdict": "unreachable",
@@ -261,7 +261,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.alpic.test/test-mcp-server",
-      "lastSeen": "2026-08-02T05:07:37.227Z"
+      "lastSeen": "2026-08-02T13:12:58.387Z"
     },
     "https://mcp.ambix.ai": {
       "verdict": "unauditable",
@@ -270,7 +270,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.ambix/ambix",
-      "lastSeen": "2026-08-02T05:07:38.424Z"
+      "lastSeen": "2026-08-02T13:12:59.491Z"
     },
     "https://mcp.anomalyarmor.ai/mcp": {
       "verdict": "unauditable",
@@ -279,7 +279,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.anomalyarmor/armor-mcp",
-      "lastSeen": "2026-08-02T05:07:41.039Z"
+      "lastSeen": "2026-08-02T13:13:02.276Z"
     },
     "https://api-v2.appdeploy.ai/mcp": {
       "verdict": "unauditable",
@@ -288,7 +288,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.appdeploy/deploy-app",
-      "lastSeen": "2026-08-02T05:07:42.282Z"
+      "lastSeen": "2026-08-02T13:13:03.593Z"
     },
     "https://arclan.ai/mcp": {
       "verdict": "answers",
@@ -720,7 +720,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agenticaffiliate/affiliate-networks-mcp",
-      "lastSeen": "2026-08-02T03:06:25.180Z"
+      "lastSeen": "2026-08-02T13:12:35.335Z"
     },
     "https://analyticslegends.ai/mcp": {
       "verdict": "answers",
@@ -729,7 +729,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.analyticslegends/sap-analytics",
-      "lastSeen": "2026-08-02T05:07:39.730Z"
+      "lastSeen": "2026-08-02T13:13:00.859Z"
     },
     "https://afmr.ai/api/rpc": {
       "verdict": "answers",
@@ -742,13 +742,13 @@
     },
     "https://agentplaybooks.ai/api/mcp/manage": {
       "verdict": "answers",
-      "tools": 17,
-      "names": "create_persona,create_playbook,create_skill,delete_memory,delete_persona,delete_playbook,delete_skill,get_playbook,get_skill,list_playbooks,list_skills,read_memory,search_memory,update_persona,update_playbook,update_skill,write_memory",
+      "tools": 47,
+      "names": "archive_memories,call_connected_tool,consolidate_memories,create_mcp_server,create_persona,create_playbook,create_run,create_skill,create_task_graph,delete_mcp_server,delete_memory,delete_persona,delete_playbook,delete_run,delete_secret,delete_skill,get_canvas_toc,get_memory_context,get_memory_tree,get_playbook,get_skill,list_canvas,list_mcp_servers,list_playbooks,list_runs,list_secrets,list_skill_versions,list_skills,lock_canvas_section,patch_canvas_section,promote_memory,read_canvas,read_memory,rollback_skill,rotate_secret,search_memory,store_secret,unlock_canvas_section,update_mcp_server,update_persona,update_playbook,update_run,update_skill,update_task_status,use_secret,write_canvas,write_memory",
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agentplaybooks/agentplaybooks",
-      "lastSeen": "2026-08-02T05:07:24.087Z"
+      "lastSeen": "2026-08-02T13:12:44.543Z"
     }
   },
-  "offset": 17
+  "offset": 37
 }
