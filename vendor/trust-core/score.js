@@ -19,22 +19,40 @@ const SUBJECT_TYPES = {
   DEPLOYER_ONCHAIN: 'deployer-onchain',
 };
 
+
+// ── 2026-08-01: NaN walked straight through the 0-100 clamp ──────────────────────────────────────
+// `Math.max(0, Math.min(100, NaN))` is NaN, so a single junk metric returned NaN as a "score" —
+// measured on 7 of 7 probes (successRate 'abc', usdcVolume 'x', jobCount 'many', deployer
+// survivalRate 'x', …). A NaN score then loses EVERY comparison downstream: in preflight-core.js
+// both `>= 50` and `>= 30` are false, so it settles on PROCEED_LOW_VALUE and is published as a
+// number. The clamp read like a guarantee of the 0-100 range and was not one.
+function finite(v, fallback) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+// A non-finite total is not a score and must not be dressed as one. null forces the caller to say
+// something honest rather than publish a number nobody computed.
+function clamp100(total) {
+  return Number.isFinite(total) ? Math.max(0, Math.min(100, Math.round(total))) : null;
+}
+
 /** Business (Google rating + review volume) → 0-100. */
 function computeScoreBusiness(snapshot) {
-  const rating = Number(snapshot?.rating) || 0;
-  const reviewCount = Number(snapshot?.reviewCount) || 0;
+  const rating = Math.max(0, finite(snapshot?.rating, 0));
+  const reviewCount = Math.max(0, finite(snapshot?.reviewCount, 0));
   const ratingPart = Math.max(0, Math.min(60, (rating / 5) * 60));
   const volumePart = Math.max(0, Math.min(40, Math.log10(Math.max(1, reviewCount)) * 10));
-  return Math.round(ratingPart + volumePart);
+  return clamp100(ratingPart + volumePart);
 }
 
 /** AI agent (successRate 50 · usdcVolume 30 · recency 20), sample-confidence guarded → 0-100. */
 function computeScoreAgent(metrics) {
   // ?? 0 not || 0 — daysSinceLastJob can legitimately be 0 (active today)
-  const successRate = Math.max(0, Math.min(1, Number(metrics?.successRate ?? 0)));
-  const usdcVolume = Math.max(0, Number(metrics?.usdcVolume ?? 0));
-  const daysSinceLastJob = Math.max(0, Number(metrics?.daysSinceLastJob ?? 365));
-  const jobCount = Math.max(0, Number(metrics?.jobCount ?? 0));
+  const successRate = Math.max(0, Math.min(1, finite(metrics?.successRate, 0)));
+  const usdcVolume = Math.max(0, finite(metrics?.usdcVolume, 0));
+  const daysSinceLastJob = Math.max(0, finite(metrics?.daysSinceLastJob, 365));
+  const jobCount = Math.max(0, finite(metrics?.jobCount, 0));
 
   // Success rate: 50 pts, penalized under 10 jobs so 1 success ≠ a perfect score.
   const sampleConfidence = Math.min(1, jobCount / 10);
@@ -46,7 +64,7 @@ function computeScoreAgent(metrics) {
   // Recency: 30-day decay, 20 pts if < 1 day, 0 if > 30
   const recencyPart = Math.max(0, 20 * Math.exp(-daysSinceLastJob / 15));
 
-  return Math.round(successPart + volumePart + recencyPart);
+  return clamp100(successPart + volumePart + recencyPart);
 }
 
 /**
@@ -55,15 +73,15 @@ function computeScoreAgent(metrics) {
  * the ONE impurity removed in extraction. The hosted adapter passes the env read as this option.
  */
 function computeActivityScore(metrics, { outcomeAdjust = false } = {}) {
-  const jobCount = Math.max(0, Number(metrics?.jobCount ?? 0));
-  const daysSinceLastJob = Math.max(0, Number(metrics?.daysSinceLastJob ?? 30));
-  const successRate = metrics?.successRate == null ? null : Math.max(0, Math.min(1, Number(metrics.successRate)));
+  const jobCount = Math.max(0, finite(metrics?.jobCount, 0));
+  const daysSinceLastJob = Math.max(0, finite(metrics?.daysSinceLastJob, 30));
+  const successRate = metrics?.successRate == null ? null : Math.max(0, Math.min(1, finite(metrics.successRate, 0)));
   const alive = metrics?.alive;
   // Longevity signals — agent has been around for a while + showed up consistently
-  const ageDays = Math.max(0, Number(metrics?.ageDays ?? 0));
-  const snapshotDays = Math.max(0, Number(metrics?.snapshotDaysLast30 ?? 0));
+  const ageDays = Math.max(0, finite(metrics?.ageDays, 0));
+  const snapshotDays = Math.max(0, finite(metrics?.snapshotDaysLast30, 0));
   // Diversity — number of distinct tags / categories surfaced in Bazaar metadata
-  const tagCount = Math.max(0, Number(metrics?.tagCount ?? 0));
+  const tagCount = Math.max(0, finite(metrics?.tagCount, 0));
 
   // Activity (40 pts max)
   const activityPart = Math.min(40, Math.log10(Math.max(1, jobCount)) * 10);
@@ -113,9 +131,9 @@ function computeActivityScore(metrics, { outcomeAdjust = false } = {}) {
                 - Math.min(20, 10 * (Number(oh.rugged) || 0));
   }
 
-  return Math.max(0, Math.min(100, Math.round(
+  return clamp100(
     activityPart + recencyPart + reputationPart + healthPart + longevityPart + proofBonus + outcomePart
-  )));
+  );
 }
 
 /** LawGecko conduct penalty on a deployer score. Penalty-only; CLEAN/UNKNOWN/none = 0. */
@@ -130,18 +148,30 @@ function conductScorePenalty(conduct) {
 
 /** Token-deployer reputation (survival · liquidity · recency×survival · diversity · age · proofs − conduct) → 0-100. */
 function computeScoreDeployer(m) {
-  const launchCount = Math.max(0, Number(m?.launchCount ?? 0));
+  const launchCount = Math.max(0, finite(m?.launchCount, 0));
   // Identity-only path: no launches but external proofs — proof bonus counts standalone.
   if (launchCount === 0) {
     const proofs = Array.isArray(m?.proofs) ? m.proofs : [];
     const bonus = Math.min(40, proofs.reduce((s, p) => s + (Number(p?.weight) || 5), 0));
     return bonus;
   }
-  const survivalRate = Math.max(0, Math.min(1, Number(m?.survivalRate ?? 0)));
-  const liquidity = Math.max(0, Number(m?.cumulativeLiquidityUsd ?? 0));
-  const daysSinceLast = Math.max(0, Number(m?.daysSinceLastLaunch ?? 365));
-  const diversity = Math.max(0, Number(m?.platformDiversity ?? 0));
-  const ageDays = Math.max(0, Number(m?.walletAgeDays ?? 0));
+  // ── 2026-08-01: an UNCHECKED backlog was scored as a proven-dead one ────────────────────────────
+  // `?? 0` made "we have not checked whether this deployer's launches are still alive" identical to
+  // "we checked, and none of them are". It is worth 39 points here — survivalPart is 40 × this value,
+  // and recencyPart at :152 is MULTIPLIED by it, so an unknown zeroes two components at once. The
+  // caller (agent.js) then publishes verdict BLOCK and the sentence "high-risk — launches show low
+  // post-7d activity (dormant or rugged)". The job that fills this field, mainstreet-deployer-alive,
+  // was frozen for six weeks; for all of it we were publishing that accusation about real wallets on
+  // a free, cached endpoint, generated entirely by our own backlog.
+  //
+  // Unknown survival is not scoreable: it is 40 of the points outright and gates 15 more, so a number
+  // computed without it is not comparable to one computed with it. null, and the caller says why.
+  if (m?.survivalRate == null || !Number.isFinite(Number(m.survivalRate))) return null;
+  const survivalRate = Math.max(0, Math.min(1, Number(m.survivalRate)));
+  const liquidity = Math.max(0, finite(m?.cumulativeLiquidityUsd, 0));
+  const daysSinceLast = Math.max(0, finite(m?.daysSinceLastLaunch, 365));
+  const diversity = Math.max(0, finite(m?.platformDiversity, 0));
+  const ageDays = Math.max(0, finite(m?.walletAgeDays, 0));
 
   // Sample confidence — 1 launch at 100% survival ≠ 50 launches at 100%.
   const sampleConfidence = Math.min(1, launchCount / 5);
@@ -156,9 +186,9 @@ function computeScoreDeployer(m) {
   const proofBonus = Math.min(25, proofs.reduce((s, p) => s + (Number(p?.weight) || 5), 0));
   const conductPenalty = conductScorePenalty(m?.onchainConduct);
 
-  return Math.max(0, Math.min(100, Math.round(
+  return clamp100(
     survivalPart + liquidityPart + recencyPart + diversityPart + agePart + proofBonus - conductPenalty
-  )));
+  );
 }
 
 /** Dispatcher — routes on subjectType (options forwarded for computeActivityScore-style callers). */

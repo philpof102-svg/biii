@@ -81,17 +81,45 @@ if (attendus.length === 0) {
     + '  combien de fichiers sont lances, donc impossible de savoir si le total ci-dessus est complet.');
   process.exit(2);
 }
-if (lignes !== attendus.length) {
-  const manquants = Math.abs(attendus.length - lignes);
-  console.error('\n✗ ' + lignes + ' bilans lus pour ' + attendus.length + ' fichiers lances — ' + manquants
-    + ' de decalage.\n'
-    + '  Un fichier imprime son bilan dans un format que ce compteur ne connait pas, et ses tests sont\n'
-    + '  donc ABSENTS du total ci-dessus. C\'est exactement la faute du 2026-07-27 (13 suites ignorees,\n'
-    + '  101 tests, un total presente comme complet). Ajouter le format a la liste BILANS — ne pas\n'
-    + '  publier ce chiffre en attendant.');
+/* ORDRE DELIBERE: un test EN ECHEC s'annonce AVANT le decalage de comptage, parce qu'il l'EXPLIQUE.
+ * `npm test` enchaine les 83 fichiers avec `&&`: le premier qui sort non-zero ARRETE la chaine, et tous
+ * les suivants ne tournent jamais. Leur bilan manque alors — non pas parce que son format est inconnu,
+ * mais parce qu'il n'a jamais ete imprime.
+ *
+ * ⚠️ 2026-08-03, mesure: 1 test en echec au fichier 44 sur 83 → ce script annoncait « 39 de decalage »
+ * et accusait le parseur, en affirmant une cause unique pour un symptome qui en a trois. La vraie cause
+ * (un echec dans vendor-parity) n'etait imprimee nulle part, l'ordre des controles la rendant
+ * inatteignable. C'est trait pour trait le defaut que ce depot traque — une lecture ratee qui ressemble
+ * a une autre lecture ratee — installe dans l'instrument charge de le detecter. */
+if (failed > 0) {
+  console.error('\n✗ ' + failed + ' test(s) en echec.');
+  if (lignes < attendus.length) {
+    console.error('  Et ' + (attendus.length - lignes) + ' fichier(s) n\'ont imprime aucun bilan: la chaine `&&`\n'
+      + '  s\'arrete au premier fichier non-zero, donc ils n\'ont probablement JAMAIS tourne. Ce decalage\n'
+      + '  est un effet de l\'echec ci-dessus, pas forcement un format inconnu — corriger l\'echec, puis\n'
+      + '  relancer avant de conclure quoi que ce soit sur le comptage.');
+  }
   process.exit(1);
 }
-if (failed > 0) { console.error('\n✗ ' + failed + ' test(s) en echec'); process.exit(1); }
+if (lignes !== attendus.length) {
+  if (lignes > attendus.length) {
+    console.error('\n✗ ' + lignes + ' bilans lus pour seulement ' + attendus.length + ' fichiers lances — '
+      + (lignes - attendus.length) + ' de TROP.\n'
+      + '  Un fichier imprime plus d\'une ligne de bilan (ou une ligne de bilan apparait dans un message),\n'
+      + '  donc des tests sont comptes DEUX FOIS et le total ci-dessus est surevalue.');
+    process.exit(1);
+  }
+  console.error('\n✗ ' + lignes + ' bilans lus pour ' + attendus.length + ' fichiers lances — '
+    + (attendus.length - lignes) + ' de decalage, alors que tous les bilans lus sont verts.\n'
+    + '  Des tests sont donc ABSENTS du total ci-dessus. TROIS causes donnent ce meme symptome, et ce\n'
+    + '  script ne sait pas les distinguer — les verifier dans cet ordre plutot que d\'en supposer une:\n'
+    + '    1. un fichier a JETE avant d\'imprimer son bilan (regarder la fin de la sortie brute) ;\n'
+    + '    2. un fichier imprime son bilan dans un TROISIEME format (l\'ajouter a BILANS) — c\'est la\n'
+    + '       faute du 2026-07-27: 13 suites ignorees, 101 tests, un total presente comme complet ;\n'
+    + '    3. la chaine `&&` s\'est arretee (mais alors on serait sorti plus haut, sur l\'echec).\n'
+    + '  Ne pas publier ce chiffre en attendant.');
+  process.exit(1);
+}
 if (r.status !== 0) {
   console.error('\n✗ `npm test` est sorti en ' + r.status + ' alors que tous les bilans lus sont verts —\n'
     + '  donc quelque chose a casse EN DEHORS d\'un bilan (un fichier qui jette avant d\'imprimer, par ex.).');
