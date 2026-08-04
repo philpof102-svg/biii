@@ -651,12 +651,29 @@ async function callTool(name, a = {}) {
     if (a.mode === 'moved') {
       if (!a.txHash) return { error: 'txHash is required for mode "moved"' };
       const m = await whatMoved(chain, a.txHash);
-      if (!m.ok) return { error: m.reason };
+      // `ok: false` voyage aussi, pour que les trois modes echouent de la MEME facon — la moitie du
+      // defaut etait que chaque mode se lisait differemment, pas seulement que l'un d'eux se taisait.
+      if (!m.ok) return { ok: false, reason: m.reason, error: m.reason };
       return { ...m, note: m.forgedTransfers ? m.forgedTransfers + ' transfer event(s) name a sender who did not sign this transaction — those are forged logs, do not follow them.' : 'All transfer events match the transaction signer.' };
     }
     if (a.mode === 'bridge') {
       if (!a.txHash) return { error: 'txHash is required for mode "bridge"' };
-      return await readBridgeExit(chain, a.txHash);
+      /* ⚠️ UN TOOL, TROIS MODES, DEUX CONVENTIONS D'ECHEC.
+       *
+       * Ce handler signale l'echec par `{ error }` — quinze fois dans ce fichier, y compris trois lignes
+       * plus haut pour le mode `moved`. Mais `readBridgeExit` rend `{ ok: false, reason }` et cette ligne
+       * le repassait tel quel. Un agent qui suit la convention du tool teste `.error`, n'en trouve pas, et
+       * lit un echec comme une reponse — puis cherche `destinationChains` dans un objet qui n'en a pas.
+       *
+       * Le correctif etait alle sur `moved` et pas sur son jumeau: c'est le motif de divergence entre
+       * routes soeurs, ici a l'interieur d'un SEUL handler.
+       *
+       * Purement ADDITIF: `ok` et `reason` restent, `error` s'ajoute. Un consommateur qui lit deja `ok`
+       * n'est pas casse, et celui qui suit la convention documentee cesse de rater l'echec. (`followTron`
+       * plus bas ne rend jamais `ok: false` — il porte son arret dans le resultat — donc il ne partage
+       * pas ce defaut, verifie plutot que suppose.) */
+      const b = await readBridgeExit(chain, a.txHash);
+      return b && b.ok ? b : { ...b, error: (b && b.reason) || 'the bridge read did not answer' };
     }
     if (a.mode === 'tron') {
       if (!a.address) return { error: 'address is required for mode "tron"' };
