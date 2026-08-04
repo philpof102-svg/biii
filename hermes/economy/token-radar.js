@@ -705,13 +705,41 @@ function recordBlackout(db, nowIso) {
   // Not wired into the verdict: this is measured on the very data that produced it, and three confidently
   // reasoned rules died to that exact mistake this session. It gets labelled and the scorecard will grade it
   // forward. If it holds on tokens judged AFTER today, it is the first defensible green signal here.
+  // ── 2026-08-04: un balayage QUI N'A PAS EU LIEU sortait en 🟢 ──────────────────────────────────
+  // La ligne etait `sib === undefined || sib < INDUSTRIAL_FUNDER`. Or `siblingCount` vaut `null`,
+  // pas `undefined`, quand l'explorateur n'a pas repondu — c'est ecrit ligne 522. Mesure :
+  //
+  //     null === undefined  ->  false   (la garde ne le voit pas)
+  //     null < 20           ->  true    (null se coerce en 0 : « moins de 20 freres »)
+  //
+  // Donc un token dont l'historique du financeur n'a jamais ete lu ressortait dans la bande verte
+  // « presque rien n'a rugge ici ». C'est le meme piege que le commentaire ligne 552 decrit pour
+  // `siblingCountCensored` — et `siblingCountCensored`, calcule ligne 556, n'avait AUCUN
+  // consommateur. Le drapeau existait, la decision l'ignorait.
+  //
+  // Et ce n'est pas seulement plus sur, c'est plus fidele a la mesure : le 26/07, la bande restreinte
+  // aux tokens AVEC donnee freres etait 0/15, pas 2/34. Le code publiait la bande large en y incluant
+  // des tokens que la mesure n'a jamais couverts.
+  //
+  // Trois etats, pas deux : dans la bande · hors bande · pas pu le dire. Le troisieme est desormais
+  // visible au lieu d'etre range en vert.
   for (const c of toJudge) {
     const sib = db[c.addr].siblingCount;
-    const clean = c.liq >= 15000 && (sib === undefined || sib < INDUSTRIAL_FUNDER);
+    const sibRead = typeof sib === 'number' && !db[c.addr].siblingCountCensored;
+    const clean = c.liq >= 15000 && sibRead && sib < INDUSTRIAL_FUNDER;
     db[c.addr].cleanBand = clean;
+    // Pourquoi on n'a pas pu conclure — enregistre, parce qu'un vert absent sans raison se relit
+    // comme un rouge.
+    db[c.addr].cleanBandUnknown = c.liq >= 15000 && !sibRead;
     if (clean) lines.push('🟢 ' + c.sym + ' ' + c.addr.slice(0, 10) + '… (' + usd(c.liq) +
-      ') sits in the band where almost nothing has rugged: seeded above $15k and no industrial funder found. ' +
-      '(6% observed, 2/34 — IN-SAMPLE, being graded forward. Not a verdict.)');
+      ') sits in the band where almost nothing has rugged: seeded above $15k, funder history actually read, ' +
+      'and fewer than ' + INDUSTRIAL_FUNDER + ' siblings. ' +
+      '(2/34 = 6% on the loose band, 0/15 once restricted to tokens whose funder history was read — ' +
+      'IN-SAMPLE and a small sample, being graded forward. Not a verdict.)');
+    else if (db[c.addr].cleanBandUnknown) lines.push('⚪ ' + c.sym + ' ' + c.addr.slice(0, 10) + '… (' + usd(c.liq) +
+      ') seeded above $15k, but the funder history could not be read' +
+      (db[c.addr].siblingCountCensored ? ' completely' : '') +
+      '. NOT in the green band — we could not check the half that matters. This says nothing about the token.');
   }
 
   for (const r of relaunches) {
