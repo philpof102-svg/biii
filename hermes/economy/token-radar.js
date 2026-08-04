@@ -26,7 +26,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const https = require('node:https');
 const { scanRug } = require('../../lib/rugsignals');
-const { traceFeeder, SIBLING_ALERT } = require('../../lib/feeder');
+const { traceFeeder, planTrace, SIBLING_ALERT, SIBLING_MAX_PAGES, TRACE_FIXED_CALLS } = require('../../lib/feeder');
 const { vetMeme } = require('../../lib/meme');
 const { classifyB20 } = require('../../lib/b20');
 const { scoreCalls } = require('../../lib/scorecard');
@@ -68,6 +68,24 @@ const MAX_NEW = 40;              // 2 GoPlus batches of 20. Raised from 20 after
  * factory (the openhuman cluster seeds at a $61k median). The top 15% by liquidity rug at 81% against 46%
  * for the rest, so the existing sort was already picking the right end. Hypothesis wrong, measurement kept. */
 const TRACE_MAX = 20;
+/* ═══ LE BUDGET DEVIENT UN CHIFFRE, PARCE QUE LE COUT D'UNE TRACE N'EST PLUS CONSTANT ═══
+ *
+ * Jusqu'au 2026-08-04 le budget de ce run etait IMPLICITE: TRACE_MAX × ~4 appels, jamais ecrit nulle part,
+ * et le commentaire ci-dessus disait « three explorer calls per token » quand il y en avait quatre. Une
+ * borne qu'on obtient par multiplication mentale n'est pas une borne — personne ne la verifie.
+ *
+ * Depuis que `traceFeeder` suit la pagination, le cout par token varie de 3 (financeur sans historique) a
+ * 9 (2 fixes + 6 pages + l'horodatage de creation). Le pire cas passe donc de 80 a 180 appels par run.
+ * Le budget est desormais EXPLICITE et REELLEMENT DEPENSE: la boucle compte ce que chaque trace a coute
+ * (`explorerCalls`, rendu par le tracer) et s'arrete quand l'enveloppe est vide, en DISANT ce qu'elle n'a
+ * pas regarde. Un run qui s'arrete en silence se relit comme un run qui n'a rien trouve.
+ *
+ * POURQUOI 180 EST TENABLE, mesure et non suppose (2026-08-04): 262 appels au meme endpoint a concurrence
+ * 4 ont rendu 262×200, zero 429. La boucle de trace ici est SEQUENTIELLE, donc plus douce que la sonde.
+ * Meme reserve que pour TRACE_MAX, et elle vaut toujours: tolerer une rafale n'est pas tolerer une charge
+ * horaire soutenue. Si les 429 apparaissent, c'est ce chiffre qu'on baisse — et le baisser reduit la
+ * PROFONDEUR avant la COUVERTURE, parce qu'un token trace a une page reste mieux qu'un token pas trace. */
+const TRACE_CALL_BUDGET = 180;
 const IMPOSTOR_MAX = 10;         // symbol checks per run — one search each
 const INDUSTRIAL_FUNDER = 20;    // wallets bankrolled by one funder before it reads as an operation, not a person
                                  // (chosen by sweeping the threshold against known outcomes, not by intuition)
@@ -514,9 +532,23 @@ function recordBlackout(db, nowIso) {
    * what-survives.js savait deja lire ce troisieme etat (il rend `null`); c'est le PRODUCTEUR qui ne
    * l'emettait pas. Le consommateur avait appris la lecon, la source jamais. */
   let traceOk = 0, traceEchec = 0, traceSansFinanceur = 0, traceSansCreateur = 0;
+  /* Ce que le budget a coute, compte plutot qu'estime — et separement de ce que le CAP a coute. Les deux
+   * se lisaient « pas trace » et ce sont deux decisions differentes: le cap est un choix de couverture,
+   * le budget est une limite atteinte en cours de route. */
+  let callsSpent = 0, traceSauteBudget = 0, tracesEcourtees = 0;
   for (const c of toTrace) {
+    /* La politique de budget vit dans lib/feeder.js (`planTrace`), pure et exercee par la suite, plutot
+     * que dans cette closure ou elle ne serait verifiee que par un run reel. Elle rogne la PROFONDEUR
+     * avant de refuser le token: un financeur lu sur deux pages vaut mieux qu'un token pas trace. */
+    const plan = planTrace(TRACE_CALL_BUDGET - callsSpent);
+    if (!plan.trace) { traceSauteBudget++; continue; }
     let f = null, panne = null;
-    try { f = await traceFeeder(CHAIN, c.addr); } catch (e) { panne = (e && e.message) || String(e); }
+    try { f = await traceFeeder(CHAIN, c.addr, { maxPages: plan.pages }); }
+    catch (e) { panne = (e && e.message) || String(e); }
+    /* On paie ce qu'on a consomme, y compris quand la trace echoue: une trace qui tombe apres cinq pages a
+     * bel et bien coute cinq appels a l'explorateur. Ne compter que les succes ferait deborder l'enveloppe
+     * exactement le jour ou l'explorateur va mal — le jour ou il faut le moins insister. */
+    callsSpent += (f && Number.isInteger(f.explorerCalls)) ? f.explorerCalls : TRACE_FIXED_CALLS;
     if (!panne && (!f || !f.ok)) panne = (f && f.reason) || 'the explorer did not answer';
     if (panne) {
       /* ⚠️ « ECHEC » RECOUVRAIT DEUX CHOSES OPPOSEES — mesure du 2026-07-30, 99 lignes marquees `failed`:
@@ -536,6 +568,11 @@ function recordBlackout(db, nowIso) {
     }
     if (!f.funder) { traceSansFinanceur++; db[c.addr].funderTrace = 'no_funder'; continue; }   // un RESULTAT
     traceOk++;
+    /* « Ecourtee » ne veut dire quelque chose que si le budget nous a REELLEMENT coute de la profondeur.
+     * Compter toutes les traces dont la borne etait abaissee gonflerait le chiffre avec des financeurs qui
+     * se terminaient de toute facon: on annoncerait une perte qui n'a pas eu lieu. La condition est donc
+     * « la lecture s'est arretee SUR une borne, et cette borne etait plus basse que la normale ». */
+    if (f.siblingScanStoppedBy === 'page_cap' && f.siblingPageCap < SIBLING_MAX_PAGES) tracesEcourtees++;
     db[c.addr].funderTrace = 'ok';
     db[c.addr].deployer = f.deployer; db[c.addr].funder = f.funder;
     db[c.addr].siblingCount = f.siblingCount; db[c.addr].freshDeployer = f.freshDeployer;
@@ -569,11 +606,27 @@ function recordBlackout(db, nowIso) {
     db[c.addr].identicalAmountSiblings = f.identicalAmountSiblings;
     db[c.addr].identicalAmountEth = f.identicalAmount;
     db[c.addr].fundedEth = f.fundedEth;
-    // `siblingCount` is a FLOOR, not a count, whenever the funder's history did not fit on one page.
+    // `siblingCount` is a FLOOR, not a count, whenever the funder's history did not fit inside the scan.
     // Et un balayage QUI N'A PAS EU LIEU est le cas le plus censure de tous: avec `siblingCount: null`,
     // `!!null || null >= 50` rendait `false`, c'est-a-dire « ce compte est exact et complet » — l'inverse
     // exact de la verite, affirme au moment ou on en sait le moins.
-    db[c.addr].siblingCountCensored = f.siblingsRead === false || !!f.morePages || f.siblingCount >= 50;
+    /* ⚠️ `|| f.siblingCount >= 50` EST PARTI, et son depart est le fond de ce changement. 50 etait la
+     * taille d'une page de l'explorateur, codee en dur ICI, a un fichier de distance de la boucle qui la
+     * subissait — la censure etait DEVINEE a partir de la valeur au lieu d'etre RAPPORTEE par la lecture.
+     * Deux fautes en decoulaient, opposees:
+     *   · un compte lu jusqu'a son terme mais grand (56 freres, mesure le 2026-08-04 sur un financeur reel
+     *     qui TERMINE) se faisait tamponner « censure » alors qu'il est exact — on jetait la seule mesure
+     *     complete du haut de la plage, celle qui pese le plus dans un quantile;
+     *   · et la regle derivee `funder-derived-uncensored` ne voyait donc jamais que des petits comptes,
+     *     ce qui est exactement le mecanisme qui figeait son p75 a 1.
+     * `traceFeeder` sait s'il a atteint la fin de l'historique. On lui demande, on ne devine plus. */
+    db[c.addr].siblingCountCensored = f.siblingsRead === false || !!f.morePages;
+    /* L'INSTRUMENT EST PERSISTE A COTE DE LA MESURE. Sans lui, une ligne de 2026-07 (une page) et une ligne
+     * de 2026-08 (six pages) portent le meme nom de champ pour deux instruments differents, et toute
+     * analyse qui melange les deux compare des choses incomparables sans pouvoir s'en apercevoir. */
+    db[c.addr].siblingPagesRead = f.siblingPagesRead;
+    db[c.addr].siblingPageCap = f.siblingPageCap;
+    db[c.addr].siblingScanStoppedBy = f.siblingScanStoppedBy;
     if (f.identicalAmountSiblings >= SIBLING_ALERT || f.siblingCount >= SIBLING_ALERT) clusters.push({ ...c, f });
 
     // The one rule this session that survived its own backtest. Measured over 62 tokens with funding data:
@@ -590,12 +643,12 @@ function recordBlackout(db, nowIso) {
      * The threshold of 20 sits in an entirely empty gap, so any value from 12 to 26 gives an identical
      * answer. This one cannot be overfitted because there is nothing to fit. */
     if ((f.siblingCount || 0) >= INDUSTRIAL_FUNDER && db[c.addr].firstVerdict !== 'rug_ready') {
-      const censored = !!f.morePages || f.siblingCount >= 50;
+      const censored = !!f.morePages;
       db[c.addr].firstVerdict = 'high_risk';
-      // "50" is the page ceiling, not a count — saying "50 wallets" understates it as a fact and overstates
-      // it as a measurement. At least N is the true claim, and it is the stronger one anyway.
+      // A capped count is the page ceiling, not a count — saying "N wallets" understates it as a fact and
+      // overstates it as a measurement. At least N is the true claim, and it is the stronger one anyway.
       db[c.addr].firstReason = 'its funder has bankrolled ' + (censored ? 'at least ' : '') + f.siblingCount +
-        ' wallets' + (censored ? ' (its history did not fit on one page, so that is a floor)' : '') +
+        ' wallets' + (censored ? ' (we read ' + f.siblingPagesRead + ' page(s) of its history and there was more, so that is a floor)' : '') +
         ' — industrial scale, and 83% of tokens behind such a funder have rugged in what we have watched';
       db[c.addr].industrialFunder = f.siblingCount;
     }
@@ -614,6 +667,15 @@ function recordBlackout(db, nowIso) {
       + ' — of ' + toTrace.length + ' attempted'
       + (toJudge.length > toTrace.length ? ', ' + (toJudge.length - toTrace.length) + ' skipped by the cap, not cleared' : '') + ')');
     if (traceEchec) lines.push('   ⚠️ ' + traceEchec + ' funding trace(s) failed — those tokens are UNREAD, not unfunded');
+    /* CE QUE LE BUDGET A COUTE, PUBLIE. Un run qui epuise son enveloppe rend moins de signal qu'un run
+     * calme, et sans cette ligne la difference se lit comme « moins de financeurs industriels ce soir »
+     * — la meme confusion entre notre borne et la chaine que le commentaire de TRACE_MAX decrit. */
+    lines.push('   (explorer budget: ' + callsSpent + '/' + TRACE_CALL_BUDGET + ' calls spent'
+      + (tracesEcourtees ? ', ' + tracesEcourtees + ' trace(s) read FEWER pages than the ' + SIBLING_MAX_PAGES + '-page bound' : '')
+      + (traceSauteBudget ? ', ' + traceSauteBudget + ' token(s) NOT traced at all — budget exhausted, not cleared' : '')
+      + ')');
+    if (traceSauteBudget) lines.push('   ⚠️ the funding budget ran out this run — ' + traceSauteBudget
+      + ' token(s) went unasked. That is our limit, not a finding about them.');
   }
 
   // ---------- SCORECARD: what our calls were actually worth --------------------------------------
