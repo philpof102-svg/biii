@@ -216,16 +216,16 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.aient/mcp",
-      "lastSeen": "2026-08-03T23:38:03.020Z"
+      "lastSeen": "2026-08-04T09:44:36.250Z"
     },
     "https://mcp.airshelf.ai/mcp": {
       "verdict": "answers",
-      "tools": 7,
-      "names": "compare_products,explain_product,find_products,get_product,list_merchants,request_quote,search_catalog",
+      "tools": 8,
+      "names": "compare_products,explain_product,find_products,get_product,list_merchants,request_quote,research_shopping,search_catalog",
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.airshelf/catalog",
-      "lastSeen": "2026-08-03T23:38:04.797Z"
+      "lastSeen": "2026-08-04T09:44:38.235Z"
     },
     "https://api.aisecuritygateway.ai/mcp": {
       "verdict": "unauditable",
@@ -234,7 +234,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.aisecuritygateway/mcp-gateway",
-      "lastSeen": "2026-08-03T23:38:05.766Z"
+      "lastSeen": "2026-08-04T09:44:39.151Z"
     },
     "https://mcp.alphacreek.ai/mcp": {
       "verdict": "answers",
@@ -243,7 +243,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.alphacreek/alphacreek-mcp",
-      "lastSeen": "2026-08-03T23:38:07.033Z"
+      "lastSeen": "2026-08-04T09:44:40.805Z"
     },
     "https://mcp.alpic.ai": {
       "verdict": "unauditable",
@@ -252,7 +252,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.alpic.mcp/alpic-mcp",
-      "lastSeen": "2026-08-03T23:38:08.719Z"
+      "lastSeen": "2026-08-04T09:44:42.029Z"
     },
     "https://test.alpic.ai/": {
       "verdict": "unreachable",
@@ -261,7 +261,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.alpic.test/test-mcp-server",
-      "lastSeen": "2026-08-03T23:38:09.503Z"
+      "lastSeen": "2026-08-04T09:44:42.800Z"
     },
     "https://mcp.ambix.ai": {
       "verdict": "unauditable",
@@ -270,7 +270,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.ambix/ambix",
-      "lastSeen": "2026-08-04T01:39:02.958Z"
+      "lastSeen": "2026-08-04T09:44:43.843Z"
     },
     "https://mcp.anomalyarmor.ai/mcp": {
       "verdict": "unauditable",
@@ -279,7 +279,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.anomalyarmor/armor-mcp",
-      "lastSeen": "2026-08-04T01:39:06.187Z"
+      "lastSeen": "2026-08-04T09:44:46.430Z"
     },
     "https://api-v2.appdeploy.ai/mcp": {
       "verdict": "unauditable",
@@ -288,7 +288,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.appdeploy/deploy-app",
-      "lastSeen": "2026-08-04T01:39:07.365Z"
+      "lastSeen": "2026-08-04T09:44:47.587Z"
     },
     "https://arclan.ai/mcp": {
       "verdict": "answers",
@@ -297,7 +297,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.arclan/registry",
-      "lastSeen": "2026-08-04T01:39:08.595Z"
+      "lastSeen": "2026-08-04T09:44:48.974Z"
     },
     "https://argushq.ai/api/mcp": {
       "verdict": "answers",
@@ -306,7 +306,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.argushq/enforcement-database",
-      "lastSeen": "2026-08-04T01:39:10.079Z"
+      "lastSeen": "2026-08-04T09:44:50.354Z"
     },
     "https://mcp.arpi.ai/mcp": {
       "verdict": "unauditable",
@@ -315,7 +315,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.arpi/arpi-mcp",
-      "lastSeen": "2026-08-04T01:39:11.923Z"
+      "lastSeen": "2026-08-04T09:44:52.279Z"
     },
     "https://artidrop.ai/mcp": {
       "verdict": "answers",
@@ -324,7 +324,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.artidrop/artidrop",
-      "lastSeen": "2026-08-04T01:39:13.269Z"
+      "lastSeen": "2026-08-04T09:44:53.938Z"
     },
     "https://api.assetlog.ai/mcp": {
       "verdict": "unauditable",
@@ -333,7 +333,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.assetlog/assetlog",
-      "lastSeen": "2026-08-04T01:39:14.277Z"
+      "lastSeen": "2026-08-04T09:44:54.968Z"
     },
     "https://supershopping-mcp.atdev.ai/mcp": {
       "verdict": "unauditable",
@@ -342,7 +342,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.atdev/supershopping",
-      "lastSeen": "2026-08-04T01:39:16.540Z"
+      "lastSeen": "2026-08-04T09:44:57.418Z"
     },
     "https://api.atlasverified.ai/mcp": {
       "verdict": "unauditable",
@@ -351,7 +351,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.atlasverified/atlas-mcp",
-      "lastSeen": "2026-08-04T01:39:18.701Z"
+      "lastSeen": "2026-08-04T09:44:59.847Z"
     },
     "https://api.augmentev.ai/mcp": {
       "verdict": "unauditable",
@@ -360,7 +360,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.augmentev/paseo",
-      "lastSeen": "2026-08-04T01:39:20.277Z"
+      "lastSeen": "2026-08-04T09:45:01.517Z"
     },
     "https://travel.augworlds.ai/mcp": {
       "verdict": "unauditable",
@@ -369,7 +369,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.augworlds/travel-world",
-      "lastSeen": "2026-08-04T01:39:21.354Z"
+      "lastSeen": "2026-08-04T09:45:02.796Z"
     },
     "https://mcp.auralogs.ai/mcp": {
       "verdict": "answers",
@@ -729,7 +729,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.analyticslegends/sap-analytics",
-      "lastSeen": "2026-08-04T01:39:04.594Z"
+      "lastSeen": "2026-08-04T09:44:45.072Z"
     },
     "https://afmr.ai/api/rpc": {
       "verdict": "answers",
@@ -756,7 +756,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.atlaso/mcp",
-      "lastSeen": "2026-08-04T01:39:17.513Z"
+      "lastSeen": "2026-08-04T09:44:58.699Z"
     },
     "https://app.ai-advisors.ai/api/mcp": {
       "verdict": "unauditable",
@@ -777,5 +777,5 @@
       "lastSeen": "2026-08-04T05:42:12.428Z"
     }
   },
-  "offset": 29
+  "offset": 49
 }
