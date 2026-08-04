@@ -341,13 +341,33 @@ function recordBlackout(db, nowIso) {
   // Une classification qui LEVE laissait le token avec son verdict d'avant — c'est-a-dire non escalade,
   // donc indiscernable d'un token examine et juge sain. Or c'est precisement ce controle qui arme
   // `rug_ready` sur un imposteur de prefixe. On persiste la panne au lieu de la taire.
-  let b20Echec = 0;
+  let b20Echec = 0, b20NonLu = 0;
   for (const c of toJudge) {
     if (!/^0xb200/i.test(c.addr)) continue;
     let b;
     try { b = await classifyB20(CHAIN, c.addr); }
     catch (e) { b20Echec++; if (db[c.addr]) { db[c.addr].b20Check = 'failed'; db[c.addr].b20CheckError = String((e && e.message) || e).slice(0, 120); } continue; }
-    if (db[c.addr]) db[c.addr].b20Check = 'ok';
+    /* ⚠️ `classifyB20` NE JETTE PAS quand la chaine ne repond pas: son `rpc()` fait `resolve(null)`
+     * sur l'erreur reseau COMME sur un JSON illisible, et la fonction RETOURNE `{verdict:'unknown',
+     * reason:'could not read contract code'}`. Le `catch` ci-dessus ne voyait donc jamais une panne
+     * RPC: `b20Check` passait a 'ok', `b20Echec` restait a 0, la ligne d'avertissement du digest ne
+     * s'imprimait pas, et le flag « l'emetteur peut geler et bruler n'importe quel solde » n'etait
+     * jamais pose — le token gardait un `unknown` indiscernable d'une abstention ordinaire.
+     * L'echec revenait en VALEUR et on ne gardait que le JET. Prouve au runtime dans
+     * test/b20-unread-is-not-ok.test.js, en injectant un rpcImpl qui rend null. */
+    if (!b || b.verdict === 'unknown') {
+      b20NonLu++;
+      if (db[c.addr]) { db[c.addr].b20Check = 'unread';
+        db[c.addr].b20CheckError = String((b && b.reason) || 'classifier returned no verdict').slice(0, 120); }
+      continue;
+    }
+    /* On ecrit CE QUE le classifieur a repondu, pas seulement qu'il a repondu. `b20Check: 'ok'`
+     * disait que le controle avait tourne sans jamais dire ce qu'il avait trouve, donc la classe se
+     * reconstruisait a posteriori depuis le prefixe d'adresse — ce qu'il a fallu faire pour rejouer
+     * les 156, avec l'adresse de l'unique imposteur codee en dur dans le script de rejeu. Meme
+     * defaut deja connu sur `rug_ready`, dont la base ne stocke pas la regle emettrice. */
+    if (db[c.addr]) { db[c.addr].b20Check = 'ok'; db[c.addr].b20Kind = b.verdict;
+      db[c.addr].b20CodeBytes = b.codeBytes; db[c.addr].b20ZeroRun = b.zeroRun; }
     const v = verdicts[c.addr];
     if (b.verdict === 'prefix_impostor') {
       b20Notes.push({ c, kind: 'impostor', b });
@@ -675,6 +695,11 @@ function recordBlackout(db, nowIso) {
    * tombent est visuellement identique a un run ou tout est propre, ce qui est le contraire de la
    * verite. Meme regle que pour la recolte: publier les manques a cote des prises. */
   if (b20Echec) lines.push('   ⚠️ ' + b20Echec + ' B20 classification(s) failed — those prefixed tokens were NOT cleared, they were not read');
+  // Une classification qui revient SANS verdict est le meme manque, par un autre chemin: elle ne jette
+  // pas, donc elle ne comptait nulle part. Deux compteurs parce que ce sont deux pannes distinctes —
+  // l'une casse l'appel, l'autre le laisse repondre « je ne sais pas ». Les confondre effacerait le
+  // fait que la seconde passait silencieusement pour un controle reussi.
+  if (b20NonLu) lines.push('   ⚠️ ' + b20NonLu + ' B20 classification(s) came back with NO verdict (contract code unreadable) — not cleared, not read');
   if (symEchec) lines.push('   ⚠️ ' + symEchec + ' symbol check(s) failed of ' + (symOk + symEchec) + ' attempted — no impersonation verdict exists for those');
 
   for (const a of armed) lines.push('🚩 ' + a.sym + ' ' + a.addr.slice(0, 10) + '… (' + a.source + ', ' + usd(a.liq) + ') — ' + a.v.armed[0]);

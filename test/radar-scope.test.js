@@ -65,9 +65,27 @@ t('les notes de recolte passent par HARVEST_NOTES, qui EXISTE au niveau module',
  * redescendre SOUS celle du bloc declarant. (Comparer les profondeurs seules est faux dans les deux sens:
  * lire une variable externe depuis un bloc plus profond est legal, et deux blocs FRERES a profondeur egale
  * ne partagent rien.) */
-t('★ tout compteur `let X = 0` lu dans une ligne publiee vit dans un bloc encore OUVERT', () => {
+/* La detection, extraite pour qu'on puisse la lancer sur AUTRE CHOSE que le fichier reel — sans quoi
+ * « aucun defaut trouve » et « detecteur casse » rendent le meme vert. */
+function compteursHorsPortee(srcText) {
+  /* ⚠️ LES COMMENTAIRES DE BLOC DOIVENT PARTIR AVANT LE COMPTAGE, ET C'ETAIT UN TROU.
+   *
+   * Ce compteur retirait les commentaires `//` mais laissait les `/* ... *\/`. Or la prose de ce depot
+   * est francaise: chaque apostrophe de « l'erreur », « n'etait », « d'une » ouvre une fausse chaine
+   * pour la regex ci-dessous, et une accolade citee dans un commentaire compte comme une vraie.
+   *
+   * Mesure du 2026-08-04: l'ajout d'un commentaire de bloc de huit lignes au-dessus d'un compteur a
+   * fait remonter DEUX faux positifs, dont `b20Echec` qui n'avait pas bouge. Le faux positif est
+   * demontrable sans ce test: `if (b20Echec)` est evalue a CHAQUE run du radar, et le radar publie ses
+   * digests — un identifiant hors portee y jetterait une ReferenceError tous les soirs.
+   *
+   * Un garde qui accuse le code correct se fait desarmer par le prochain qui le lit. On lui donne donc
+   * de quoi lire ce qu'il juge, en gardant le compte de lignes intact pour que les numeros restent
+   * ceux du fichier. */
+  const brutes = srcText.split(/\r?\n/);
+  const sansBlocs = srcText.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).split(/\r?\n/);
   const prof = []; let d = 0;
-  for (const l of lines) {
+  for (const l of sansBlocs) {
     prof.push(d);
     const nu = l.replace(/'(\\.|[^'\\])*'/g, "''").replace(/"(\\.|[^"\\])*"/g, '""')
                 .replace(/`(\\.|[^`\\])*`/g, '``').replace(/\/\/.*$/, '');
@@ -75,14 +93,14 @@ t('★ tout compteur `let X = 0` lu dans une ligne publiee vit dans un bloc enco
   }
   const horsPortee = [];
   let examines = 0;                 // ⚠️ un garde qui n'a RIEN a examiner passe en vert: il faut le dire.
-  for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^\s*let\s+([\w\s,=0-9]+);\s*(?:\/\/.*)?$/);
+  for (let i = 0; i < brutes.length; i++) {
+    const m = brutes[i].match(/^\s*let\s+([\w\s,=0-9]+);\s*(?:\/\/.*)?$/);
     if (!m) continue;
     const noms = m[1].split(',').map((s) => s.split('=')[0].trim()).filter((s) => /^\w+$/.test(s));
     for (const nom of noms) {
       const re = new RegExp('(^|[^.\\w])' + nom + '([^\\w]|$)');
-      for (let u = i + 1; u < lines.length; u++) {
-        if (!/lines\.push\(/.test(lines[u]) || !re.test(lines[u])) continue;
+      for (let u = i + 1; u < brutes.length; u++) {
+        if (!/lines\.push\(/.test(brutes[u]) || !re.test(brutes[u])) continue;
         examines++;
         let ferme = 0;
         for (let k = i + 1; k <= u; k++) if (prof[k] < prof[i]) { ferme = k + 1; break; }
@@ -90,6 +108,11 @@ t('★ tout compteur `let X = 0` lu dans une ligne publiee vit dans un bloc enco
       }
     }
   }
+  return { horsPortee, examines };
+}
+
+t('★ tout compteur `let X = 0` lu dans une ligne publiee vit dans un bloc encore OUVERT', () => {
+  const { horsPortee, examines } = compteursHorsPortee(src);
   assert.deepStrictEqual(horsPortee, [],
     'un identifiant publie depuis un bloc ferme = ReferenceError le jour ou la branche s\'execute:\n       '
     + horsPortee.join('\n       '));
@@ -98,6 +121,38 @@ t('★ tout compteur `let X = 0` lu dans une ligne publiee vit dans un bloc enco
    * c'est le motif meme que ce depot chasse, applique a l'instrument qui le chasse. */
   assert.ok(examines >= 3, 'succes VIDE: seulement ' + examines + ' couple(s) declaration/publication inspecte(s). '
     + 'Soit les compteurs de divulgation ont disparu du radar, soit ce garde ne les reconnait plus.');
+});
+
+/* Le garde a ete MODIFIE le 2026-08-04 (retrait des commentaires de bloc avant le comptage). Un garde
+ * qu'on retouche doit reprouver qu'il mord, sinon « rien trouve » et « detecteur emousse » se
+ * ressemblent trop. Deux cas OPPOSES sur des sources synthetiques: le defaut est vu, et le code
+ * correct qui lui ressemble ne l'est pas. */
+t('★ le garde des compteurs mord encore — defaut injecte vu, cas legitime epargne', () => {
+  const casse = [
+    'function f() {', '  if (x) {', '    let cpt = 0;', '  }',
+    '  lines.push(cpt + " echecs");', '}',
+  ].join('\n');
+  const r1 = compteursHorsPortee(casse);
+  assert.equal(r1.examines, 1, 'le couple declaration/publication doit etre inspecte');
+  assert.equal(r1.horsPortee.length, 1, 'un compteur declare dans un bloc REFERME doit etre signale');
+
+  // Le cas legitime, qui ne differe que par la place de l'accolade: meme forme, portee valide.
+  const sain = [
+    'function f() {', '  let cpt = 0;', '  if (x) { cpt++; }',
+    '  lines.push(cpt + " echecs");', '}',
+  ].join('\n');
+  const r2 = compteursHorsPortee(sain);
+  assert.equal(r2.examines, 1, 'meme couple inspecte — sinon la comparaison ne vaut rien');
+  assert.deepStrictEqual(r2.horsPortee, [], 'un compteur de portee valide ne doit PAS etre accuse');
+
+  // Et la regression precise du jour: de la prose francaise avec apostrophes et accolades citees,
+  // au-dessus d'un compteur sain, ne doit plus le faire accuser.
+  const avecProse = [
+    'function f() {', '  /* l\'erreur n\'etait pas la: RETOURNE {verdict:\'unknown\'} d\'une lecture */',
+    '  let cpt = 0;', '  if (x) { cpt++; }', '  lines.push(cpt + " echecs");', '}',
+  ].join('\n');
+  assert.deepStrictEqual(compteursHorsPortee(avecProse).horsPortee, [],
+    'un commentaire de bloc en francais ne doit pas deplacer la profondeur d\'accolades');
 });
 
 t('le test mordrait vraiment — verifie sur le defaut reinjecte', () => {
