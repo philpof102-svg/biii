@@ -86,5 +86,43 @@ t('malformed recipient / non-positive amount → refuse', () => {
   assert.equal(prepareBuy({ to: clean, amountUsd: '0', floor }).ok, false);
 });
 
+/* ═══ « ON N'A PAS PU SCREENER » NE DOIT PAS SORTIR EN « PAS KNOWN-BAD » ═══
+ *
+ * `screenAddress` rend trois etats et nomme le troisieme dans sa propre raison — « no known-bad list
+ * loaded — screening UNAVAILABLE, not a clean verdict ». `prepareBuy` ne lisait que `blocked`, donc une
+ * liste absente donnait `blocked === false` et le chemin allait jusqu'a publier
+ * `recipientVerdict: 'not-known-bad'`: une AFFIRMATION sur le destinataire fabriquee par notre propre
+ * incapacite a regarder, sur la fonction qui construit une intention de paiement.
+ *
+ * C'est le miroir de « ne jamais accuser sur sa propre incompletude » — ici on ABSOUT, ce qui est pire
+ * sur ce chemin. Le plancher se passe en parametre, donc le cas se reproduit sans aucun montage. */
+t('★ plancher known-bad ABSENT → refuse, et ne prononce jamais « not-known-bad »', () => {
+  const r = prepareBuy({ to: clean, amountUsd: '5', registry });      // aucun `floor` fourni
+  assert.equal(r.ok, false, 'sans screen possible, on ne prepare pas un achat');
+  assert.equal(r.recipientVerdict, 'unscreened', 'l etat doit etre NOMME, pas absent');
+  assert.notEqual(r.recipientVerdict, 'not-known-bad', 'une absence de liste n absout personne');
+  assert.match(r.reason || '', /UNAVAILABLE/i, 'la raison doit nommer le manque');
+  assert.match(r.reason || '', /NOTHING WAS CONSUMED/i, 'un refus doit dire que la mise est intacte');
+  assert.equal(r.intent, undefined, 'aucune intention de paiement ne doit etre construite');
+});
+
+/* Le cas OPPOSE, sans lequel le precedent passerait aussi sur un code qui refuserait TOUT: avec un
+ * plancher charge, l affirmation est meritee — et elle porte desormais sa provenance, sinon un
+ * « not-known-bad » ne peut etre ni date ni contredit par un lecteur. */
+t('★ plancher charge → l affirmation est meritee ET auditable', () => {
+  const r = prepareBuy({ to: clean, amountUsd: '5', floor, registry });
+  assert.equal(r.ok, true);
+  assert.equal(r.recipientVerdict, 'not-known-bad');
+  assert.equal(r.recipientScreen && r.recipientScreen.available, true);
+  assert.ok(r.recipientScreen && typeof r.recipientScreen.basis === 'string' && r.recipientScreen.basis.length > 0,
+    'la base du verdict (source + date de la liste) doit voyager avec lui');
+});
+
+t('un destinataire KNOWN-BAD reste refuse — le nouveau garde n a pas remplace l ancien', () => {
+  const r = prepareBuy({ to: knownBad, amountUsd: '5', floor, registry });
+  assert.equal(r.ok, false);
+  assert.equal(r.recipientVerdict, 'known-bad', 'et il se distingue de « unscreened »');
+});
+
 console.log(`\n${pass} passed · ${fail} failed`);
 process.exit(fail ? 1 : 0);
