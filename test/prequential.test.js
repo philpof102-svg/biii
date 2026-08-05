@@ -65,10 +65,47 @@ t('★ le compteur de fuite mord vraiment — verifie sur des dates inversees', 
 });
 
 t('un survivant n en est un qu APRES la fenetre de maturite', () => {
-  const vivant = { addr: '0xv', firstSeen: iso(T0), outcome: 'live' };
+  /* ⚠️ `lastSeen` EST DESORMAIS OBLIGATOIRE POUR AFFIRMER UNE SURVIE, et cette ligne le prouve: la
+   * version precedente de ce cas n'en portait pas et passait quand meme, parce que la fonction ne
+   * regardait que l'age depuis `firstSeen`. Un token vieilli mais jamais reobserve etait declare
+   * survivant. */
+  const vivant = { addr: '0xv', firstSeen: iso(T0), lastSeen: iso(T0 + 6 * H), outcome: 'live' };
   assert.strictEqual(outcomeKnownAt(vivant, T0 + 2 * H, 4), null, 'trop jeune: pas encore une preuve de survie');
   assert.strictEqual(outcomeKnownAt(vivant, T0 + 5 * H, 4), 'survived', 'au-dela de la fenetre: survivant');
   assert.strictEqual(outcomeKnownAt(vivant, T0 + 5 * H, null), null, 'sans fenetre observee, rien n est resolu');
+});
+
+// ── la survie se PROUVE par une observation, elle ne se deduit pas de l age ────────────────────
+t('un token qu on a CESSE d observer n est pas un survivant', () => {
+  /* Le cas mesure le 2026-08-05: 416 des 452 tokens 'live' n'avaient pas ete lus depuis 24 h — dont
+   * 229 depuis une semaine — et le harnais les comptait TOUS survivants. token-radar.js:295 fait
+   * `if (liq == null) continue;` sans jamais regrader, donc un pool retire gele la ligne et
+   * `lastSeen` cesse d'avancer. Vieillir n'est pas survivre. */
+  const gele = { addr: '0xg', firstSeen: iso(T0), lastSeen: iso(T0 + 1 * H), outcome: 'live' };
+  assert.strictEqual(outcomeKnownAt(gele, T0 + 200 * H, 4), null,
+    'observe une seule heure puis plus jamais: l issue n est pas tranchee, meme 200 h plus tard');
+
+  const jamaisRevu = { addr: '0xj', firstSeen: iso(T0), lastSeen: iso(T0), outcome: 'live' };
+  assert.strictEqual(outcomeKnownAt(jamaisRevu, T0 + 50 * H, 4), null,
+    'vu une fois et jamais reobserve: aucune preuve de survie');
+
+  const sansLastSeen = { addr: '0xs', firstSeen: iso(T0), outcome: 'live' };
+  assert.strictEqual(outcomeKnownAt(sansLastSeen, T0 + 50 * H, 4), null,
+    'sans lastSeen lisible on ne peut rien affirmer — trois etats, pas deux');
+
+  /* ⛔ ET LA BORNE EST `min(lastSeen, t)`: une observation POSTERIEURE a l instant juge ne peut pas
+   * servir a le trancher, sinon la marche chronologique lit le futur — la clause 4 du protocole. */
+  const observeApres = { addr: '0xa', firstSeen: iso(T0), lastSeen: iso(T0 + 100 * H), outcome: 'live' };
+  assert.strictEqual(outcomeKnownAt(observeApres, T0 + 2 * H, 4), null,
+    'lastSeen tres tardif ne rend pas le token resolu a un instant ou il etait encore jeune');
+  assert.strictEqual(outcomeKnownAt(observeApres, T0 + 5 * H, 4), 'survived',
+    'a un instant ou il avait passe la fenetre ET etait encore observe: resolu');
+
+  /* Un rug reste date par `ruggedAt` et ne depend donc PAS de la fraicheur — le cote DANGER ne bouge
+   * pas. Sans ce cas, un correctif qui casserait aussi les rugs passerait inapercu. */
+  const mort = { addr: '0xm', firstSeen: iso(T0), lastSeen: iso(T0 + 1 * H), outcome: 'rugged', ruggedAt: iso(T0 + 3 * H) };
+  assert.strictEqual(outcomeKnownAt(mort, T0 + 4 * H, 4), 'rugged',
+    'un rug est DATE: sa resolution ne depend pas de la derniere lecture');
 });
 
 // ── les trois etats, dans le comptage ──────────────────────────────────────────────────────────

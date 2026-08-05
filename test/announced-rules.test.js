@@ -69,11 +69,25 @@ t('les annonces sont GELEES — une reecriture silencieuse est impossible', () =
 /** Regle jouet: DANGER si le symbole commence par X. Aucun reseau, aucune dependance. */
 const jouet = { key: 'jouet', label: 'jouet', predict: (t2) => (String(t2.sym || '').startsWith('X') ? DANGER : SAFE) };
 const annonce = [{ key: 'jouet', label: 'jouet', announcedAt: iso(T0), predicted: { dangerRate: 0.9, safeRate: 0.1 }, basis: {}, note: 'x' }];
-/** n tokens, moitie avant la frontiere et moitie apres, avec l'issue demandee. */
-const faire = (n, decalageH, sym, outcome) => Array.from({ length: n }, (_, i) => ({
-  addr: '0x' + String(i) + sym + decalageH, sym, firstSeen: iso(T0 + decalageH * H + i * 1000),
-  outcome, ruggedAt: outcome === 'rugged' ? iso(T0 + decalageH * H + i * 1000 + H) : undefined,
-}));
+/** n tokens, moitie avant la frontiere et moitie apres, avec l'issue demandee.
+ *
+ * ⚠️ `lastSeen` EST OBLIGATOIRE POUR UN SURVIVANT, et cette fixture ne le portait pas. Elle fabriquait
+ * donc des tokens declares 'live' que personne n'avait jamais reobserves, et le harnais les comptait
+ * survivants sur leur seul age — le defaut mesure le 2026-08-05 (416 des 452 tokens 'live' de la base
+ * n'avaient plus de lecture depuis 24 h). Depuis le durcissement d'`outcomeKnownAt`, vieillir ne suffit
+ * plus: il faut avoir ete VU vivant a un age >= maturite. La fixture le fournit explicitement, ce qui
+ * la rend realiste au lieu de la rendre indulgente.
+ *
+ * Un rug garde `ruggedAt` et reste date, donc il n'a pas besoin de fraicheur — on lui donne quand meme
+ * un `lastSeen` a l'instant de sa mort, comme le radar le ferait. */
+const faire = (n, decalageH, sym, outcome) => Array.from({ length: n }, (_, i) => {
+  const vu = T0 + decalageH * H + i * 1000;
+  return {
+    addr: '0x' + String(i) + sym + decalageH, sym, firstSeen: iso(vu),
+    lastSeen: iso(outcome === 'rugged' ? vu + H : vu + 400 * H),
+    outcome, ruggedAt: outcome === 'rugged' ? iso(vu + H) : undefined,
+  };
+});
 
 t('★ les tokens ANTERIEURS a l annonce ne sont jamais notes', () => {
   const rows = faire(40, -50, 'XAV', 'rugged');           // 40 rugs, tous AVANT la frontiere

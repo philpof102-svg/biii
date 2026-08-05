@@ -292,7 +292,24 @@ function recordBlackout(db, nowIso) {
   for (const addr of tracked) {
     const t = db[addr];
     const liq = liqNow[addr];
-    if (liq == null) continue;                       // no pool returned = delisted/illiquid; needs 2 runs to confirm
+    /* ⛔ CE `continue` ETAIT MUET, ET SON COMMENTAIRE PROMETTAIT UNE SECONDE PASSE QUI N'EXISTAIT PAS.
+     * Un pool entierement retire — le rug le plus complet qui soit — rendait `null`, la ligne etait
+     * sautee, `lastSeen` cessait d'avancer et le token gardait `outcome: 'live'` pour toujours. Mesure
+     * du 2026-08-05: 416 des 452 tokens 'live' n'avaient pas ete lus depuis 24 h, 229 depuis une
+     * semaine, et le harnais les comptait TOUS survivants.
+     *
+     * ⛔ ON N'ECRIT PAS `rugged` POUR AUTANT. Un pool illisible peut etre un retrait total comme une
+     * paire migree; l'appeler rug serait inventer une trouvaille, et ce depot interdit d'accuser sur
+     * sa propre incompletude. Ce qui change, c'est que le silence devient un FAIT ENREGISTRE: la serie
+     * de lectures manquees est persistee, donc « on ne sait plus lire ce token » cesse d'etre
+     * indiscernable de « rien a signaler ». La consequence sur les taux est traitee en amont, dans
+     * lib/prequential.js, qui n'appelle plus « survivant » un token qu'on a cesse d'observer. */
+    if (liq == null) {
+      t.liqMissStreak = (t.liqMissStreak || 0) + 1;
+      if (!t.liqMissSince) t.liqMissSince = now;
+      continue;
+    }
+    t.liqMissStreak = 0; delete t.liqMissSince;      // relu: la serie repart de zero
     t.lastLiq = liq; t.lastSeen = now;
     if (liq > (t.peakLiq || 0)) t.peakLiq = liq;
     const drop = t.peakLiq > 0 ? 1 - liq / t.peakLiq : 0;
@@ -300,6 +317,14 @@ function recordBlackout(db, nowIso) {
       t.outcome = 'rugged'; t.ruggedAt = now; t.dropPct = drop;
       newlyRugged.push({ addr, ...t });
     }
+  }
+  /* Un token illisible depuis DEUX passes ou plus est la « seconde passe » que le commentaire d'origine
+   * promettait. On le DIT dans le digest au lieu de le compter comme un suivi normal — sans quoi le
+   * rapport annonce N tokens suivis dont une part n'est plus lue du tout. */
+  const muets = tracked.filter((a) => (db[a].liqMissStreak || 0) >= 2);
+  if (muets.length) {
+    HARVEST_NOTES.push('🔇 ' + muets.length + ' token(s) suivis n ont plus de pool lisible depuis au moins 2 passes — '
+      + 'issue NON TRANCHEE, ni survie ni rug (le harnais les exclut des deux cotes).');
   }
 
   // ---------- 1b. RE-JUDGE THE ABSTENTIONS ------------------------------------------------------
