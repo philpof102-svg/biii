@@ -19,6 +19,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { quantile } = require('../../lib/prequential');
 
 const DB = path.join(__dirname, '..', '..', 'data', 'token-radar', 'tokens.json');
 const stat = fs.statSync(DB);
@@ -69,8 +70,11 @@ const heuresActives = [...new Set(rows.map((d) => Math.floor(d / 3600000)))].sor
 const ecarts = [];
 for (let i = 1; i < heuresActives.length; i++) ecarts.push(heuresActives[i] - heuresActives[i - 1]);
 ecarts.sort((a, b) => a - b);
-const q = (p) => (ecarts.length ? ecarts[Math.min(ecarts.length - 1, Math.ceil(p * ecarts.length) - 1)] : null);
-const p50 = q(0.5), p99 = q(0.99), maxEcart = ecarts.length ? ecarts[ecarts.length - 1] : null;
+/* ⛔ Le quantile vient de lib/prequential.js. Cet instrument en portait une troisieme copie — la
+ * formule etait identique aujourd'hui, ce qui est exactement la condition dans laquelle une copie
+ * survit jusqu'au jour ou l'une des deux est corrigee seule. */
+const p50 = quantile(ecarts, 0.5), p99 = quantile(ecarts, 0.99);
+const maxEcart = ecarts.length ? ecarts[ecarts.length - 1] : null;
 
 console.log('');
 console.log(`  cadence mesuree sur ${heuresActives.length} heures actives :`);

@@ -21,7 +21,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { maturityWindow, outcomeKnownAt } = require('../../lib/prequential');
+const { maturityWindow, outcomeKnownAt, coupeQuartiles } = require('../../lib/prequential');
 
 const DB = path.join(__dirname, '..', '..', 'data', 'token-radar', 'tokens.json');
 const rows = Object.entries(JSON.parse(fs.readFileSync(DB, 'utf8'))).map(([addr, v]) => ({ addr, ...v }));
@@ -56,9 +56,12 @@ function parQuartiles(champ) {
   const absents = rows.filter((t) => !lus.includes(t));
   if (lus.length < 40) { console.log(`    trop peu de valeurs lues (${lus.length}) — rien a couper.\n`); return; }
 
+  /* ⛔ Le quantile ne se recalcule PAS ici. Il vivait deja dans lib/prequential.js et cet instrument
+   * en portait une copie, comme replay-ingestion.js — le motif qui a produit sept divergences dans ce
+   * depot. La coupe et son garde viennent du meme endroit que le harnais qui les note. */
   const v = lus.map((t) => val(t, champ)).sort((a, b) => a - b);
-  const q = (p) => v[Math.min(v.length - 1, Math.ceil(p * v.length) - 1)];
-  const [q1, q2, q3] = [q(0.25), q(0.5), q(0.75)];
+  const coupe = coupeQuartiles(v);
+  const { q1, q2, q3 } = coupe;
   console.log(`    bornes derivees : q1=${q1} · median=${q2} · q3=${q3} · min=${v[0]} · max=${v[v.length - 1]}`);
 
   const seaux = [
@@ -72,15 +75,23 @@ function parQuartiles(champ) {
   ligne('NON LU (absent/null)', absents);
 
   /* L'ecart entre les seaux extremes, publie a cote des bornes: un lecteur doit pouvoir contester le
-   * decoupage, pas seulement le resultat. ⚠️ Si les quartiles sont identiques (distribution ecrasee),
-   * le decoupage ne separe rien et le dire vaut mieux qu'un chiffre. */
-  if (q1 === q3) {
-    console.log('    ⛔ q1 === q3: la distribution est ecrasee, ce decoupage ne peut rien separer.');
+   * decoupage, pas seulement le resultat. ⚠️ Et le garde passe AVANT le chiffre: une coupe qui laisse
+   * un seau vide ne separe rien, et le dire vaut mieux qu'un ecart calcule sur des bandes fictives.
+   * La raison est imprimee telle quelle — un « refuse » sans son pourquoi finit par etre ignore. */
+  if (coupe.degeneree) {
+    console.log(`    ⛔ ${coupe.degeneree}.`);
+    console.log(`       (tailles reelles des 4 seaux : ${coupe.seaux.join(' · ')})`);
   } else {
     const bas = marques[0], haut = marques[3];
     if (bas && haut && bas.bas != null && haut.bas != null) {
       const d = (haut.bas - bas.bas) * 100;
-      console.log(`    -> ecart entre seaux extremes : ${d >= 0 ? '+' : ''}${d.toFixed(1)} pts`);
+      /* ⚠️ L'ECART VOYAGE AVEC SON EFFECTIF. `topWalletPct` rendait « -21,7 pts » sur des seaux de dix
+       * tokens, imprime a l'identique du « +34,3 pts » de `holders` qui en pesait 141. Un chiffre
+       * detache de son n se cite ensuite tout seul, et c'est comme ca qu'une regle nait d'un bruit. */
+      const plusPetit = Math.min(coupe.seaux[0], coupe.seaux[3]);
+      const reserve = plusPetit < 30 ? `  ⚠️ le plus petit des deux seaux ne pese que ${plusPetit} tokens` : '';
+      console.log(`    -> ecart entre seaux extremes : ${d >= 0 ? '+' : ''}${d.toFixed(1)} pts`
+        + `  (n ${coupe.seaux[0]} vs ${coupe.seaux[3]})${reserve}`);
     }
   }
   console.log('');
