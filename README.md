@@ -56,7 +56,8 @@ wallet signs, and the chain — not us — is the only thing allowed to say "pai
 ## Run it
 
 ```bash
-npm test                               # 226 assertions across 35 files + a 17-case eval harness, all offline
+npm test                               # all offline; 1253 assertions across 95 files + a 22-case eval harness (2026-08-05)
+node test/suite-total.js               # re-derives that count — two report formats coexist, so grep undercounts it
 BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface, :4700
 ```
 
@@ -78,12 +79,15 @@ BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface,
   fail-closed — catches the FBI-flagged lookalike-token fraud, and composes into the trust triangle
   (`till_vet_asset`).
 - **Issuer-verified registry (`data/issuer-verified.json`, committed, multi-chain)** — the AUTHORITATIVE,
-  no-key, commercial-safe layer that earns the strong **green "issuer-verified"** badge. **147 entries across
-  9 chains**, all from ISSUER-DIRECT sources: **Dinari dShares** (40, Base — enumerated on-chain from the
-  factory's `DShareAdded` event, each re-verified via `symbol()`/`name()`; `scripts/biii-rwa-issuer-direct.js`),
-  **Backed / xStocks** (100, across Ethereum/Arbitrum/Optimism/BSC/Mantle/XLayer/Ink — Backed's own public API
-  `api.backed.fi`, no key; `scripts/biii-issuer-backed.js`), and **Ondo** (7 OUSG/USDY/rUSDY — official docs,
-  each on-chain-verified). `lib/asset-registry` merges this over the aggregator by address, so a verified
+  no-key, commercial-safe layer that earns the strong **green "issuer-verified"** badge. **183 entries across
+  11 chains** (counted 2026-08-05 by `hermes/economy/probe-readme-claims.js`, which reads the registry rather
+  than this sentence), all from ISSUER-DIRECT sources: **Dinari dShares** (54, Base — enumerated on-chain from
+  the factory's `DShareAdded` event, each re-verified via `symbol()`/`name()`; `scripts/biii-rwa-issuer-direct.js`),
+  **Backed / xStocks** (100 across Ethereum/Optimism/BSC/XLayer/Mantle/Arbitrum/Ink from Backed's own public API
+  `api.backed.fi`, no key, plus 12 on Base from `backed-fi/tokenlists`; `scripts/biii-issuer-backed.js`),
+  **Ondo** (9 OUSG/USDY/rUSDY — official docs, each on-chain-verified), and 8 single-issuer entries on Base
+  (Circle USDC/EURC, Coinbase cbBTC/cbETH, Franklin Templeton BENJI, Lido, Aerodrome).
+  `lib/asset-registry` merges this over the aggregator by address, so a verified
   address reads `provenance: issuer-official` (green) while everything else stays aggregator-teal.
 - `scripts/biii-rwa-registry.js` — builds the AGGREGATOR fallback (the teal "listed" layer). **Coingecko's
   free tier** (no key) → `data/rwa-registry.json`, `generatedFrom: "coingecko (free)"`. Coingecko is an
@@ -121,10 +125,13 @@ BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface,
   token, recipient allow-list, per-charge max, AND the **cumulative cap** (drain-safe: ten small charges
   can't beat a low cap; a malformed or absent limit is REFUSED, never treated as "no limit"). Both
   fail-closed; BIII does not verify JWT signatures itself (delegated, no dep).
-- `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (15 tools: `till_vet_merchant`,
-  `till_create_charge`, `till_check_payment`, `till_trust`, `till_create_invoice`,
-  `till_check_invoice`, `till_vet_asset`, `till_receipt`, `till_roll`, `till_export`, `till_meter`,
-  `till_floor`, `till_resolve`, `till_kya`, `till_authorize`) — an agent can vet a merchant or a tokenized
+- `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (**28 tools**, listed from the source
+  on 2026-08-05: `till_authorize`, `till_check_invoice`, `till_check_payment`, `till_create_charge`,
+  `till_create_invoice`, `till_export`, `till_floor`, `till_funder_history`, `till_key_exposure`, `till_kya`,
+  `till_launch_funder`, `till_meter`, `till_open_approvals`, `till_receipt`, `till_recovery_offer`,
+  `till_resolve`, `till_roll`, `till_rug_powers`, `till_seed_exposure`, `till_trace_theft`, `till_trust`,
+  `till_verify_delivery`, `till_vet_agent`, `till_vet_approach`, `till_vet_asset`, `till_vet_meme`,
+  `till_vet_merchant`, `till_watch_wallet`) — an agent can vet a merchant or a tokenized
   asset, get the whole trust triangle in one call, issue or pay an invoice, keep a receipt, export the books,
   meter usage, prove its floor, resolve a buzz npub or a gitlawb did:key to a Base address, read a KYA
   identity, spend only within a signed authorization, and render provable books (`till_roll`)
