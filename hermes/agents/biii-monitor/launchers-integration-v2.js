@@ -169,29 +169,13 @@ class ToshimartMonitor {
       }));
     } catch (e) {
       console.error(`[${this.name}] Erreur:`, e.message);
-      // Fallback: retourner données simulées pour test
-      return this.getMockData(count);
+      /* ⛔ MEME DEFAUT QUE DANS launchers-integration-v3.js, et c'est le motif du jumeau: le correctif
+       * « NON LU != aucun lancement » a ete pose sur trois moniteurs de ce fichier et pas sur celui-ci.
+       * `getMockData()` fabriquait cinq tokens a l'adresse et au createur tires de Math.random(), sans
+       * poser `lastError` — donc l'appelant comptait des observations qui n'existaient pas. */
+      this.lastError = e.message;   // NON LU != aucun lancement
+      return [];
     }
-  }
-  
-  getMockData(count) {
-    // Données simulées pour développement
-    const mockTokens = [];
-    for (let i = 0; i < Math.min(count, 5); i++) {
-      mockTokens.push({
-        platform: this.name,
-        chain: this.chain,
-        address: `0x${Math.random().toString(16).substr(2, 40)}`,
-        symbol: `TOSHI${i}`,
-        name: `Toshimart Token ${i}`,
-        creator: `0x${Math.random().toString(16).substr(2, 40)}`,
-        createdAt: Date.now() - i * 3600000,
-        marketCap: Math.random() * 100000,
-        volume24h: Math.random() * 50000,
-        risk: Math.floor(Math.random() * 60)
-      });
-    }
-    return mockTokens;
   }
   
   assessRisk(token) {

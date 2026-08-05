@@ -172,29 +172,23 @@ class ToshimartMonitor {
       }));
     } catch (e) {
       console.error(`[${this.name}] Erreur:`, e.message);
-      return this.getMockData(count);
+      /* ⛔ CE `catch` RENDAIT DES TOKENS INVENTES. `getMockData()` fabriquait jusqu'a cinq tokens dont
+       * l'adresse ET le createur sortaient de Math.random(), avec un `risk` tire au sort — et sans
+       * poser `lastError`, donc l'appelant les lisait comme des observations saines. Mesure sur un
+       * echec reseau force: scanAllPlatforms() publiait « totalTokens: 10 », dont 1 medium-risk et 9
+       * low-risk, alors qu'aucun de ces tokens n'existe.
+       *
+       * Les quatre autres moniteurs de ce fichier faisaient DEJA la bonne chose. C'est ce qui rendait
+       * le trou invisible: trois plateformes declaraient honnetement « NON LU », et cette franchise
+       * faisait lire les deux muettes comme reellement saines.
+       *
+       * Le depot interdit de completer une adresse de memoire; en fabriquer une entiere est la meme
+       * faute en pire. Une lecture ratee est une ABSENCE, jamais une observation. */
+      this.lastError = e.message;   // NON LU != aucun lancement
+      return [];
     }
   }
-  
-  getMockData(count) {
-    const mockTokens = [];
-    for (let i = 0; i < Math.min(count, 5); i++) {
-      mockTokens.push({
-        platform: this.name,
-        chain: this.chain,
-        address: `0x${Math.random().toString(16).substr(2, 40)}`,
-        symbol: `TOSHI${i}`,
-        name: `Toshimart Token ${i}`,
-        creator: `0x${Math.random().toString(16).substr(2, 40)}`,
-        createdAt: Date.now() - i * 3600000,
-        marketCap: Math.random() * 100000,
-        volume24h: Math.random() * 50000,
-        risk: Math.floor(Math.random() * 60)
-      });
-    }
-    return mockTokens;
-  }
-  
+
   assessRisk(token) {
     let score = 0;
     
@@ -325,31 +319,15 @@ class B20Monitor {
       }));
     } catch (e) {
       console.error(`[${this.name}] Erreur:`, e.message);
-      // Fallback avec données simulées pour test
-      return this.getMockData(count);
+      /* ⛔ Meme correction que sur ToshimartMonitor ci-dessus, et le commentaire d'origine disait
+       * « Fallback avec donnees simulees pour test » — sauf que ce chemin n'etait pas un chemin de
+       * test: il servait en production, a chaque echec reseau, sans aucun moyen de distinguer la
+       * simulation d'une lecture reelle en aval. */
+      this.lastError = e.message;   // NON LU != aucun lancement
+      return [];
     }
   }
-  
-  getMockData(count) {
-    const mockTokens = [];
-    for (let i = 0; i < Math.min(count, 5); i++) {
-      mockTokens.push({
-        platform: this.name,
-        chain: this.chain,
-        address: `0x${Math.random().toString(16).substr(2, 40)}`,
-        symbol: `B20${i}`,
-        name: `B20 Token ${i}`,
-        creator: `0x${Math.random().toString(16).substr(2, 40)}`,
-        createdAt: Date.now() - i * 3600000,
-        marketCap: Math.random() * 150000,
-        volume24h: Math.random() * 75000,
-        replies: Math.floor(Math.random() * 50),
-        risk: Math.floor(Math.random() * 70)
-      });
-    }
-    return mockTokens;
-  }
-  
+
   assessRisk(token) {
     let score = 0;
     
