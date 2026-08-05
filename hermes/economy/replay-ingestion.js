@@ -133,16 +133,49 @@ async function lireJumeau(URL) {
   } catch (e) { return { lu: false, pourquoi: String((e && e.message) || e) }; }
 }
 
+/* La vraie tete, lue par NOUS. Le jumeau publie un `lag` calcule contre sa propre tete en cache;
+ * s'en servir pour juger sa fraicheur reviendrait a lui demander de se noter lui-meme. */
+async function teteDeChaine() {
+  try {
+    const r = await fetch(process.env.BASE_RPC_URL || 'https://mainnet.base.org', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_blockNumber', params: [] }),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!r.ok) return null;
+    const h = parseInt(((await r.json()) || {}).result, 16);
+    return Number.isFinite(h) && h > 0 ? h : null;
+  } catch { return null; }
+}
+
+/* ⛔ 2026-08-05, DEUXIEME CORRECTION DU MEME GARDE — et la faute est symetrique de la premiere.
+ *
+ * Version 1: un NIVEAU (`lag < 1h`) lu une fois. Elle a declare sain un collecteur qui venait de geler.
+ * Version 2: le MOUVEMENT (`lastIndexedBlock` sur 20 s). Elle a declare fige un collecteur qui venait
+ * de RATTRAPER — parce qu'un indexeur par lots, arrive a la tete, n'a plus rien a avancer. Zero
+ * mouvement y est le comportement CORRECT, et le garde le lisait comme une panne.
+ *
+ * Le discriminant n'est donc ni l'un ni l'autre seul: c'est la DISTANCE a la vraie tete, lue par nous
+ * et non empruntee au jumeau. Le mouvement ne compte que s'il reste du chemin a faire:
+ *
+ *     proche de la tete            -> a jour, qu il bouge ou non
+ *     loin ET n avance pas         -> fige
+ *     loin ET avance               -> en train de rattraper
+ *
+ * Trois etats, et le troisieme n'existait dans aucune des deux versions precedentes. */
+const PROCHE_BLOCS = 900;   // ~30 min a 2 s/bloc: au-dela, un retard cesse d'etre du bruit de lot.
+
 async function comparerAuJumeau() {
   const URL = process.env.MAINSTREET_URL || 'https://avisradar-production.up.railway.app';
   const a = await lireJumeau(URL);
   if (!a.lu) return a;
+  const tete = await teteDeChaine();
   await new Promise((r) => setTimeout(r, ESPACEMENT_MS));
   const b = await lireJumeau(URL);
   if (!b.lu) return b;
-  // `avance` est le seul champ qui distingue « a jour » de « fige il y a six minutes ».
   const avance = typeof a.bloc === 'number' && typeof b.bloc === 'number' ? b.bloc - a.bloc : null;
-  return { ...b, avance, espacementMs: ESPACEMENT_MS };
+  const distance = tete != null && typeof b.bloc === 'number' ? tete - b.bloc : null;
+  return { ...b, avance, distance, tete, espacementMs: ESPACEMENT_MS, procheBlocs: PROCHE_BLOCS };
 }
 
 comparerAuJumeau().then((j) => {
@@ -152,23 +185,29 @@ comparerAuJumeau().then((j) => {
     console.log(`    ⚠️ NON LU (${j.pourquoi}) — aucune cause ne peut etre ecartee par cette voie.`);
   } else {
     console.log(`    lag ${j.lag}h · stale ${j.stale} · ${j.parHeure} reglements dans l heure`);
-    console.log(`    bloc indexe ${j.bloc} · avance en ${(j.espacementMs / 1000).toFixed(0)}s : ${j.avance == null ? 'non mesurable' : j.avance + ' bloc(s)'}`);
+    console.log(`    bloc indexe ${j.bloc} · vraie tete ${j.tete == null ? 'NON LUE' : j.tete}`
+      + ` · distance ${j.distance == null ? 'n/a' : j.distance + ' blocs (~' + (j.distance * 2 / 60).toFixed(0) + ' min)'}`);
+    console.log(`    avance en ${(j.espacementMs / 1000).toFixed(0)}s : ${j.avance == null ? 'non mesurable' : j.avance + ' bloc(s)'}`);
 
-    /* Le verdict tient sur l'AVANCE, pas sur le lag. Trois etats, parce que « non mesurable » ne doit
-     * pas se replier sur l'un des deux autres. */
-    if (j.avance == null) {
-      console.log('    ⚠️ Avance NON MESURABLE — aucune cause ne peut etre ecartee par cette voie.');
-    } else if (j.avance <= 0) {
-      console.log('    ⛔ Le jumeau est FIGE lui aussi: son curseur n a pas avance d un bloc.');
-      console.log('       ⚠️ Son `lag` peut encore paraitre bon — il grandit seulement a la vitesse de');
-      console.log('       l horloge. Un NIVEAU ne mesure pas un MOUVEMENT.');
-      console.log('       DEUX collecteurs arretes: chercher une cause COMMUNE (RPC amont, credential');
-      console.log('       partage, hote) avant de suspecter le cron de celui-ci en particulier.');
-    } else if (process.exitCode) {
-      console.log(`    ✅ Le jumeau AVANCE (${j.avance} blocs) pendant que ce radar se tait.`);
-      console.log('       Ecartees: infrastructure, chaine a l arret. Restent: le cron de CE collecteur,');
-      console.log('       ou une absence reelle de nouveaux pools — que ce chiffre ne mesure PAS');
-      console.log('       (il compte des reglements x402, pas des lancements).');
+    /* Le verdict tient sur la DISTANCE a la vraie tete. L'avance ne departage que les collecteurs
+     * qui ont encore du chemin: pres de la tete, zero mouvement est le comportement normal d'un job
+     * par lots, et c'est ce qui avait fait crier « fige » a la version precedente. */
+    if (j.distance == null) {
+      console.log('    ⚠️ Distance NON MESURABLE (tete de chaine non lue) — aucune cause ecartee par cette voie.');
+    } else if (j.distance <= j.procheBlocs) {
+      console.log(`    ✅ Le jumeau est A LA TETE (moins de ${j.procheBlocs} blocs) — qu il bouge ou non.`);
+      if (process.exitCode) {
+        console.log('       Ecartees: infrastructure, chaine a l arret. Restent: le cron de CE collecteur,');
+        console.log('       ou une absence reelle de nouveaux pools — que ce chiffre ne mesure PAS');
+        console.log('       (il compte des reglements x402, pas des lancements).');
+      }
+    } else if (j.avance != null && j.avance > 0) {
+      console.log(`    ⏳ Le jumeau RATTRAPE : ${j.distance} blocs de retard, +${j.avance} en ${(j.espacementMs / 1000).toFixed(0)}s.`);
+    } else {
+      console.log(`    ⛔ Le jumeau est FIGE : ${j.distance} blocs de retard et aucune avance mesuree.`);
+      console.log('       ⚠️ Son `lag` publie peut paraitre bon — il est calcule contre sa PROPRE tete en');
+      console.log('       cache, pas contre celle qu on vient de lire.');
+      console.log('       DEUX collecteurs arretes: chercher une cause COMMUNE avant de suspecter un cron.');
     }
   }
   if (process.exitCode) {
