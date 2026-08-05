@@ -93,11 +93,54 @@ if (p99 == null) {
   console.log(`  ✅ ${ageH.toFixed(1)} h — dans la cadence habituelle.`);
 }
 
-if (process.exitCode) {
-  console.log('\n     Le mecanisme d annonce ne peut rien noter tant que ca dure.');
-  console.log('     ⚠️ Et ce n est PAS « le cron est mort ». Cette base est une copie LOCALE: une copie');
-  console.log('     qui ne se synchronise plus ressemble EXACTEMENT a une collecte arretee, et un creux');
-  console.log('     de marche nocturne leur ressemble aussi. Trois causes, une seule apparence —');
-  console.log('     regarder le planificateur, pas ce fichier, avant de nommer une panne.');
-}
 console.log(`\n  tranches de 24 h SANS aucune entree, sur 8 : ${vides}`);
+
+/* ═══ TROIS CAUSES, UNE SEULE APPARENCE — ET DEUX SONT ELIMINABLES D'ICI ═══
+ *
+ * Un silence peut vouloir dire: (1) la copie locale ne se synchronise plus, (2) l'infrastructure ou
+ * la chaine sont a l'arret, (3) le collecteur lui-meme ne tourne plus. Elles se ressemblent
+ * exactement dans ce fichier, et seule la troisieme est une panne de NOTRE cote.
+ *
+ * La premiere version s'arretait a « regarder le planificateur ». C'etait honnete mais paresseux: le
+ * collecteur JUMEAU (mainstreet) est joignable en HTTP et publie sa propre fraicheur. S'il est a jour
+ * pendant que nous sommes muets, l'infrastructure et la chaine sont hors de cause — et il ne reste
+ * qu'une explication au lieu de trois. Mesure du 2026-08-05: lag 0,1 h et 4914 reglements dans
+ * l'heure, pendant que ce radar-ci se taisait depuis 7,5 h.
+ *
+ * ⚠️ CE QUE LA COMPARAISON NE PROUVE PAS, et qui doit se dire: le jumeau indexe des REGLEMENTS x402,
+ * pas des nouveaux pools. Une chaine occupee peut lancer peu de tokens. Elle ecarte donc « la chaine
+ * est morte », jamais « aucun pool n'est ne depuis 7 heures ». */
+async function comparerAuJumeau() {
+  const URL = process.env.MAINSTREET_URL || 'https://avisradar-production.up.railway.app';
+  try {
+    const r = await fetch(URL + '/api/agent/health', { headers: { 'x-ms-monitor': '1' }, signal: AbortSignal.timeout(20000) });
+    if (!r.ok) return { lu: false, pourquoi: 'HTTP ' + r.status };
+    const j = await r.json();
+    const l = (j && j.live) || {};
+    return { lu: true, lag: l.settlementsLagHours, stale: l.settlementsWindowStale, parHeure: l.settlements1h };
+  } catch (e) { return { lu: false, pourquoi: String((e && e.message) || e) }; }
+}
+
+comparerAuJumeau().then((j) => {
+  console.log('\n  ── le collecteur JUMEAU (mainstreet), pour ecarter les causes communes ──');
+  if (!j.lu) {
+    // Non lu n'est pas « le jumeau va mal »: on ne conclut rien, et on le dit.
+    console.log(`    ⚠️ NON LU (${j.pourquoi}) — aucune cause ne peut etre ecartee par cette voie.`);
+  } else {
+    console.log(`    lag ${j.lag}h · stale ${j.stale} · ${j.parHeure} reglements dans l heure`);
+    const jumeauSain = typeof j.lag === 'number' && j.lag < 1 && j.stale === false;
+    if (process.exitCode && jumeauSain) {
+      console.log('    ⛔ Le jumeau est A JOUR pendant que ce radar se tait.');
+      console.log('       Ecartees: infrastructure, chaine a l arret. Restent: le cron de CE collecteur,');
+      console.log('       ou une absence reelle de nouveaux pools — que ce chiffre ne mesure PAS');
+      console.log('       (il compte des reglements x402, pas des lancements).');
+    } else if (process.exitCode) {
+      console.log('    Le jumeau decroche aussi — la cause est probablement commune, pas propre a ce cron.');
+    }
+  }
+  if (process.exitCode) {
+    console.log('\n     Le mecanisme d annonce ne peut rien noter tant que ca dure.');
+    console.log('     ⚠️ Verifier le planificateur sur la machine qui l heberge: `hermes` est absent de');
+    console.log('     cette machine-ci, donc rien ici ne peut confirmer ni infirmer qu il tourne.');
+  }
+});
