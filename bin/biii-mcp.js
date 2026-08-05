@@ -172,13 +172,13 @@ const TOOLS = [
       receipts: { type: 'array', description: 'the verified receipt objects (from till_receipt), each carrying a txHash', items: { type: 'object' } },
       merchantName: { type: 'string' }, lang: { type: 'string', description: '"en" (default) or "fr"' },
       brand: { description: 'WHITE-LABEL: a partner brand for the footer ("via <name>", optionally "· powered by BIII"). String or {name, poweredBy}. The non-custodial disclosure is a fact and stays regardless.' } }, required: ['receipts'] } },
-  { name: 'till_export', description: 'ACCOUNTING EXPORT: turn the verified receipts into an accountant-ready CSV that QuickBooks / Xero / Excel import (the export finance teams need to adopt). Every row carries its own txHash + Basescan link, so the accountant re-verifies each amount on Base themselves — the export is a POINTER to the chain, never a book to trust. Non-custodial (BIII moved no funds). Columns: date, receipt_no, reference, description, payer, gross_usdc, tip_usdc, charged_usdc, token, chain, tx_hash, basescan_url, status. Dedup by txHash; optional block-time window; brand slugs the filename.',
+  { name: 'till_export', description: 'ACCOUNTING EXPORT: turn the verified receipts into an accountant-ready CSV that QuickBooks / Xero / Excel import (the export finance teams need to adopt). Every row carries its own txHash + Basescan link, so the accountant re-verifies each amount on Base themselves — the export is a POINTER to the chain, never a book to trust. Non-custodial (BIII moved no funds). Columns: date, receipt_no, reference, description, payer, gross_usdc, tip_usdc, charged_usdc, token, chain, tx_hash, basescan_url, status. Dedup by txHash; optional block-time window; brand slugs the filename. WINDOW HONESTY: a receipt with no on-chain block time cannot be proven to fall inside a dated window, so it is excluded from one — and summary.undatedExcluded reports HOW MANY were, with the same warning prepended to `disclosure`. If that count is non-zero the CSV is short by those rows: re-run with no window to see them all.',
     inputSchema: { type: 'object', properties: {
       receipts: { type: 'array', description: 'the verified receipt objects (from till_receipt), each carrying a txHash', items: { type: 'object' } },
       fromBlockTime: { type: 'number', description: 'optional — only export receipts settled at/after this unix block time' },
       toBlockTime: { type: 'number', description: 'optional — only export receipts settled at/before this unix block time' },
       brand: { description: 'WHITE-LABEL: a partner brand (string or {name}) — slugs the download filename; the non-custodial disclosure stays regardless.' } }, required: ['receipts'] } },
-  { name: 'till_meter', description: 'USAGE → BILL for a white-label pilot, split by trust. The settled receipts are ON-CHAIN (each txHash re-verifiable on Base — the PROVABLE basis for receipt charges); the verdict count is SELF-REPORTED (verdicts are advisory reads, not chain artifacts) and labeled as such. The pricing plan is INJECTED (the partner brings their tiers). Pure, stateless, non-custodial (BIII holds no ledger). Returns the provable/self-reported split + itemized charges + total.',
+  { name: 'till_meter', description: 'USAGE → BILL for a white-label pilot, split by trust. The settled receipts are ON-CHAIN (each txHash re-verifiable on Base — the PROVABLE basis for receipt charges); the verdict count is SELF-REPORTED (verdicts are advisory reads, not chain artifacts) and labeled as such. The pricing plan is INJECTED (the partner brings their tiers). Pure, stateless, non-custodial (BIII holds no ledger). Returns the provable/self-reported split + itemized charges + total. WINDOW HONESTY: a receipt with no on-chain block time is excluded from a DATED window (its date cannot be proven) and counted in provable.undatedExcluded — a non-zero value means the bill is UNDER-charged by those receipts, so check it before invoicing.',
     inputSchema: { type: 'object', properties: {
       receipts: { type: 'array', description: 'the verified receipt objects (from till_receipt) — the provable on-chain usage', items: { type: 'object' } },
       verdictCount: { type: 'number', description: 'optional — operator-reported number of trust verdicts served this period (advisory, NOT chain-provable)' },
@@ -773,7 +773,9 @@ async function callTool(name, a = {}) {
     const s = L.summary(rows);
     return {
       statement: L.renderRoll(rows, { merchantName: a.merchantName || 'Merchant', lang: a.lang === 'fr' ? 'fr' : 'en', brand: a.brand }),
-      summary: { count: s.count, grossUsd: s.grossUsd, tipsUsd: s.tipsUsd },
+      // till_roll ne passe AUCUNE fenetre, donc undatedExcluded y vaut toujours 0 — il descend quand meme,
+      // pour que les trois routes des livres aient la meme forme et qu'aucune ne redevienne l'exception.
+      summary: { count: s.count, grossUsd: s.grossUsd, tipsUsd: s.tipsUsd, undatedExcluded: s.undatedExcluded },
       lines: rows.map((e) => ({ no: e.no, amountUsd: e.receipt.amountUsd, txHash: e.receipt.txHash, explorer: e.receipt.explorer || ('https://basescan.org/tx/' + e.receipt.txHash) })),
       note: 'Re-verify EVERY txHash on BaseScan yourself — this statement is only as true as the chain it points to. ' + DISCLAIMER,
     };
@@ -787,7 +789,12 @@ async function callTool(name, a = {}) {
     if (Number.isFinite(a.fromBlockTime)) window.fromBlockTime = Number(a.fromBlockTime);
     if (Number.isFinite(a.toBlockTime)) window.toBlockTime = Number(a.toBlockTime);
     const ex = X.buildExport(receipts, { window, brand: a.brand });
-    return { ...ex, note: 'Import into QuickBooks / Xero / Excel; re-verify every tx_hash on BaseScan yourself. ' + DISCLAIMER };
+    // La divulgation doit atteindre l'agent au bout du fil: `...ex` porte deja summary.undatedExcluded et
+    // la phrase dans `disclosure`, mais `note` est ce qu'un appelant lit en premier — elle le dit aussi.
+    const manque = ex.summary.undatedExcluded
+      ? `⚠ ${ex.summary.undatedExcluded} receipt(s) had no on-chain block time and are NOT in this dated CSV. `
+      : '';
+    return { ...ex, note: manque + 'Import into QuickBooks / Xero / Excel; re-verify every tx_hash on BaseScan yourself. ' + DISCLAIMER };
   }
   if (name === 'till_meter') {
     // USAGE → BILL, stateless, split by trust: settled receipts are provable (on-chain), the verdict
@@ -797,7 +804,10 @@ async function callTool(name, a = {}) {
     if (Number.isFinite(a.fromBlockTime)) window.fromBlockTime = Number(a.fromBlockTime);
     if (Number.isFinite(a.toBlockTime)) window.toBlockTime = Number(a.toBlockTime);
     const bill = meterUsage(receipts, { plan: a.plan, verdictCount: a.verdictCount, window });
-    return { ...bill, note: 'Re-verify the settled receipts on Base yourself; bill on the self-reported verdict count only with a trusted volume report. ' + DISCLAIMER };
+    const manque = bill.provable.undatedExcluded
+      ? `⚠ ${bill.provable.undatedExcluded} receipt(s) had no on-chain block time and are NOT billed in this dated period — this total is UNDER-charged. `
+      : '';
+    return { ...bill, note: manque + 'Re-verify the settled receipts on Base yourself; bill on the self-reported verdict count only with a trusted volume report. ' + DISCLAIMER };
   }
   if (name === 'till_floor') {
     // DECENTRALIZATION PROOF: expose this node's known-bad floor provenance + fingerprint so any other
