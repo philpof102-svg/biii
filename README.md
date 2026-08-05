@@ -56,7 +56,7 @@ wallet signs, and the chain — not us — is the only thing allowed to say "pai
 ## Run it
 
 ```bash
-npm test                               # all offline; 1253 assertions across 95 files + a 22-case eval harness (2026-08-05)
+npm test                               # all offline; 1269 assertions across 96 files + a 22-case eval harness (2026-08-05)
 node test/suite-total.js               # re-derives that count — two report formats coexist, so grep undercounts it
 BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface, :4700
 ```
