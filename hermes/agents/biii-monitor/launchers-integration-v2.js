@@ -17,6 +17,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const https = require('node:https');
 const http = require('node:http');
+const { creatorIsUnknown } = require('../../../lib/creator-state');
 
 const CACHE_DIR = path.join(__dirname, 'cache');
 const SCAN_RESULTS = path.join(CACHE_DIR, 'launchers-scan.json');
@@ -183,7 +184,9 @@ class ToshimartMonitor {
     
     if (token.marketCap < 20000) score += 35;
     if (token.volume24h < 5000) score += 25;
-    if (!token.creator || token.creator === '0x000...') score += 40;
+    /* `'0x000...'` etait une forme d'AFFICHAGE (points litteraux): clause morte, et l'adresse zero
+     * passait donc sans marquer un point. Predicat unique, bareme inchange — cf. lib/creator-state.js. */
+    if (creatorIsUnknown(token.creator)) score += 40;
     
     return Math.min(score, 100);
   }
@@ -227,7 +230,9 @@ class BankrMonitor {
     let score = 0;
     
     if (launch.marketCap < 30000) score += 30;
-    if (!launch.creator) score += 50;
+    /* Meme question que sur Toshimart/B20, posee sans le litteral mort — donc invisible dans une
+     * recherche de `'0x000...'`. C'est exactement par la que le jumeau diverge. Bareme inchange. */
+    if (creatorIsUnknown(launch.creator)) score += 50;
     
     return Math.min(score, 100);
   }
