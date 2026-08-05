@@ -110,15 +110,39 @@ console.log(`\n  tranches de 24 h SANS aucune entree, sur 8 : ${vides}`);
  * ⚠️ CE QUE LA COMPARAISON NE PROUVE PAS, et qui doit se dire: le jumeau indexe des REGLEMENTS x402,
  * pas des nouveaux pools. Une chaine occupee peut lancer peu de tokens. Elle ecarte donc « la chaine
  * est morte », jamais « aucun pool n'est ne depuis 7 heures ». */
-async function comparerAuJumeau() {
-  const URL = process.env.MAINSTREET_URL || 'https://avisradar-production.up.railway.app';
+/* ⛔ UN NIVEAU NE MESURE PAS UN MOUVEMENT — et la premiere version s'y est laissee prendre.
+ *
+ * Elle lisait `settlementsLagHours` une fois et concluait « jumeau a jour » sous 1 h. Mesure du
+ * 2026-08-05: lag 0,1 h a 00h21, puis 0,6 h a 00h52 — soit exactement le temps ecoule. Le curseur
+ * n'avait pas bouge d'un bloc, mais le NIVEAU passait encore le seuil, et l'instrument a ecarte
+ * l'hypothese « infrastructure » sur un collecteur qui venait de geler.
+ *
+ * Deux lectures espacees tranchent ce qu'une seule ne peut pas: `lastIndexedBlock` identique = curseur
+ * fige, quel que soit le lag affiche. Base produit un bloc toutes les ~2 s, donc quelques dizaines de
+ * secondes suffisent a rendre l'absence d'avancee non ambigue. C'est « une sortie CONSTANTE n'est pas
+ * une mesure » applique a un endpoint de sante. */
+const ESPACEMENT_MS = Number(process.env.TWIN_PROBE_GAP_MS) || 20000;
+
+async function lireJumeau(URL) {
   try {
     const r = await fetch(URL + '/api/agent/health', { headers: { 'x-ms-monitor': '1' }, signal: AbortSignal.timeout(20000) });
     if (!r.ok) return { lu: false, pourquoi: 'HTTP ' + r.status };
-    const j = await r.json();
-    const l = (j && j.live) || {};
-    return { lu: true, lag: l.settlementsLagHours, stale: l.settlementsWindowStale, parHeure: l.settlements1h };
+    const l = ((await r.json()) || {}).live || {};
+    return { lu: true, bloc: l.lastIndexedBlock, lag: l.settlementsLagHours,
+      stale: l.settlementsWindowStale, parHeure: l.settlements1h, total: l.totalSettlementsTracked };
   } catch (e) { return { lu: false, pourquoi: String((e && e.message) || e) }; }
+}
+
+async function comparerAuJumeau() {
+  const URL = process.env.MAINSTREET_URL || 'https://avisradar-production.up.railway.app';
+  const a = await lireJumeau(URL);
+  if (!a.lu) return a;
+  await new Promise((r) => setTimeout(r, ESPACEMENT_MS));
+  const b = await lireJumeau(URL);
+  if (!b.lu) return b;
+  // `avance` est le seul champ qui distingue « a jour » de « fige il y a six minutes ».
+  const avance = typeof a.bloc === 'number' && typeof b.bloc === 'number' ? b.bloc - a.bloc : null;
+  return { ...b, avance, espacementMs: ESPACEMENT_MS };
 }
 
 comparerAuJumeau().then((j) => {
@@ -128,14 +152,23 @@ comparerAuJumeau().then((j) => {
     console.log(`    ⚠️ NON LU (${j.pourquoi}) — aucune cause ne peut etre ecartee par cette voie.`);
   } else {
     console.log(`    lag ${j.lag}h · stale ${j.stale} · ${j.parHeure} reglements dans l heure`);
-    const jumeauSain = typeof j.lag === 'number' && j.lag < 1 && j.stale === false;
-    if (process.exitCode && jumeauSain) {
-      console.log('    ⛔ Le jumeau est A JOUR pendant que ce radar se tait.');
+    console.log(`    bloc indexe ${j.bloc} · avance en ${(j.espacementMs / 1000).toFixed(0)}s : ${j.avance == null ? 'non mesurable' : j.avance + ' bloc(s)'}`);
+
+    /* Le verdict tient sur l'AVANCE, pas sur le lag. Trois etats, parce que « non mesurable » ne doit
+     * pas se replier sur l'un des deux autres. */
+    if (j.avance == null) {
+      console.log('    ⚠️ Avance NON MESURABLE — aucune cause ne peut etre ecartee par cette voie.');
+    } else if (j.avance <= 0) {
+      console.log('    ⛔ Le jumeau est FIGE lui aussi: son curseur n a pas avance d un bloc.');
+      console.log('       ⚠️ Son `lag` peut encore paraitre bon — il grandit seulement a la vitesse de');
+      console.log('       l horloge. Un NIVEAU ne mesure pas un MOUVEMENT.');
+      console.log('       DEUX collecteurs arretes: chercher une cause COMMUNE (RPC amont, credential');
+      console.log('       partage, hote) avant de suspecter le cron de celui-ci en particulier.');
+    } else if (process.exitCode) {
+      console.log(`    ✅ Le jumeau AVANCE (${j.avance} blocs) pendant que ce radar se tait.`);
       console.log('       Ecartees: infrastructure, chaine a l arret. Restent: le cron de CE collecteur,');
       console.log('       ou une absence reelle de nouveaux pools — que ce chiffre ne mesure PAS');
       console.log('       (il compte des reglements x402, pas des lancements).');
-    } else if (process.exitCode) {
-      console.log('    Le jumeau decroche aussi — la cause est probablement commune, pas propre a ce cron.');
     }
   }
   if (process.exitCode) {
