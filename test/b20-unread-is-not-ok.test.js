@@ -71,13 +71,19 @@ async function main() {
   const SRC = fs.readFileSync(path.join(__dirname, '..', 'hermes', 'economy', 'token-radar.js'), 'utf8')
     .split(/\r?\n/).map((l) => l.replace(/\/\/.*$/, '')).join('\n').replace(/\/\*[\s\S]*?\*\//g, '');
 
+  /* ⚠️ `[:=]` ET PAS `=` — le 2026-08-05, ces deux regles ont casse sans qu'aucune propriete ne change.
+   * Les ecritures b20 se faisaient AVANT que la ligne n'existe en base et etaient perdues (voir le
+   * commentaire du bloc dans token-radar.js); le correctif les collecte dans une Map fusionnee a
+   * l'insertion, donc la forme passe de `b20Check = 'unread'` a `b20Check: 'unread'`. La propriete
+   * surveillee — l'etat non concluant est PERSISTE, et la classe avec — est identique. Une regle
+   * accrochee a la syntaxe d'affectation confondait « le champ a disparu » et « le champ a demenage ». */
   await t('token-radar distingue « lu » de « pas lu » apres classifyB20', () => {
-    assert.ok(/b20Check\s*=\s*'unread'/.test(SRC),
+    assert.ok(/b20Check\s*[:=]\s*'unread'/.test(SRC),
       'aucun etat « unread » persiste: un verdict `unknown` de classifyB20 sera enregistre comme un controle reussi');
   });
 
   await t('token-radar persiste CE QUE le classifieur a repondu, pas seulement qu il a repondu', () => {
-    assert.ok(/b20Kind\s*=/.test(SRC),
+    assert.ok(/b20Kind\s*[:=]/.test(SRC),
       'la classification (native_b20 / prefix_impostor) n est ecrite nulle part: aucun rejeu ne peut '
       + 'redecouper la base par mecanisme, il doit deviner depuis le prefixe d adresse');
   });

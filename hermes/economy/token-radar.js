@@ -342,11 +342,31 @@ function recordBlackout(db, nowIso) {
   // donc indiscernable d'un token examine et juge sain. Or c'est precisement ce controle qui arme
   // `rug_ready` sur un imposteur de prefixe. On persiste la panne au lieu de la taire.
   let b20Echec = 0, b20NonLu = 0;
+  /* ⚠️ CE BLOC TOURNE AVANT QUE LE TOKEN N'EXISTE EN BASE, ET LES ECRITURES ETAIENT PERDUES.
+   *
+   * `toJudge` ne garde QUE les adresses ABSENTES de `db` (`filter((c) => !db[c.addr])`), et l'insertion
+   * `db[c.addr] = { ... }` vit soixante lignes plus bas. Les trois ecritures ci-dessous etaient donc
+   * gardees par un `if (db[c.addr])` qui, pour un token frais, est faux PAR CONSTRUCTION. Elles n'ont
+   * jamais tire — pas une fois: 0 ligne sur 1880 portait `b20Check` au 2026-08-05.
+   *
+   * La garde n'etait pas une precaution, c'etait la panne. Et elle etait muette dans le pire sens: les
+   * compteurs `b20Echec`/`b20NonLu` s'incrementaient quand meme, donc le digest annoncait des lectures
+   * qui n'ecrivaient rien. Le verdict, lui, passait — le bloc mute `verdicts[c.addr]`, que l'insertion
+   * relit — donc un imposteur etait bien arme `rug_ready`. C'est la BASE de l'appel qui disparaissait,
+   * et une scorecard sans sa base ne s'audite pas.
+   *
+   * On collecte donc dans une Map, fusionnee dans l'objet litteral au moment de l'insertion. Deplacer
+   * la boucle apres l'insertion aurait marche aussi, mais aurait reordonne les appels reseau et le
+   * budget RPC avec: ici le flux et le nombre d'appels sont inchanges.
+   *
+   * ⛔ L'invariant est epingle par test/radar-scope.test.js: aucune ecriture `db[c.addr].champ =` ne
+   *    doit reapparaitre AVANT la ligne d'insertion. */
+  const b20ParAdresse = new Map();
   for (const c of toJudge) {
     if (!/^0xb200/i.test(c.addr)) continue;
     let b;
     try { b = await classifyB20(CHAIN, c.addr); }
-    catch (e) { b20Echec++; if (db[c.addr]) { db[c.addr].b20Check = 'failed'; db[c.addr].b20CheckError = String((e && e.message) || e).slice(0, 120); } continue; }
+    catch (e) { b20Echec++; b20ParAdresse.set(c.addr, { b20Check: 'failed', b20CheckError: String((e && e.message) || e).slice(0, 120) }); continue; }
     /* ⚠️ `classifyB20` NE JETTE PAS quand la chaine ne repond pas: son `rpc()` fait `resolve(null)`
      * sur l'erreur reseau COMME sur un JSON illisible, et la fonction RETOURNE `{verdict:'unknown',
      * reason:'could not read contract code'}`. Le `catch` ci-dessus ne voyait donc jamais une panne
@@ -357,8 +377,8 @@ function recordBlackout(db, nowIso) {
      * test/b20-unread-is-not-ok.test.js, en injectant un rpcImpl qui rend null. */
     if (!b || b.verdict === 'unknown') {
       b20NonLu++;
-      if (db[c.addr]) { db[c.addr].b20Check = 'unread';
-        db[c.addr].b20CheckError = String((b && b.reason) || 'classifier returned no verdict').slice(0, 120); }
+      b20ParAdresse.set(c.addr, { b20Check: 'unread',
+        b20CheckError: String((b && b.reason) || 'classifier returned no verdict').slice(0, 120) });
       continue;
     }
     /* On ecrit CE QUE le classifieur a repondu, pas seulement qu'il a repondu. `b20Check: 'ok'`
@@ -366,8 +386,8 @@ function recordBlackout(db, nowIso) {
      * reconstruisait a posteriori depuis le prefixe d'adresse — ce qu'il a fallu faire pour rejouer
      * les 156, avec l'adresse de l'unique imposteur codee en dur dans le script de rejeu. Meme
      * defaut deja connu sur `rug_ready`, dont la base ne stocke pas la regle emettrice. */
-    if (db[c.addr]) { db[c.addr].b20Check = 'ok'; db[c.addr].b20Kind = b.verdict;
-      db[c.addr].b20CodeBytes = b.codeBytes; db[c.addr].b20ZeroRun = b.zeroRun; }
+    b20ParAdresse.set(c.addr, { b20Check: 'ok', b20Kind: b.verdict,
+      b20CodeBytes: b.codeBytes, b20ZeroRun: b.zeroRun });
     const v = verdicts[c.addr];
     if (b.verdict === 'prefix_impostor') {
       b20Notes.push({ c, kind: 'impostor', b });
@@ -431,7 +451,13 @@ function recordBlackout(db, nowIso) {
         topWalletPct: v.topWalletPct == null ? null : v.topWalletPct,
         unreadable: Array.isArray(v.unknowns) ? v.unknowns.length : null,
       },
-      firstLiq: c.liq, peakLiq: c.liq, lastLiq: c.liq, outcome: 'live' };
+      firstLiq: c.liq, peakLiq: c.liq, lastLiq: c.liq, outcome: 'live',
+      /* LA LECTURE B20, fusionnee ICI parce que c'est le premier instant ou la ligne existe. La boucle
+       * qui l'a produite tourne plus haut — elle DOIT, elle alimente `verdicts` qui arme `rug_ready` —
+       * mais elle n'avait alors aucune ligne ou ecrire. Vide pour tout token non prefixe 0xb200, qui
+       * n'est jamais soumis au classifieur: absence de champ = pas de lecture tentee, a distinguer
+       * d'une lecture tentee et ratee, qui elle porte `b20Check: 'failed'` ou `'unread'`. */
+      ...(b20ParAdresse.get(c.addr) || {}) };
     obsOut += JSON.stringify({ ts: now, addr: c.addr, sym: c.sym, chain: CHAIN, source: c.source, liq: c.liq, verdict: v.verdict, armed: v.armed, flags: v.flags }) + '\n';
     if (v.verdict === 'rug_ready') armed.push({ ...c, v });
     else if (v.verdict === 'clean') survivors.push({ ...c, v });

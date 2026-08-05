@@ -65,6 +65,37 @@ t('les notes de recolte passent par HARVEST_NOTES, qui EXISTE au niveau module',
  * redescendre SOUS celle du bloc declarant. (Comparer les profondeurs seules est faux dans les deux sens:
  * lire une variable externe depuis un bloc plus profond est legal, et deux blocs FRERES a profondeur egale
  * ne partagent rien.) */
+/* ⚠️ LE RETRAIT DE LA PROSE, EXTRAIT — parce qu'un second garde en avait besoin et que la copie
+ * affaiblie est le defaut n°1 de ce depot: le helper correct EXISTE, l'appelant a fort enjeu s'en
+ * ecrit une version plus faible. Il etait enterre dans `compteursHorsPortee`; les deux gardes de ce
+ * fichier l'appellent maintenant, donc le durcir durcit les deux.
+ *
+ * Les caracteres sont remplaces par des ESPACES et non supprimes: le compte de lignes reste celui du
+ * fichier, sinon un garde qui accuse pointe une ligne a cote. L'ordre est load-bearing — chaines
+ * neutralisees AVANT le retrait des `//`, sans quoi le `//` d'une URL citee tronquerait la ligne. */
+function lignesSansCommentaires(srcText) {
+  return srcText.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).split(/\r?\n/)
+    .map((l) => {
+      /* Le `//` se CHERCHE sur une copie masquee et se COUPE sur l'originale: sinon le `//` d'une URL
+       * citee dans une chaine tronquerait du code reel. Les masques gardent la meme longueur pour que
+       * l'index trouve reste valide sur la ligne d'origine. */
+      const masque = l.replace(/'(\\.|[^'\\])*'/g, (s) => "'" + 'x'.repeat(s.length - 2) + "'")
+                      .replace(/"(\\.|[^"\\])*"/g, (s) => '"' + 'x'.repeat(s.length - 2) + '"')
+                      .replace(/`(\\.|[^`\\])*`/g, (s) => '`' + 'x'.repeat(s.length - 2) + '`');
+      const i = masque.indexOf('//');
+      return i < 0 ? l : l.slice(0, i);
+    });
+}
+
+/* La variante qui neutralise AUSSI les chaines — pour compter des accolades ou chercher un motif de
+ * code, la ou le contenu d'une chaine est du bruit. Le code n'y est plus evaluable: qui veut executer
+ * la source extraite prend `lignesSansCommentaires`. */
+function lignesSansProse(srcText) {
+  return lignesSansCommentaires(srcText)
+    .map((l) => l.replace(/'(\\.|[^'\\])*'/g, "''").replace(/"(\\.|[^"\\])*"/g, '""')
+                 .replace(/`(\\.|[^`\\])*`/g, '``'));
+}
+
 /* La detection, extraite pour qu'on puisse la lancer sur AUTRE CHOSE que le fichier reel — sans quoi
  * « aucun defaut trouve » et « detecteur casse » rendent le meme vert. */
 function compteursHorsPortee(srcText) {
@@ -83,13 +114,10 @@ function compteursHorsPortee(srcText) {
    * de quoi lire ce qu'il juge, en gardant le compte de lignes intact pour que les numeros restent
    * ceux du fichier. */
   const brutes = srcText.split(/\r?\n/);
-  const sansBlocs = srcText.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).split(/\r?\n/);
   const prof = []; let d = 0;
-  for (const l of sansBlocs) {
+  for (const l of lignesSansProse(srcText)) {
     prof.push(d);
-    const nu = l.replace(/'(\\.|[^'\\])*'/g, "''").replace(/"(\\.|[^"\\])*"/g, '""')
-                .replace(/`(\\.|[^`\\])*`/g, '``').replace(/\/\/.*$/, '');
-    for (const ch of nu) { if (ch === '{') d++; else if (ch === '}') d--; }
+    for (const ch of l) { if (ch === '{') d++; else if (ch === '}') d--; }
   }
   const horsPortee = [];
   let examines = 0;                 // ⚠️ un garde qui n'a RIEN a examiner passe en vert: il faut le dire.
@@ -272,6 +300,150 @@ t('le formateur du rapport convertit bien la fraction (sinon « 100% » sortirai
   const src = fs.readFileSync(path.join(__dirname, '..', 'hermes', 'economy', 'token-radar.js'), 'utf8');
   assert.match(src, /const pct = \(n\) => Math\.round\(n \* 100\)/,
     'si ce formateur cesse de multiplier, chaque rapport publié divisera la chute par 100');
+});
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * UNE ECRITURE AVANT L'INSERTION EST PERDUE — et celle-la l'a ete depuis le jour ou elle a ete ecrite.
+ *
+ * `toJudge` ne garde QUE les adresses ABSENTES de la base (`filter((c) => !db[c.addr])`). La boucle B20
+ * tourne ensuite, et elle ecrivait `if (db[c.addr]) { db[c.addr].b20Check = ... }` — une garde qui, pour
+ * un token frais, est fausse PAR CONSTRUCTION, puisque `db[c.addr] = { ... }` ne vient que soixante
+ * lignes plus bas. Les trois ecritures n'ont jamais tire.
+ *
+ * Mesure du 2026-08-05 sur la base reelle: 0 ligne sur 1880 portait `b20Check`. ZERO — jamais une.
+ * Et la panne etait pire que muette: `b20Echec`/`b20NonLu` s'incrementaient quand meme, donc le digest
+ * annoncait des lectures qui n'ecrivaient rien. Le champ manquant n'etait pas « pas encore vu », il
+ * etait inatteignable.
+ *
+ * Aucun test de comportement n'attrape ca: le radar tourne, ne jette pas, publie son digest, et le
+ * verdict lui-meme est correct (la boucle mute `verdicts[c.addr]`, que l'insertion relit — un imposteur
+ * est bien arme `rug_ready`). C'est la BASE de l'appel qui disparait. Le defaut est un ORDRE, donc le
+ * garde est STRUCTUREL.
+ *
+ * ⚠️ LA PROSE PART AVANT LE SCAN. Ce depot documente ses pannes en citant le code fautif, et ce
+ * fichier-ci en est plein: sans `lignesSansProse`, le garde s'accuserait sur la description de ce
+ * qu'il interdit. C'est arrive trois fois dans ce depot.
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+function ecrituresAvantInsertion(srcText) {
+  const L = lignesSansProse(srcText);
+  const insertions = [], ecritures = [];
+  for (let i = 0; i < L.length; i++) {
+    if (/(^|[^.\w])db\s*\[\s*c\.addr\s*\]\s*=\s*\{/.test(L[i])) insertions.push(i);
+    // `=(?!=)` et pas `=`: sinon `==`/`>=` comptent comme des ecritures. `+=` ne matche pas non plus,
+    // le `+` tombant entre `\w+` et `\s*=`.
+    const m = L[i].match(/(^|[^.\w])db\s*\[\s*c\.addr\s*\]\s*\.\s*(\w+)\s*=(?!=)/);
+    if (m) ecritures.push({ i, champ: m[2] });
+  }
+  const insertion = insertions.length ? insertions[0] : -1;
+  const perdues = insertion < 0 ? [] : ecritures.filter((e) => e.i < insertion)
+    .map((e) => 'L' + (e.i + 1) + ': db[c.addr].' + e.champ + ' = … (insertion L' + (insertion + 1) + ')');
+  return { insertion, insertions, ecritures, perdues };
+}
+
+t('★ aucune ecriture `db[c.addr].champ =` AVANT la ligne qui cree la ligne', () => {
+  const { insertion, insertions, ecritures, perdues } = ecrituresAvantInsertion(src);
+
+  assert.ok(insertion >= 0, 'insertion `db[c.addr] = {` introuvable — extraction a reparer AVANT de '
+    + 'conclure quoi que ce soit: sans point de reference, ce garde rendrait vert sur n\'importe quoi.');
+  assert.equal(insertions.length, 1, insertions.length + ' insertions `db[c.addr] = {`: avec plusieurs '
+    + 'points de creation, « avant » et « apres » n\'ont plus de sens et ce garde devient ambigu.');
+
+  assert.deepStrictEqual(perdues, [], 'ecriture(s) PERDUE(S): elles visent une ligne qui n\'existe pas '
+    + 'encore, `toJudge` ne retenant que les adresses absentes de la base. Elles ne tireront jamais, et '
+    + 'les compteurs qui les accompagnent feront annoncer au digest des lectures sans ecriture:\n       '
+    + perdues.join('\n       '));
+
+  /* Succes VIDE = erreur. Si les ecritures `db[c.addr].champ =` disparaissaient toutes du radar, ce
+   * garde n'aurait plus rien a inspecter et l'annoncerait en vert — le motif meme qu'il chasse. */
+  assert.ok(ecritures.length >= 5, 'succes VIDE: seulement ' + ecritures.length + ' ecriture(s) inspectee(s). '
+    + 'Soit la persistance a demenage, soit ce garde ne la reconnait plus.');
+});
+
+/* Un garde neuf doit prouver qu'il MORD, sinon « rien trouve » et « detecteur emousse » rendent le meme
+ * vert. Trois cas: le defaut REEL reinjecte dans la vraie source, le cas legitime epargne, et le piege
+ * du commentaire — celui qui a desarme trois gardes de ce depot. */
+t('★ le garde mord — defaut historique reinjecte, cas legitime et commentaire epargnes', () => {
+  // 1. LE DEFAUT REEL, remis dans la vraie source telle qu'elle etait avant le correctif.
+  const avant = (src.match(/b20ParAdresse\.set\(c\.addr, \{ b20Check: 'ok'/g) || []).length;
+  assert.equal(avant, 1, 'ancrage de la mutation introuvable — le test ne prouverait rien');
+  const regresse = src.replace(/b20ParAdresse\.set\(c\.addr, \{ b20Check: 'ok', b20Kind: b\.verdict,/,
+    "if (db[c.addr]) { db[c.addr].b20Check = 'ok'; db[c.addr].b20Kind = b.verdict;");
+  assert.notEqual(regresse, src, 'la mutation ne s\'est PAS appliquee: le cas qui suit serait un faux vert');
+  const vu = ecrituresAvantInsertion(regresse).perdues;
+  assert.ok(vu.length >= 1, 'le defaut historique reinjecte n\'est pas vu — ce garde ne garde rien');
+  assert.match(vu[0], /b20Check/, 'et il doit NOMMER le champ perdu, sinon il n\'est pas actionnable');
+
+  // 2. LE CAS LEGITIME: ecrire APRES l'insertion est la forme correcte, massivement utilisee plus bas.
+  const sain = ['for (const c of toJudge) {', '  db[c.addr] = { sym: c.sym };',
+    '  db[c.addr].funderTrace = \'ok\';', '}'].join('\n');
+  assert.deepStrictEqual(ecrituresAvantInsertion(sain).perdues, [],
+    'une ecriture APRES l\'insertion est correcte — la signaler ferait desarmer ce garde par le prochain lecteur');
+
+  // 3. LE PIEGE DU COMMENTAIRE: ce depot cite le code fautif dans sa prose. Un garde qui lit sa propre
+  //    documentation comme du code accuse une ligne qui ne s'execute pas.
+  const commente = ['/* la panne: db[c.addr].b20Check = \'ok\' tirait avant que la ligne n\'existe */',
+    '// db[c.addr].b20Kind = b.verdict;',
+    'for (const c of toJudge) {', '  db[c.addr] = { sym: c.sym };', '}'].join('\n');
+  assert.deepStrictEqual(ecrituresAvantInsertion(commente).perdues, [],
+    'le garde a lu un COMMENTAIRE comme du code — exactement ce qui a desarme trois gardes ici');
+});
+
+/* L'ORDRE EST GARDE CI-DESSUS, MAIS L'ORDRE N'EST PAS LA FUSION.
+ *
+ * Un garde structurel prouve que plus rien n'ecrit trop tot. Il ne prouve PAS que la lecture B20 arrive
+ * jusqu'a la ligne: si le `...(b20ParAdresse.get(...))` disparaissait de l'objet litteral, le garde
+ * d'ordre resterait vert et `b20Check` serait de nouveau absent de la base — la panne d'a cote, celle
+ * qui remplace un defaut par son voisin silencieux.
+ *
+ * ⚠️ ON EVALUE LA SOURCE REELLE, PAS UNE RECOPIE. Une reconstitution du litteral ici derivrait du
+ * fichier sans que rien ne le signale, et ce test continuerait a passer sur du code qui n'existe plus.
+ *
+ * Deux cas OPPOSES, sans quoi « ecrit toujours » passerait aussi bien que « ecrit correctement ». */
+t('★ la lecture B20 ATTERRIT vraiment dans la ligne creee — et son absence reste distincte', () => {
+  /* ⚠️ SUR LA SOURCE DECOMMENTEE, ET CE N'EST PAS UNE PRECAUTION DE STYLE: la premiere version de ce
+   * test extrayait sur `src` brut et a capture `db[c.addr] = { ... }` cite dans la PROSE de
+   * token-radar.js, quarante lignes trop haut. 8626 caracteres de commentaire francais passes a
+   * `new Function` — « Unexpected token } ». Quatrieme fois dans ce depot qu'un garde lit sa propre
+   * documentation comme du code, et la premiere ou il l'a fait dans le meme fichier que le helper
+   * ecrit pour l'empecher. On garde les chaines, elles, sinon le litteral n'est plus evaluable. */
+  const bloc = (lignesSansCommentaires(src).join('\n')
+    .match(/db\[c\.addr\] = \{[\s\S]*?\.\.\.\(b20ParAdresse\.get\(c\.addr\) \|\| \{\}\) \};/) || [])[0];
+  assert.ok(bloc, 'l\'insertion fusionnant la lecture B20 est introuvable dans la source. Soit le litteral '
+    + 'a change de forme, soit la fusion a disparu — dans les deux cas ce test doit etre repare AVANT '
+    + 'de croire que le champ est ecrit.');
+
+  const inserer = (c, b20ParAdresse) => {
+    const db = {};
+    new Function('db', 'c', 'v', 'now', 'CHAIN', 'b20ParAdresse', bloc)(
+      db, c, { verdict: 'unknown', reason: 'r', armed: [], flags: [] }, 1, 'base', b20ParAdresse);
+    return db[c.addr];
+  };
+
+  // CAS 1 — un token prefixe dont le classifieur a repondu: les quatre champs doivent etre sur la ligne.
+  const addr = '0xb200000000000000000000602c95f70b5d3aea2d';
+  const lu = inserer({ addr, sym: 'NAT', liq: 1 }, new Map([[addr,
+    { b20Check: 'ok', b20Kind: 'native_b20', b20CodeBytes: 1, b20ZeroRun: 0 }]]));
+  assert.equal(lu.b20Check, 'ok', 'la lecture B20 n\'atteint PAS la ligne creee — c\'est exactement la '
+    + 'panne du 2026-08-05, ou 0 token sur 1880 portait ce champ');
+  assert.equal(lu.b20Kind, 'native_b20', 'la CLASSE doit etre persistee, pas seulement le fait d\'avoir lu: '
+    + 'sans elle, tout rejeu doit redeviner le mecanisme depuis le prefixe d\'adresse');
+  assert.strictEqual(lu.b20CodeBytes, 1);
+  assert.strictEqual(lu.b20ZeroRun, 0);
+  assert.equal(lu.sym, 'NAT', 'la fusion ne doit pas ecraser les champs de base de la ligne');
+
+  // CAS 2 — un echec de lecture se persiste COMME echec, et ne se lit pas comme un controle reussi.
+  const rate = inserer({ addr, sym: 'NAT', liq: 1 }, new Map([[addr,
+    { b20Check: 'unread', b20CheckError: 'could not read contract code' }]]));
+  assert.equal(rate.b20Check, 'unread', 'une lecture ratee doit rester ratee sur la ligne');
+  assert.equal(rate.b20Kind, undefined, 'et ne porter AUCUNE classe: une classe sans lecture serait inventee');
+
+  // CAS 3 — LA BORNE. Un token non prefixe n'est jamais soumis au classifieur. L'absence de champ doit
+  // rester une absence: « pas de lecture tentee » ≠ « lecture tentee et ratee ». Sans ce cas, un merge
+  // qui ecrirait `b20Check: 'ok'` par defaut passerait les deux cas precedents.
+  const jamais = inserer({ addr: '0xdead0000000000000000000000000000beef0000', sym: 'ERC', liq: 1 }, new Map());
+  assert.equal(jamais.b20Check, undefined, 'un token jamais soumis au classifieur ne doit porter aucun '
+    + 'etat de lecture — sinon la base ne distingue plus « pas regarde » de « regarde »');
+  assert.equal(jamais.sym, 'ERC', 'et la ligne doit rester complete par ailleurs');
 });
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
