@@ -14,7 +14,10 @@ export PATH=/usr/local/bin:/usr/bin:/bin:${PATH:-}
 cd /mnt/d/Users/VolKov/veilleIA/biii || { echo "token-radar: cannot reach the repo — nothing ran."; exit 1; }
 
 . /root/.hermes-biii/scripts/verify-payload.sh
-verify_payload "/mnt/d/Users/VolKov/veilleIA/biii/hermes/economy/token-radar.js" || exit 1
+# Le journal vit dans le depot (lisible depuis Windows); le CODE vient de /root, hors de portee de /mnt/d.
+NOTE_REFUSAL_LOG=/mnt/d/Users/VolKov/veilleIA/biii/data/fleet-refusals.log
+. /root/.hermes-biii/scripts/note-refusal.sh
+verify_payload "/mnt/d/Users/VolKov/veilleIA/biii/hermes/economy/token-radar.js" || { note_refusal "token-radar" "payload non epingle"; exit 1; }
 node hermes/economy/token-radar.js
 radar_status=$?
 
