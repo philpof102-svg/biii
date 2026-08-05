@@ -39,6 +39,17 @@ const DATA_PATHS = [
    * meme lot que `tokens.json`: un chiffre tire d'observations ne veut rien dire sans la trace des
    * periodes ou l'on ne regardait pas. Son absence de cette liste bloquait TOUT le committeur. */
   'data/token-radar/blackouts.json',
+  /* Ajoute le 2026-08-05 AVANT que le fichier existe, et c'est deliberé: `hermes/economy/note-refusal.sh`
+   * ecrira ici la premiere fois qu'un wrapper de la flotte refusera de tourner. Sans cette ligne, ce
+   * journal rejouerait mot pour mot l'incident du 28/07 — un quatrieme fichier de donnees apparu sans
+   * etre epingle a bloque TOUT le committeur, de facon permanente, et 172 observations sont restees en
+   * base sans jamais partir.
+   *
+   * Contenu: trois champs par ligne — horodatage UTC, nom du job, raison du refus. Aucune cle, aucune
+   * adresse, aucun secret. Borne a 500 lignes par le script lui-meme (un volume plein a deja corrompu
+   * une base ici le 07/06). Il appartient au meme lot que `blackouts.json`: tous deux enregistrent des
+   * periodes ou l'on ne regardait PAS, et un chiffre tire d'observations ne vaut rien sans elles. */
+  'data/fleet-refusals.log',
 ];
 
 const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
