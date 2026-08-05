@@ -265,9 +265,31 @@ function main() {
 
   // THE GATES — a scam blessed (recall<1) or an ambiguous case waved through (failClosedHeld<1) is fatal.
   const gateBreach = [];
+  /* ⛔ UNE PORTE QUI TIENT SUR ZERO CAS NE TIENT RIEN. Les quatre metriques ci-dessus s'ecrivent
+   * `byLabel.X.total ? ok/total : 1`, donc un corpus vide rend 1 — un score PARFAIT tire d'aucune
+   * preuve. Vider les cas `negative` par une mauvaise edition ou un filtre laissait donc `recall=1`,
+   * les portes tenir, `npm test` vert, et le harnais imprimer « ✅ gates hold ».
+   *
+   * Ce depot connait deja la regle et l'applique ailleurs: test/suite-total.js refuse d'annoncer un
+   * total quand AUCUN bilan n'a ete reconnu, parce qu'un zero rendu par un outil qui n'a rien su lire
+   * n'est pas un zero du monde. Elle manquait a la garde qui protege les verdicts PAYANTS.
+   *
+   * Le plancher porte sur les trois labels a porte DURE. `positive` reste advisory — sa definition dit
+   * « should pass », pas « must » — mais son absence est signalee, car `positivesPayable: 1` publie
+   * dans policy.json serait autrement lu comme « les bons contreparties passent toutes ». */
+  for (const label of ['negative', 'failclosed', 'informative']) {
+    if (!r.byLabel[label].total) {
+      gateBreach.push('corpus vide pour `' + label + '`: la porte a tenu sur ZERO cas — '
+        + 'un score parfait sans preuve n est pas un succes, c est un instrument aveugle');
+    }
+  }
   if (r.recall < 1) gateBreach.push('recall on known-bad = ' + r.recall + ' (< 1.0): a flagged counterparty/asset was NOT caught');
   if (r.failClosedHeld < 1) gateBreach.push('fail-closed held = ' + r.failClosedHeld + ' (< 1.0): an ambiguous case became payable');
   if (r.signalsInformative < 1) gateBreach.push('signals informative = ' + r.signalsInformative + ' (< 1.0): a signal stopped distinguishing — a constant is not a measurement, it is an assertion');
+  if (!r.byLabel.positive.total) {
+    console.log('  ⚠️ aucun cas `positive`: positivesPayable=1 ne dit alors PAS que les bonnes '
+      + 'contreparties passent — il dit qu on n en a teste aucune.');
+  }
 
   if (check) {
     let drift = null;
