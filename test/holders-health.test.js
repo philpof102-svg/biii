@@ -291,6 +291,55 @@ t('un eth_blockNumber en erreur ne se poursuit pas sur une plage inventee', asyn
   assert.match(r.error, /syncing/);
 });
 
+/* ── CARACTERISATION: le seuil `> 80` implemente en fait `>= 81` ─────────────────────────────────
+ * ⛔ CE BLOC N'APPROUVE PAS LE COMPORTEMENT, IL LE FIGE. `top10Concentration` vaut
+ * `Number(top10Sum * 100n / totalSupply)`, une division ENTIERE sur BigInt: elle tronque toujours vers
+ * le bas. Un top 10 detenant reellement 80,90 % rend donc 80, et `80 > 80` est faux.
+ *
+ * Mesure du 2026-08-06, par le producteur:
+ *     concentration reelle 80,90 %  ->  rendu 80  ->  `> 80` NON  ->  rugScore  50
+ *     concentration reelle 81,00 %  ->  rendu 81  ->  `> 80` OUI  ->  rugScore 100
+ * Un dixieme de point de concentration separe 50 points de rugScore, et toute la bande
+ * [80,00 – 80,99] tombe du cote BAS. L'erreur va donc toujours vers le rassurant, sur un chemin qui
+ * alimente `till_vet_meme` — un tool payant.
+ *
+ * ⚠️ CE QUI N'EST PAS REVENDIQUE: le meme effet au seuil de 60. Deux fixtures construites pour lui sont
+ * tombees a 75 % de concentration, donc il n'est PAS mesure ici et ne doit pas etre suppose par
+ * symetrie.
+ *
+ * ⛔ POURQUOI CE N'EST PAS CORRIGE ICI: passer a deux decimales changerait un champ SERVI et
+ * deplacerait le rugScore de tokens reels. C'est un arbitrage produit, pas une divulgation. Ce test
+ * rend l'ecart visible et empeche qu'il bouge sans qu'on le sache. */
+const queueMint = (hauts, queue) => [
+  ...Array.from({ length: 10 }, (_, i) => mint(adr(i + 1), hauts)),
+  ...queue.map((v, i) => mint(adr(20 + i), v)),
+];
+
+t('★ CARACTERISATION: 80,90 % de concentration reelle ne declenche PAS le seuil `> 80`', () => {
+  // top 10 a 809 chacun = 8090 ; queue de trois porteurs PLUS PETITS totalisant 1910 ; total 10000.
+  const m = computeHealthMetrics(queueMint(809, [637, 637, 636]));
+  assert.strictEqual(m.holderCount, 13, 'la fixture doit poser 13 porteurs, sinon le top 10 n est pas celui qu on croit');
+  assert.strictEqual(m.top10Concentration, 80, 'la division entiere tronque 80,90 vers 80');
+  assert.strictEqual(m.top10Concentration > 80, false, 'et le seuil ne se declenche donc pas');
+  assert.strictEqual(m.rugScore, 50, 'le +50 de « tres concentre » est perdu');
+});
+
+t('★ le cas OPPOSE, un dixieme de point plus haut: le seuil se declenche et le score double', () => {
+  const m = computeHealthMetrics(queueMint(810, [634, 633, 633]));
+  assert.strictEqual(m.top10Concentration, 81);
+  assert.strictEqual(m.rugScore, 100, '81,00 % vaut 100 la ou 80,90 % vaut 50');
+});
+
+t('la fixture ne ment pas: le 11e porteur doit etre PLUS PETIT que le top 10', () => {
+  /* ⚠️ La premiere version de ces cas faisait du porteur de queue le PLUS GROS: il entrait donc dans le
+   * top 10, qui montait a 91,91 % au lieu des 80,90 % vises. La fixture fabriquait un autre cas que
+   * celui qu elle nommait. On asserte donc la propriete dont tout le reste depend. */
+  const m = computeHealthMetrics(queueMint(809, [637, 637, 636]));
+  const parts = m.top10Holders.map((h) => h.percent);
+  assert.strictEqual(m.top10Holders.length, 10);
+  assert.ok(parts.every((p) => p === parts[0]), 'les dix du top doivent etre a parts egales dans cette fixture');
+});
+
 (async () => {
   for (const [nom, fn] of files) {
     try { await fn(); pass++; console.log('  ok   ' + nom); }
