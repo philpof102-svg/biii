@@ -158,6 +158,49 @@ t('une carte `trop-peu` ne publie plus ses taux par la porte de derriere', () =>
   assert.strictEqual(r.dangerResolved, 5, 'le compte, lui, reste lisible');
 });
 
+/* ⛔ UN PARI GELE NE VAUT QUE SI SA VARIABLE GARDE SON SENS. Le texte de la regle est protege par un
+ * test; le LECTEUR qui produit sa variable ne l'etait pas. Mesure du 2026-08-06: `siblingCount` porte
+ * deux instruments depuis la pagination du 04/08, et 20 des 30 tokens comptes notes depuis l'annonce de
+ * `simulation-et-financeur-lu` viennent du nouveau. La carte ne le disait nulle part. */
+const compte = (t, n, pages) => Object.assign(t, pages === undefined
+  ? { siblingCount: n } : { siblingCount: n, siblingPagesRead: pages });
+
+t('★ deux lecteurs sous un seul nom de champ: la carte le DIT au lieu de lire une serie homogene', () => {
+  const vieux = faire(20, 10, 'XAP', 'rugged').map((t) => compte(t, 30));            // lecteur une page
+  const neufs = faire(20, 11, 'ZAP', 'live').map((t) => compte(t, 30, 6));           // lecteur pagine
+  const r = gradeAnnounced([...vieux, ...neufs], iso(T0 + 500 * H), { rules: [jouet], announced: annonce }).cards[0];
+  assert.strictEqual(r.instrumentsMelanges, true, 'deux instruments doivent etre signales');
+  assert.strictEqual(r.instruments['sibling:une-page'], 20);
+  assert.strictEqual(r.instruments['sibling:pagine'], 20);
+  assert.match(r.note, /PLUSIEURS INSTRUMENTS/);
+});
+
+t('★ le cas OPPOSE: un seul lecteur ne declenche AUCUN avertissement', () => {
+  const rows = [...faire(20, 10, 'XAP', 'rugged'), ...faire(20, 11, 'ZAP', 'live')].map((t) => compte(t, 30));
+  const r = gradeAnnounced(rows, iso(T0 + 500 * H), { rules: [jouet], announced: annonce }).cards[0];
+  assert.strictEqual(r.instrumentsMelanges, false, 'un seul instrument ne doit rien signaler');
+  assert.deepStrictEqual(Object.keys(r.instruments), ['sibling:une-page']);
+  assert.ok(!/PLUSIEURS INSTRUMENTS/.test(r.note), 'aucun avertissement ne doit apparaitre');
+});
+
+t('une regle qui n utilise PAS la variable n est pas accusee — aucun temoin, aucun melange', () => {
+  const rows = [...faire(20, 10, 'XAP', 'rugged'), ...faire(20, 11, 'ZAP', 'live')];   // sans siblingCount
+  const r = gradeAnnounced(rows, iso(T0 + 500 * H), { rules: [jouet], announced: annonce }).cards[0];
+  assert.deepStrictEqual(r.instruments, {}, 'sans la variable, il n y a pas d instrument a declarer');
+  assert.strictEqual(r.instrumentsMelanges, false);
+});
+
+t('les appels OUVERTS et les ABSTENTIONS n entrent pas au temoignage', () => {
+  // 20 notes au lecteur une page + 20 tokens JAMAIS reobserves (ouverts) au lecteur pagine.
+  const notes = faire(20, 10, 'XAP', 'rugged').map((t) => compte(t, 30));
+  const ouverts = faire(20, 11, 'ZAP', 'live').map((t) => compte(t, 30, 6));
+  for (const t of ouverts) t.lastSeen = t.firstSeen;      // vu une fois, jamais revu -> non tranche
+  const r = gradeAnnounced([...notes, ...ouverts], iso(T0 + 500 * H), { rules: [jouet], announced: annonce }).cards[0];
+  assert.strictEqual(r.safeOpen, 20, 'la fixture doit produire des appels OUVERTS, sinon le test ne dit rien');
+  assert.strictEqual(r.instrumentsMelanges, false, 'un appel ouvert ne salit aucun taux publie');
+  assert.strictEqual(r.instruments['sibling:pagine'], undefined);
+});
+
 t('★ une annonce sans regle vivante est NOMMEE, jamais sautee en silence', () => {
   const c = gradeAnnounced([], iso(T0 + 500 * H),
     { rules: [jouet], announced: [{ key: 'disparue', label: 'disparue', announcedAt: iso(T0), predicted: {}, basis: {}, note: 'x' }] });
