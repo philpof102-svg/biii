@@ -201,6 +201,51 @@ t('les appels OUVERTS et les ABSTENTIONS n entrent pas au temoignage', () => {
   assert.strictEqual(r.instruments['sibling:pagine'], undefined);
 });
 
+/* ⛔ UN ECART CONTRE LE PARI N'EST PAS UN ECART CONTRE LE HASARD. Mesure du 2026-08-06: la base de la
+ * population eligible valait 97,2 % quand celle de la base entiere valait 83,3 %. Les quatre cotes
+ * publiables du bulletin affichaient des ecarts de +9 a +22 points « en faveur du pari » et etaient
+ * tous a −0,7 / +0,0 point contre le hasard. Le monde etait devenu plus dangereux; aucune regle
+ * n'avait rien prouve. */
+t('★ quand TOUT rugge, l ecart contre le PARI est grand et l ecart contre la BASE est nul', () => {
+  const rows = [...faire(20, 10, 'XAP', 'rugged'), ...faire(20, 11, 'ZAP', 'rugged')];
+  const r = gradeAnnounced(rows, iso(T0 + 500 * H), { rules: [jouet], announced: annonce }).cards[0];
+  assert.strictEqual(r.baseRateJuge, 1, 'les 40 appels notes ont tous rugge');
+  assert.strictEqual(r.baseRateJugeN, 40);
+  assert.ok(r.deltaPts.danger > 0, 'contre le pari a 90 %, un 100 % observe donne un ecart POSITIF');
+  assert.strictEqual(r.deltaVsBase.danger, 0, 'contre le hasard, la regle n a rien separe');
+  assert.strictEqual(r.deltaVsBase.safe, 0);
+});
+
+t('★ le cas OPPOSE: une regle qui separe VRAIMENT sort un ecart contre la base', () => {
+  const rows = [...faire(20, 10, 'XAP', 'rugged'), ...faire(20, 11, 'ZAP', 'live')];
+  const r = gradeAnnounced(rows, iso(T0 + 500 * H), { rules: [jouet], announced: annonce }).cards[0];
+  assert.strictEqual(r.baseRateJuge, 0.5, '20 rugs sur 40 appels notes');
+  assert.strictEqual(r.deltaVsBase.danger, 50, 'un cote danger a 100 % contre une base a 50 %');
+  assert.strictEqual(r.deltaVsBase.safe, -50, 'et un cote sur a 0 %, dans le bon sens');
+});
+
+t('la base se calcule sur les appels NOTES — une abstention n entre pas dans le denominateur', () => {
+  /* Une regle qui s abstient sur les 'QQQ'. Si la base les comptait, elle vaudrait autre chose que
+   * le taux des appels reellement notes, et comparer un taux de regle a une base calculee sur une
+   * AUTRE population est exactement la facon dont une regle a l air bonne gratuitement. */
+  const abstenante = { key: 'jouet', label: 'jouet',
+    predict: (t2) => (String(t2.sym).startsWith('Q') ? ABSTAIN : String(t2.sym).startsWith('X') ? DANGER : SAFE) };
+  const rows = [...faire(20, 10, 'XAP', 'rugged'), ...faire(20, 11, 'ZAP', 'live'),
+    ...faire(40, 12, 'QQQ', 'rugged')];
+  const r = gradeAnnounced(rows, iso(T0 + 500 * H), { rules: [abstenante], announced: annonce }).cards[0];
+  assert.strictEqual(r.abstained, 40, 'la fixture doit produire des abstentions, sinon le test ne dit rien');
+  assert.strictEqual(r.baseRateJugeN, 40, 'seuls les 40 appels notes entrent au denominateur');
+  assert.strictEqual(r.baseRateJuge, 0.5, 'les 40 rugs sur lesquels on s est abstenu ne gonflent pas la base');
+});
+
+t('sous le plancher, la base est retenue comme les autres taux', () => {
+  const rows = [...faire(5, 10, 'XAP', 'rugged'), ...faire(5, 11, 'ZAP', 'live')];
+  const r = gradeAnnounced(rows, iso(T0 + 500 * H), { rules: [jouet], announced: annonce }).cards[0];
+  assert.strictEqual(r.verdict, 'trop-peu');
+  assert.strictEqual(r.baseRateJuge, null, 'une base sur 10 appels ne se publie pas non plus');
+  assert.strictEqual(r.baseRateJugeN, 10, 'mais son compte reste lisible');
+});
+
 t('★ une annonce sans regle vivante est NOMMEE, jamais sautee en silence', () => {
   const c = gradeAnnounced([], iso(T0 + 500 * H),
     { rules: [jouet], announced: [{ key: 'disparue', label: 'disparue', announcedAt: iso(T0), predicted: {}, basis: {}, note: 'x' }] });

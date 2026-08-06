@@ -44,9 +44,18 @@ for (const r of c.cards) {
       + ` sur ${pc(r.observed.safeRate)} sur n=${String(r.safeResolved).padEnd(4)}`
       + `  (${r.dangerOpen}+${r.safeOpen} ouverts, ${r.abstained} abstentions)`);
   }
+  /* ⚠️ LA BASE DE LA POPULATION JUGEE S'AFFICHE AVANT TOUT ECART. Le 2026-08-06 elle valait 97,2 %
+   * quand celle de la base entiere valait 83,3 %: un « +10,9 pts en faveur du pari » y devenait
+   * −0,9 pt contre le hasard. Sans cette ligne, le lecteur compare a un chiffre qu'il n'a pas. */
+  if (r.baseRateJuge != null) {
+    console.log(`     BASE    ${pc(r.baseRateJuge)} sur n=${r.baseRateJugeN}   <- taux de rug des appels REELLEMENT notes`);
+  }
   // Une ligne d'ecart entierement `n/a` n'affirme rien: on la tait plutot que de meubler.
   if (r.deltaPts && (r.deltaPts.danger != null || r.deltaPts.safe != null)) {
-    console.log(`     ECART   danger ${signe(r.deltaPts.danger)}   sur ${signe(r.deltaPts.safe)}`);
+    console.log(`     vs PARI danger ${signe(r.deltaPts.danger)}   sur ${signe(r.deltaPts.safe)}`);
+  }
+  if (r.deltaVsBase && (r.deltaVsBase.danger != null || r.deltaVsBase.safe != null)) {
+    console.log(`     vs BASE danger ${signe(r.deltaVsBase.danger)}   sur ${signe(r.deltaVsBase.safe)}   <- bat-elle le hasard ICI ?`);
   }
   for (const m of r.tropMince || []) console.log(`     ⚠️ RETENU  ${m}`);
   console.log(`     ${r.note}\n`);
