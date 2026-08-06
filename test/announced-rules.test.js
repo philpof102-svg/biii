@@ -122,6 +122,42 @@ t('★ au-dela du seuil, le pari est note et l ECART se lit', () => {
   assert.strictEqual(r.observed.safeRate, 0, 'aucun ZAP n a rugge');
 });
 
+/* ⛔ LE DEFAUT MESURE LE 2026-08-06, REPRODUIT ICI. Le garde `total < 20` sommait les deux cotes. Une
+ * carte a 19 appels danger et 2 appels sur totalisait 21, franchissait la porte, et publiait un taux
+ * SUR calcule sur DEUX tokens — avec un ecart en points a cote, presente comme les autres. Sur le
+ * bulletin reel: trois ecarts sur n=2, n=4 et n=6, plus le pari phare a « 0,0 % » sur n=1. */
+t('★ 19 danger + 2 sur totalisent 21: la carte passe, et le cote a DEUX appels reste retenu', () => {
+  const rows = [...faire(19, 10, 'XAP', 'rugged'), ...faire(2, 10, 'ZAP', 'live')];
+  const r = gradeAnnounced(rows, iso(T0 + 500 * H), { rules: [jouet], announced: annonce }).cards[0];
+  assert.strictEqual(r.verdict, 'note', 'la somme franchit bien 20 — c est precisement le piege');
+  assert.strictEqual(r.dangerResolved, 19);
+  assert.strictEqual(r.safeResolved, 2);
+  assert.strictEqual(r.observed.safeRate, null, 'un taux sur DEUX tokens ne doit pas sortir');
+  assert.strictEqual(r.observed.dangerRate, null, '19 non plus — le plancher vaut pour les deux cotes');
+  assert.strictEqual(r.deltaPts.safe, null, 'aucun ecart ne se derive d un taux retenu');
+  assert.strictEqual(r.deltaPts.danger, null);
+  assert.strictEqual(r.tropMince.length, 2, 'les DEUX cotes retenus doivent se nommer');
+});
+
+t('★ le cas OPPOSE: a 20 appels de chaque cote, les deux taux et les deux ecarts sortent', () => {
+  const rows = [...faire(20, 10, 'XAP', 'rugged'), ...faire(20, 10, 'ZAP', 'live')];
+  const r = gradeAnnounced(rows, iso(T0 + 500 * H), { rules: [jouet], announced: annonce }).cards[0];
+  assert.strictEqual(r.observed.dangerRate, 1, 'les 20 XAP ont tous rugge');
+  assert.strictEqual(r.observed.safeRate, 0, 'aucun des 20 ZAP n a rugge');
+  assert.ok(r.deltaPts.danger != null && r.deltaPts.safe != null, 'les ecarts doivent revenir');
+  assert.deepStrictEqual(r.tropMince, [], 'plus rien n est retenu');
+});
+
+t('une carte `trop-peu` ne publie plus ses taux par la porte de derriere', () => {
+  // 5+5 = 10 resolus: verdict `trop-peu`, mais l ancienne branche sortait quand meme les deux ratios.
+  const rows = [...faire(5, 10, 'XAP', 'rugged'), ...faire(5, 10, 'ZAP', 'live')];
+  const r = gradeAnnounced(rows, iso(T0 + 500 * H), { rules: [jouet], announced: annonce }).cards[0];
+  assert.strictEqual(r.verdict, 'trop-peu');
+  assert.strictEqual(r.observed.dangerRate, null, 'un verdict « aucune conclusion » ne publie pas un taux');
+  assert.strictEqual(r.observed.safeRate, null);
+  assert.strictEqual(r.dangerResolved, 5, 'le compte, lui, reste lisible');
+});
+
 t('★ une annonce sans regle vivante est NOMMEE, jamais sautee en silence', () => {
   const c = gradeAnnounced([], iso(T0 + 500 * H),
     { rules: [jouet], announced: [{ key: 'disparue', label: 'disparue', announcedAt: iso(T0), predicted: {}, basis: {}, note: 'x' }] });

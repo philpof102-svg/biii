@@ -33,10 +33,14 @@ if (c.orderBreaches || c.firstOfFunderWithPriorSiblings) {
 
 const pc = (x) => (x == null ? '  n/a' : (x * 100).toFixed(1).padStart(5) + '%');
 console.log(`\n  ── les regles, notees vers l avant ──`);
-console.log(`    ${'regle'.padEnd(46)} ${'prec'.padStart(6)} ${'safe'.padStart(6)} ${'rappel'.padStart(6)} ${'marque'.padStart(6)}   n  (ouv/abst)`);
+/* ⚠️ La colonne `n` ne portait QUE `dangerResolved`, collee a quatre taux dont deux ne s'appuient pas
+ * dessus. Le 2026-08-06 `funder-derived-uncensored` affichait « safe 100,0 % » a cote d'un n de 687,
+ * alors que ce 100 % reposait sur UN token: le denominateur du taux sur n'etait affiche nulle part. */
+console.log(`    ${'regle'.padEnd(46)} ${'prec'.padStart(6)} ${'safe'.padStart(6)} ${'rappel'.padStart(6)} ${'marque'.padStart(6)}   nDgr  nSur (ouv/abst)`);
 for (const r of c.cards) {
   const marque = r.derived ? '📐' : r.isStatic ? '🧱' : '✋';
-  console.log(`    ${marque} ${r.label.slice(0, 43).padEnd(44)} ${pc(r.precision)} ${pc(r.safeRugRate)} ${pc(r.recall)} ${pc(r.markedShare)}   ${String(r.dangerResolved).padStart(4)}  (${r.dangerOpen}/${r.abstained})`);
+  console.log(`    ${marque} ${r.label.slice(0, 43).padEnd(44)} ${pc(r.precision)} ${pc(r.safeRugRate)} ${pc(r.recall)} ${pc(r.markedShare)}   ${String(r.dangerResolved).padStart(4)}  ${String(r.safeResolved).padStart(4)}  (${r.dangerOpen}/${r.abstained})`);
+  for (const m of r.tropMince || []) console.log(`        ⚠️ RETENU ${m}`);
   // Le seuil derive doit se montrer. S'il converge vers celui qu'on a choisi a la main, la regle
   // « independante » est la meme regle, et le controle qu'on croyait exercer n'existe pas.
   if (r.thresholdMedian != null) {

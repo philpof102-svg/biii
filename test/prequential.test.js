@@ -12,7 +12,8 @@
  * resolue n'est ni une reussite ni un echec, et une abstention n'est pas un verdict « sur ».
  */
 const assert = require('node:assert');
-const { runPrequential, outcomeKnownAt, DANGER, SAFE, ABSTAIN } = require('../lib/prequential');
+const { runPrequential, outcomeKnownAt, tauxPublie, MIN_RESOLUS,
+  DANGER, SAFE, ABSTAIN } = require('../lib/prequential');
 
 let pass = 0, fail = 0;
 const t = (name, fn) => { try { fn(); pass++; console.log('  ok   ' + name); }
@@ -166,6 +167,73 @@ t('une ligne sans firstSeen lisible est ecartee de la marche, pas jugee au hasar
   const rows = jeu().concat([{ addr: '0xbad', firstSeen: 'pas une date', outcome: 'rugged' }]);
   const c = runPrequential(rows, iso(T0 + 100 * H), { rules: [{ key: 'x', label: 'x', predict: () => DANGER }] });
   assert.strictEqual(c.tokensWalked, 4, 'la ligne illisible ne doit pas entrer dans la marche');
+});
+
+/* ── le plancher par COTE ────────────────────────────────────────────────────────────────────────
+ * Mesure du 2026-08-06: `runPrequential` publiait « 100 % des appels SUR ont rugge » sur UN token, et
+ * l'afficheur montrait a cote le denominateur de l'AUTRE cote (687). Le taux etait faux au sens ou il
+ * n'etait pas une mesure, et rien dans la sortie ne permettait de s'en apercevoir.
+ *
+ * ⚠️ CES CAS DOIVENT ETRE OPPOSES. Un test qui ne verifie que le cote retenu passerait aussi sur un
+ * garde qui retient TOUT — une sortie constante n'est pas une mesure. La borne 19/20 voyage donc avec
+ * le chiffre: 19 doit etre refuse ET 20 doit etre publie, dans le meme test. */
+console.log('\nplancher par cote: un taux ne se publie pas sur un denominateur trop mince');
+
+t('★ tauxPublie distingue TROIS etats — rien a mesurer, trop mince, publiable', () => {
+  const vide = tauxPublie(0, 0);
+  assert.strictEqual(vide.rate, null);
+  assert.strictEqual(vide.withheld, false, 'zero appel n est pas un retrait: il n y a rien a retenir');
+  assert.match(vide.reason, /rien a mesurer/);
+
+  const mince = tauxPublie(1, MIN_RESOLUS - 1);
+  assert.strictEqual(mince.rate, null, 'un taux sur 19 appels ne doit pas sortir');
+  assert.strictEqual(mince.withheld, true);
+  assert.strictEqual(mince.n, MIN_RESOLUS - 1, 'le compte reste lisible meme quand le taux est retenu');
+
+  const publie = tauxPublie(10, MIN_RESOLUS);
+  assert.strictEqual(publie.rate, 0.5, 'a 20 appels le taux sort — sinon le garde retient tout');
+  assert.strictEqual(publie.withheld, false);
+  assert.strictEqual(publie.reason, null);
+});
+
+/** n tokens resolus, moitie d'un cote: `sym` decide la prediction, `outcome` decide l'issue.
+ *  Un survivant porte un `lastSeen` tres posterieur — depuis le durcissement d'`outcomeKnownAt`,
+ *  vieillir ne suffit plus, il faut avoir ete VU vivant a un age >= maturite. */
+const lot = (n, sym, outcome, decalage) => Array.from({ length: n }, (_, i) => {
+  const vu = T0 + decalage * H + i * 1000;
+  return { addr: '0x' + sym + decalage + '_' + i, sym, firstSeen: iso(vu),
+    lastSeen: iso(outcome === 'rugged' ? vu + H : vu + 4000 * H),
+    outcome, ruggedAt: outcome === 'rugged' ? iso(vu + H) : undefined };
+});
+const parSymbole = { key: 'k', label: 'k', predict: (x) => (x.sym === 'D' ? DANGER : SAFE) };
+
+t('★ le cote MINCE est retenu pendant que le cote FOURNI est publie — dans la meme carte', () => {
+  // 30 appels danger (tous rugges) et 19 appels sur: un seul cote franchit le plancher.
+  const rows = [...lot(30, 'D', 'rugged', 1), ...lot(19, 'S', 'live', 2)];
+  const c = runPrequential(rows, iso(T0 + 5000 * H), { rules: [parSymbole] });
+  const carte = c.cards[0];
+  assert.strictEqual(carte.dangerResolved, 30);
+  assert.strictEqual(carte.safeResolved, 19, 'la fixture doit poser 19 appels sur, sinon le test ne dit rien');
+  assert.strictEqual(carte.precision, 1, 'le cote fourni DOIT sortir — un garde qui retient tout ne mesure rien');
+  assert.strictEqual(carte.safeRugRate, null, 'un taux sur 19 appels ne doit pas sortir');
+  assert.strictEqual(carte.tropMince.length, 1, 'un seul cote est retenu, et il doit se nommer');
+  assert.match(carte.tropMince[0], /^safeRugRate: 19 appel/);
+});
+
+t('★ a 20 appels le meme cote se publie — la borne voyage avec le chiffre', () => {
+  const rows = [...lot(30, 'D', 'rugged', 1), ...lot(20, 'S', 'live', 2)];
+  const carte = runPrequential(rows, iso(T0 + 5000 * H), { rules: [parSymbole] }).cards[0];
+  assert.strictEqual(carte.safeResolved, 20);
+  assert.strictEqual(carte.safeRugRate, 0, 'aucun appel sur n a rugge, et 20 suffit pour le dire');
+  assert.deepStrictEqual(carte.tropMince, [], 'plus rien ne doit etre retenu');
+});
+
+t('la PREUVE BRUTE survit au retrait — retenir le taux n est pas effacer les comptes', () => {
+  const rows = [...lot(30, 'D', 'rugged', 1), ...lot(3, 'S', 'rugged', 2)];
+  const carte = runPrequential(rows, iso(T0 + 5000 * H), { rules: [parSymbole] }).cards[0];
+  assert.strictEqual(carte.safeRugRate, null, 'le taux est retenu');
+  assert.strictEqual(carte.safeRugged, 3, 'le numerateur reste lisible');
+  assert.strictEqual(carte.safeResolved, 3, 'le denominateur reste lisible');
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -25,17 +25,30 @@ const pc = (x) => (x == null ? '   n/a' : (x * 100).toFixed(1).padStart(5) + '%'
 const signe = (x) => (x == null ? '   n/a' : (x >= 0 ? '+' : '') + x.toFixed(1) + ' pts');
 
 for (const r of c.cards) {
-  const etat = r.verdict === 'note' ? '📊' : r.verdict === 'trop-peu' ? '⏳' : r.verdict === 'regle-introuvable' ? '⛔' : '🕐';
+  /* Une carte peut porter le verdict `note` et ne publier AUCUN taux, si ses deux cotes sont trop
+   * minces. L'icone suit ce qui est reellement sorti, pas le verdict: afficher 📊 « note » au-dessus de
+   * deux `n/a` ferait lire un resultat la ou il n'y en a pas. Le champ `verdict` lui-meme est intact. */
+  const rienPublie = r.observed && r.observed.dangerRate == null && r.observed.safeRate == null;
+  const etat = r.verdict === 'regle-introuvable' ? '⛔'
+    : r.verdict === 'pas-encore-notable' ? '🕐'
+      : (r.verdict === 'trop-peu' || rienPublie) ? '⏳' : '📊';
   console.log(`  ${etat} ${r.label}`);
   console.log(`     annoncee le ${r.announcedAt}  ·  eligibles depuis : ${r.eligible == null ? 'n/a' : r.eligible}`);
   if (r.predicted) {
     console.log(`     PARI    danger ${pc(r.predicted.dangerRate)}   sur ${pc(r.predicted.safeRate)}`);
   }
+  /* Chaque taux porte SON denominateur, colle a lui. La version precedente affichait « 19+2 resolus »
+   * une fois, en bout de ligne, pour deux taux: rien ne disait lequel des deux reposait sur 2 appels. */
   if (r.observed) {
-    console.log(`     OBSERVE danger ${pc(r.observed.dangerRate)}   sur ${pc(r.observed.safeRate)}`
-      + `   (${r.dangerResolved}+${r.safeResolved} resolus, ${r.dangerOpen + r.safeOpen} ouverts, ${r.abstained} abstentions)`);
+    console.log(`     OBSERVE danger ${pc(r.observed.dangerRate)} sur n=${String(r.dangerResolved).padEnd(4)}`
+      + ` sur ${pc(r.observed.safeRate)} sur n=${String(r.safeResolved).padEnd(4)}`
+      + `  (${r.dangerOpen}+${r.safeOpen} ouverts, ${r.abstained} abstentions)`);
   }
-  if (r.deltaPts) console.log(`     ECART   danger ${signe(r.deltaPts.danger)}   sur ${signe(r.deltaPts.safe)}`);
+  // Une ligne d'ecart entierement `n/a` n'affirme rien: on la tait plutot que de meubler.
+  if (r.deltaPts && (r.deltaPts.danger != null || r.deltaPts.safe != null)) {
+    console.log(`     ECART   danger ${signe(r.deltaPts.danger)}   sur ${signe(r.deltaPts.safe)}`);
+  }
+  for (const m of r.tropMince || []) console.log(`     ⚠️ RETENU  ${m}`);
   console.log(`     ${r.note}\n`);
 }
 
