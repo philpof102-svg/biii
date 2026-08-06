@@ -861,18 +861,56 @@ async function callTool(name, a = {}) {
 async function handleRpc(m) {
   if (m === null || typeof m !== 'object' || Array.isArray(m)) return null;
   const { id, method, params } = m;
-  const isNotification = id == null;
+  /* JSON-RPC distinguishes THREE states here, and `id == null` flattened the first two into one:
+   *   no `id` member at all -> a NOTIFICATION. Never answer it.
+   *   `id: null`            -> a request. Discouraged by the spec, but legal, and it wants an answer.
+   *   a real id             -> a request.
+   * Measured 2026-08-06 under the old test: `{jsonrpc,id:null,method:'tools/list'}` was answered (the
+   * tools/list branch returned before the check) while `{jsonrpc,id:null,method:'nope'}` was silently
+   * dropped — the same caller treated as a request or as a notification depending on which branch it hit. */
+  const isNotification = !('id' in m);
+  const reply = (body) => (isNotification ? null : { jsonrpc: '2.0', id, ...body });
   try {
-    if (method === 'initialize') return { jsonrpc: '2.0', id, result: {
+    if (method === 'initialize') return reply({ result: {
       protocolVersion: '2024-11-05', capabilities: { tools: {} },
-      serverInfo: { name: 'biii', version: '0.1.0' } } };
-    if (method === 'tools/list') return { jsonrpc: '2.0', id, result: { tools: TOOLS } };
+      serverInfo: { name: 'biii', version: '0.1.0' } } });
+    if (method === 'tools/list') return reply({ result: { tools: TOOLS } });
+    // `ping` is a spec-required utility that MUST answer with an empty result. It used to work only by
+    // falling through to the catch-all below; now that unknown methods are refused, it is handled ON
+    // PURPOSE. Measured before the change: nothing in this repo implemented it.
+    if (method === 'ping') return reply({ result: {} });
     if (method === 'tools/call') {
-      const out = await callTool(params.name, params.arguments || {});
-      return { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(out) }] } };
+      /* VALIDATE THE ENVELOPE BEFORE CLAIMING ANYTHING ABOUT A TOOL — the previous fix left this hole.
+       * Measured 2026-08-06: `{method:'tools/call'}` with NO params made `params.name` throw a TypeError,
+       * which does not match /^unknown tool /, so it fell to the generic branch and answered
+       *   -32000  tool "undefined" failed — it exists and was reached
+       * No name was supplied, so nothing existed and nothing was reached. The branch written to STOP a
+       * false attribution was itself making one. -32602 is the spec's code for exactly this. */
+      /* NOTE — a mutation SURVIVES on this line, diagnosed 2026-08-06, do not "fill the hole": replacing it
+       * with `params || null` changes no outcome, because a primitive's `.name` and an array's `.name` are
+       * both undefined and the string check below then refuses all the same. It is defence in depth, not a
+       * load-bearing guard. Left in for the reader; the refusal is enforced one line down. */
+      const p = (params && typeof params === 'object' && !Array.isArray(params)) ? params : null;
+      const name = p && p.name;
+      if (typeof name !== 'string' || name === '') {
+        return reply({ error: { code: -32602, message:
+          'tools/call needs a params.name string naming the tool. None was supplied, so no tool was looked '
+          + 'up — this says nothing about whether any tool exists. Call tools/list for the current set.' } });
+      }
+      const args = (p.arguments && typeof p.arguments === 'object') ? p.arguments : {};
+      const out = await callTool(name, args);
+      return reply({ result: { content: [{ type: 'text', text: JSON.stringify(out) }] } });
     }
     if (isNotification) return null;                       // notifications/initialized etc. — no reply
-    return { jsonrpc: '2.0', id, result: {} };             // unknown method with an id — ack quietly
+    /* AN UNIMPLEMENTED METHOD IS NOT AN EMPTY ONE. This returned `result: {}` — a SUCCESS. Measured
+     * 2026-08-06: `prompts/list`, `resources/list` and `wharrgarbl` were all answered
+     * `{"jsonrpc":"2.0","id":N,"result":{}}`, so a client asking what prompts this server offers was told
+     * "none" when the truth is that prompts were never implemented. An absence became an affirmation, and
+     * a conformance probe reading it would record a malformed success instead of a clean refusal.
+     * This is the same distinction the unknown-TOOL branch below already draws, one branch away. */
+    return reply({ error: { code: -32601, message:
+      `method "${method}" is not implemented on this server — it is not empty, it is absent. `
+      + `This server implements initialize, tools/list, tools/call and ping.` } });
   } catch (e) {
     try { console.error('[biii-mcp]', method, '·', (e && (e.stack || e.message)) || e); } catch { /* log must not throw */ }
     if (isNotification) return null;
