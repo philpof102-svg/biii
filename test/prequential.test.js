@@ -236,5 +236,58 @@ t('la PREUVE BRUTE survit au retrait — retenir le taux n est pas effacer les c
   assert.strictEqual(carte.safeResolved, 3, 'le denominateur reste lisible');
 });
 
+/* ── le badge `derived` doit etre MERITE ────────────────────────────────────────────────────────
+ * Clause 2 du protocole: un seuil pose a la main ne prouve rien et doit etre etiquete plutot que
+ * melange aux derives. Un seuil derive qui ne bouge jamais est arithmetiquement un seuil pose a la
+ * main — en pire, puisque personne ne l'a choisi et que personne ne peut donc le defendre. Les DEUX
+ * regles derivees du jeu etaient dans cet etat le 2026-08-06, figees a 50 et a 1. */
+console.log('\nle badge derive se merite: un seuil qui ne bouge jamais se dit');
+
+/** n tokens espaces d'une heure, chacun RUGGE presque aussitot.
+ *
+ * ⚠️ Ils sont rugges DELIBEREMENT, et la premiere version de cette fixture ne l'etait pas. Un token
+ * 'live' n'entre dans l'historique connu qu'une fois la fenetre de maturite passee, si bien que `hist`
+ * restait vide et qu'un seuil derive de `hist.length` valait zero partout — la fixture fabriquait le
+ * seuil constant qu'elle devait servir de contre-exemple. Un rug porte `ruggedAt`: il est tranche des
+ * l'instant de sa mort, donc l'historique grandit reellement d'un token a l'autre. */
+const jeuLong = (n) => Array.from({ length: n }, (_, i) => ({
+  addr: '0x' + i, firstSeen: iso(T0 + i * H), lastSeen: iso(T0 + i * H + H / 10),
+  outcome: 'rugged', ruggedAt: iso(T0 + i * H + H / 10), k: i,
+}));
+
+t('★ un seuil derive CONSTANT est denonce, badge et dementi cote a cote', () => {
+  const fige = { key: 'f', label: 'f', derived: true,
+    threshold: () => 7, predict: () => DANGER };
+  const carte = runPrequential(jeuLong(30), iso(T0 + 5000 * H), { rules: [fige] }).cards[0];
+  assert.strictEqual(carte.derived, true, 'la regle continue de decrire son mecanisme');
+  assert.strictEqual(carte.thresholdMin, 7);
+  assert.strictEqual(carte.thresholdMax, 7);
+  assert.ok(carte.thresholdFige, 'un seuil qui ne bouge jamais doit etre nomme');
+  assert.match(carte.thresholdFige, /ecrasee/);
+});
+
+t('★ le cas OPPOSE: un seuil qui VARIE ne declenche aucun dementi', () => {
+  // Le seuil suit la taille de l'historique, donc il bouge a chaque token.
+  const vivant = { key: 'v', label: 'v', derived: true,
+    threshold: (hist) => hist.length, predict: () => DANGER };
+  const carte = runPrequential(jeuLong(30), iso(T0 + 5000 * H), { rules: [vivant] }).cards[0];
+  assert.ok(carte.thresholdMax > carte.thresholdMin, 'la fixture doit produire un seuil qui bouge');
+  assert.strictEqual(carte.thresholdFige, null, 'un seuil derive qui bouge ne doit rien declencher');
+});
+
+t('une regle a seuil POSE A LA MAIN n est pas accusee — elle ne revendique rien', () => {
+  const main = { key: 'm', label: 'm', threshold: () => 7, predict: () => DANGER };   // pas de `derived`
+  const carte = runPrequential(jeuLong(30), iso(T0 + 5000 * H), { rules: [main] }).cards[0];
+  assert.strictEqual(carte.derived, false);
+  assert.strictEqual(carte.thresholdFige, null, 'sans revendication, il n y a rien a dementir');
+});
+
+t('sous quatre lectures, on ne juge pas le seuil — trop peu pour dire qu il est fige', () => {
+  const fige = { key: 'f', label: 'f', derived: true, threshold: () => 7, predict: () => DANGER };
+  const carte = runPrequential(jeuLong(3), iso(T0 + 5000 * H), { rules: [fige] }).cards[0];
+  assert.ok(carte.thresholdMin != null, 'la fixture doit bien produire quelques lectures');
+  assert.strictEqual(carte.thresholdFige, null, 'trois lectures ne suffisent pas a conclure');
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exitCode = 1;

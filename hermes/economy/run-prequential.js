@@ -46,6 +46,9 @@ for (const r of c.cards) {
   if (r.thresholdMedian != null) {
     console.log(`        seuil derive : min ${r.thresholdMin} · median ${r.thresholdMedian} · max ${r.thresholdMax}`);
   }
+  /* Les trois bornes etaient deja imprimees, et lire « min 50 · median 50 · max 50 » demandait au
+   * lecteur de conclure lui-meme. Le dementi se dit maintenant en toutes lettres, a cote du badge 📐. */
+  if (r.thresholdFige) console.log(`        ⛔ SEUIL FIGE — ${r.thresholdFige}`);
 }
 console.log(`\n    📐 seuil DERIVE du passe   ✋ seuil choisi a la main   🧱 trait statique (le rejeu ne prouve rien)`);
 console.log(`    prec = part des appels DANGER qui ont rugge · safe = part des appels SAFE qui ont rugge`);
