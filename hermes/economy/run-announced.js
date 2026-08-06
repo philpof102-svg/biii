@@ -56,6 +56,14 @@ for (const r of c.cards) {
   }
   if (r.deltaVsBase && (r.deltaVsBase.danger != null || r.deltaVsBase.safe != null)) {
     console.log(`     vs BASE danger ${signe(r.deltaVsBase.danger)}   sur ${signe(r.deltaVsBase.safe)}   <- bat-elle le hasard ICI ?`);
+    /* Le plafond, colle a l ecart. Sans lui, un +0,0 sur une population qui rugge a 100 % se lit comme
+     * un echec de la regle alors qu aucune regle ne pouvait y montrer autre chose. */
+    if (r.plafondEcart) {
+      const mort = r.plafondEcart.danger === 0;
+      console.log(`     PLAFOND danger ${signe(r.plafondEcart.danger)}   sur ${signe(r.plafondEcart.safe)}`
+        + (mort ? '   ⛔ plafond NUL: cette population ne peut RIEN prouver, dans aucun sens'
+          : '   <- le maximum atteignable sur cette population'));
+    }
   }
   for (const m of r.tropMince || []) console.log(`     ⚠️ RETENU  ${m}`);
   console.log(`     ${r.note}\n`);

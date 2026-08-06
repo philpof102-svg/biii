@@ -246,6 +246,35 @@ t('sous le plancher, la base est retenue comme les autres taux', () => {
   assert.strictEqual(r.baseRateJugeN, 10, 'mais son compte reste lisible');
 });
 
+/* ⛔ UN ECART DE ZERO N'EST PAS UN ECHEC SI LE PLAFOND EST ZERO. Sur les 26 appels notes de
+ * `owner-renounced` le 2026-08-06, 26 avaient rugge: aucune regle, si parfaite soit-elle, ne pouvait
+ * y montrer un ecart. Publier l'ecart sans le plafond accuse une regle d'un resultat que la population
+ * rendait impossible — le miroir exact du sur-claim, et tout aussi faux. */
+t('★ base a 100 % -> le plafond est NUL et le dit: rien n est prouvable dans aucun sens', () => {
+  const rows = [...faire(20, 10, 'XAP', 'rugged'), ...faire(20, 11, 'ZAP', 'rugged')];
+  const r = gradeAnnounced(rows, iso(T0 + 500 * H), { rules: [jouet], announced: annonce }).cards[0];
+  assert.strictEqual(r.baseRateJuge, 1);
+  assert.strictEqual(r.plafondEcart.danger, 0, 'a 100 % de base, aucun ecart danger n est atteignable');
+  assert.strictEqual(r.deltaVsBase.danger, 0, 'et l ecart observe vaut donc zero, sans que ce soit un echec');
+  assert.strictEqual(r.plafondEcart.safe, -100, 'un cote sur parfait ruggerait a 0 %, soit -100 points');
+});
+
+t('★ le cas OPPOSE: une base a 50 % laisse un plafond de 50 points, et la regle le prend', () => {
+  const rows = [...faire(20, 10, 'XAP', 'rugged'), ...faire(20, 11, 'ZAP', 'live')];
+  const r = gradeAnnounced(rows, iso(T0 + 500 * H), { rules: [jouet], announced: annonce }).cards[0];
+  assert.strictEqual(r.plafondEcart.danger, 50, 'a 50 % de base, il reste 50 points a prendre');
+  assert.strictEqual(r.deltaVsBase.danger, 50, 'et la regle les prend tous');
+  assert.strictEqual(r.plafondEcart.safe, -50);
+  assert.strictEqual(r.deltaVsBase.safe, -50, 'le cote sur aussi, dans son propre sens');
+});
+
+t('sans base publiable, aucun plafond n est affirme', () => {
+  const rows = [...faire(5, 10, 'XAP', 'rugged'), ...faire(5, 11, 'ZAP', 'live')];
+  const r = gradeAnnounced(rows, iso(T0 + 500 * H), { rules: [jouet], announced: annonce }).cards[0];
+  assert.strictEqual(r.baseRateJuge, null);
+  assert.strictEqual(r.plafondEcart, undefined, 'la branche `trop-peu` ne publie pas de plafond');
+});
+
 t('★ une annonce sans regle vivante est NOMMEE, jamais sautee en silence', () => {
   const c = gradeAnnounced([], iso(T0 + 500 * H),
     { rules: [jouet], announced: [{ key: 'disparue', label: 'disparue', announcedAt: iso(T0), predicted: {}, basis: {}, note: 'x' }] });
