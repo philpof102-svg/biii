@@ -50,6 +50,34 @@ const DATA_PATHS = [
    * une base ici le 07/06). Il appartient au meme lot que `blackouts.json`: tous deux enregistrent des
    * periodes ou l'on ne regardait PAS, et un chiffre tire d'observations ne vaut rien sans elles. */
   'data/fleet-refusals.log',
+  /* Ajoute le 2026-08-06 APRES lecture INTEGRALE du fichier, pas sur son nom: 11 entrees, un objet par
+   * financeur, champs `funder` / `tokens` / `storedCounts` / `viaToken` / `siblingCount` /
+   * `siblingPagesRead` / `siblingTxScanned` / `siblingScanStoppedBy` / `classe`. Que des adresses
+   * publiques et des compteurs — zero correspondance sur cle, secret, bearer, mot de passe ou URL.
+   *
+   * ⚠️ IL EST COMPLET, ET C'EST LA CONDITION QUI MANQUAIT. On a d'abord cru a un travail interrompu a
+   * « 11 financeurs sur 101 » et refuse de commiter un artefact a moitie ecrit. C'etait une mauvaise
+   * lecture: `siblingCount` est une propriete du FINANCEUR, et les 101 tokens du seau SUR se rangent
+   * derriere 11 financeurs distincts. 11 est le recensement ENTIER, verifie par `--dry-run` qui annonce
+   * 0 appel restant.
+   *
+   * Il appartient au meme lot que `blackouts.json` et `fleet-refusals.log`: il enregistre CE QUI A ETE
+   * LU et jusqu'ou la lecture s'est arretee. Sans lui, le decoupage du seau SUR par vrai compte n'est
+   * pas re-derivable sans redepenser le budget explorateur, et les pages de l'explorateur bougent —
+   * une lecture d'aujourd'hui ne se refait pas a l'identique demain.
+   *
+   * ⚠️ CETTE LIGNE EST POSEE AVANT QUE LE FICHIER SOIT SUIVI, ET L'ORDRE EST PORTEUR. La ligne 106
+   * ecarte les non-suivis (`d.code.includes('?')`) AVANT le tri: un fichier `??` ne peut donc pas faire
+   * refuser le committeur, seul un fichier SUIVI est juge. Commiter ce cache sans l'inscrire ici
+   * d'abord ne casserait rien le jour meme — et bloquerait TOUT a sa premiere modification, ce qui est
+   * exactement l'incident du 28/07 (172 observations retenues, blocage permanent).
+   *
+   * ⛔ Et c'est aussi le piege de lecture: le 2026-08-06 ces trois fichiers `??` ont ete rapportes comme
+   * « bloquant le committeur » sur la foi d'un diagnostic qui appelait `classer` avec des CHAINES la ou
+   * elle attend des objets `{code, file}`. `d.file` valait `undefined`, rien ne correspondait a la liste,
+   * et tout tombait dans `duCode`. Le committeur n'a jamais ete bloque. Sonder la forme reelle d'une
+   * entree avant d'ecrire contre elle vaut aussi pour les fonctions de son propre depot. */
+  'data/token-radar/rewalk-safe-bucket.json',
 ];
 
 const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();

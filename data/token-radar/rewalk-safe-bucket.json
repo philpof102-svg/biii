@@ -1,0 +1,222 @@
+{
+  "0x04f0606e2dabcecb81cc2c150c47beaac35ef292": {
+    "funder": "0x04f0606e2dabcecb81cc2c150c47beaac35ef292",
+    "tokens": 37,
+    "storedCounts": [
+      3
+    ],
+    "viaToken": "0x67a7cf672a2a2c8aaf0b0cccd0752f44dddbfbb1",
+    "ok": true,
+    "reason": null,
+    "resolvedFunder": "0x04F0606E2DABCecb81Cc2c150C47BeAAc35ef292",
+    "sameFunder": true,
+    "siblingCount": 3,
+    "siblingPagesRead": 6,
+    "siblingPageCap": 6,
+    "siblingTxScanned": 300,
+    "siblingScanStoppedBy": "page_cap",
+    "morePages": true,
+    "explorerCalls": 9,
+    "classe": "plancher_indetermine"
+  },
+  "0x302ebff6fc5d8f3bcb3b0b80a03e5b559483c5ff": {
+    "funder": "0x302ebff6fc5d8f3bcb3b0b80a03e5b559483c5ff",
+    "tokens": 33,
+    "storedCounts": [
+      17
+    ],
+    "viaToken": "0x1b33e1057d19fc92b050df1bf8f06da8c3f9670d",
+    "ok": true,
+    "reason": null,
+    "resolvedFunder": "0x302eBFF6Fc5d8f3bCB3b0B80a03E5b559483C5ff",
+    "sameFunder": true,
+    "siblingCount": 18,
+    "siblingPagesRead": 2,
+    "siblingPageCap": 6,
+    "siblingTxScanned": 53,
+    "siblingScanStoppedBy": "end",
+    "morePages": false,
+    "explorerCalls": 5,
+    "classe": "sous_le_seuil"
+  },
+  "0x69b9d1bf3eee4b4be7366f529b45a1dfb4599e0e": {
+    "funder": "0x69b9d1bf3eee4b4be7366f529b45a1dfb4599e0e",
+    "tokens": 23,
+    "storedCounts": [
+      8
+    ],
+    "viaToken": "0x19fdd92c570db4d1b13c94bfb907cc60ace8ae67",
+    "ok": true,
+    "reason": null,
+    "resolvedFunder": "0x69b9D1Bf3eeE4B4Be7366F529B45A1dFb4599E0e",
+    "sameFunder": true,
+    "siblingCount": 29,
+    "siblingPagesRead": 6,
+    "siblingPageCap": 6,
+    "siblingTxScanned": 300,
+    "siblingScanStoppedBy": "page_cap",
+    "morePages": true,
+    "explorerCalls": 9,
+    "classe": "industriel"
+  },
+  "0x2efe6ad82adda379ac49a3fe7575e24eec4bf17c": {
+    "funder": "0x2efe6ad82adda379ac49a3fe7575e24eec4bf17c",
+    "tokens": 1,
+    "storedCounts": [
+      2
+    ],
+    "viaToken": "0x10f05b37bb4b4e997c3d390c9037718c979e191e",
+    "ok": true,
+    "reason": null,
+    "resolvedFunder": "0x2EFE6ad82Adda379aC49a3Fe7575E24eeC4bF17c",
+    "sameFunder": true,
+    "siblingCount": 1,
+    "siblingPagesRead": 6,
+    "siblingPageCap": 6,
+    "siblingTxScanned": 300,
+    "siblingScanStoppedBy": "page_cap",
+    "morePages": true,
+    "explorerCalls": 9,
+    "classe": "plancher_indetermine"
+  },
+  "0x4ce69fd760ad0c07490178f9a47863dc0358cccd": {
+    "funder": "0x4ce69fd760ad0c07490178f9a47863dc0358cccd",
+    "tokens": 1,
+    "storedCounts": [
+      3
+    ],
+    "viaToken": "0x74ccbe53f77b08632ce0cb91d3a545bf6b8e0979",
+    "ok": true,
+    "reason": null,
+    "resolvedFunder": "0x4CE69fd760AD0c07490178f9a47863Dc0358cCCD",
+    "sameFunder": true,
+    "siblingCount": 11,
+    "siblingPagesRead": 6,
+    "siblingPageCap": 6,
+    "siblingTxScanned": 300,
+    "siblingScanStoppedBy": "page_cap",
+    "morePages": true,
+    "explorerCalls": 9,
+    "classe": "plancher_indetermine"
+  },
+  "0x9f084b8cb1c671801f1684770c3ad70d5173f64a": {
+    "funder": "0x9f084b8cb1c671801f1684770c3ad70d5173f64a",
+    "tokens": 1,
+    "storedCounts": [
+      2
+    ],
+    "viaToken": "0xd2fed9015e81a74bea3bdd296f4760156a1a5b23",
+    "ok": true,
+    "reason": null,
+    "resolvedFunder": "0x9F084B8cb1c671801f1684770C3ad70d5173f64a",
+    "sameFunder": true,
+    "siblingCount": 1,
+    "siblingPagesRead": 6,
+    "siblingPageCap": 6,
+    "siblingTxScanned": 300,
+    "siblingScanStoppedBy": "page_cap",
+    "morePages": true,
+    "explorerCalls": 9,
+    "classe": "plancher_indetermine"
+  },
+  "0xbaed383ede0e5d9d72430661f3285daa77e9439f": {
+    "funder": "0xbaed383ede0e5d9d72430661f3285daa77e9439f",
+    "tokens": 1,
+    "storedCounts": [
+      9
+    ],
+    "viaToken": "0xa01d418b36f68d1738872d4a2c5a0114bf9cf282",
+    "ok": true,
+    "reason": null,
+    "resolvedFunder": "0xBaeD383EDE0e5d9d72430661f3285DAa77E9439F",
+    "sameFunder": true,
+    "siblingCount": 63,
+    "siblingPagesRead": 6,
+    "siblingPageCap": 6,
+    "siblingTxScanned": 300,
+    "siblingScanStoppedBy": "page_cap",
+    "morePages": true,
+    "explorerCalls": 9,
+    "classe": "industriel"
+  },
+  "0x133719d08ea370f9b4c92132cb431ea67bd03452": {
+    "funder": "0x133719d08ea370f9b4c92132cb431ea67bd03452",
+    "tokens": 1,
+    "storedCounts": [
+      8
+    ],
+    "viaToken": "0x409e300f982a6a3185db56b481db2eceffd57f32",
+    "ok": true,
+    "reason": null,
+    "resolvedFunder": "0x133719d08EA370f9b4C92132Cb431Ea67Bd03452",
+    "sameFunder": true,
+    "siblingCount": 24,
+    "siblingPagesRead": 3,
+    "siblingPageCap": 6,
+    "siblingTxScanned": 148,
+    "siblingScanStoppedBy": "end",
+    "morePages": false,
+    "explorerCalls": 6,
+    "classe": "industriel"
+  },
+  "0x9efbdf3d5cf8666604f76470b4b77202824b23fa": {
+    "funder": "0x9efbdf3d5cf8666604f76470b4b77202824b23fa",
+    "tokens": 1,
+    "storedCounts": [
+      8
+    ],
+    "viaToken": "0x28b9808a56c612d41572d29c86e809ce063d9364",
+    "ok": true,
+    "reason": null,
+    "resolvedFunder": "0x9efbdF3d5Cf8666604F76470B4B77202824b23fa",
+    "sameFunder": true,
+    "siblingCount": 15,
+    "siblingPagesRead": 2,
+    "siblingPageCap": 6,
+    "siblingTxScanned": 98,
+    "siblingScanStoppedBy": "end",
+    "morePages": false,
+    "explorerCalls": 5,
+    "classe": "sous_le_seuil"
+  },
+  "0x9159fb6cc734f25d85e128f018372dad2514d6e2": {
+    "funder": "0x9159fb6cc734f25d85e128f018372dad2514d6e2",
+    "tokens": 1,
+    "storedCounts": [
+      15
+    ],
+    "viaToken": "0x705b81bb946703ee89f69e99b12de252987b797e",
+    "ok": true,
+    "reason": null,
+    "resolvedFunder": "0x9159Fb6CC734F25D85E128f018372daD2514d6E2",
+    "sameFunder": true,
+    "siblingCount": 43,
+    "siblingPagesRead": 4,
+    "siblingPageCap": 6,
+    "siblingTxScanned": 157,
+    "siblingScanStoppedBy": "end",
+    "morePages": false,
+    "explorerCalls": 7,
+    "classe": "industriel"
+  },
+  "0xe75358526ef4441db03ccaeb9a87f180fae80eb9": {
+    "funder": "0xe75358526ef4441db03ccaeb9a87f180fae80eb9",
+    "tokens": 1,
+    "storedCounts": [
+      4
+    ],
+    "viaToken": "0xfde4c96c8593536e31f229ea8f37b2ada2699bb2",
+    "ok": true,
+    "reason": null,
+    "resolvedFunder": "0xe75358526Ef4441Db03cCaEB9a87F180fAe80eb9",
+    "sameFunder": true,
+    "siblingCount": 41,
+    "siblingPagesRead": 6,
+    "siblingPageCap": 6,
+    "siblingTxScanned": 300,
+    "siblingScanStoppedBy": "page_cap",
+    "morePages": true,
+    "explorerCalls": 9,
+    "classe": "industriel"
+  }
+}
