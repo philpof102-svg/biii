@@ -18,6 +18,12 @@ const now = process.argv[2] || new Date().toISOString();
 const c = runPrequential(rows, now);
 
 console.log(`\n  marche prequentielle — ${c.tokensWalked} tokens, fenetre de maturite ${c.maturityWindowHours}h`);
+/* La fenetre publie son propre taux d erreur: sans lui, « survecu » se lit comme definitif alors que
+ * 4,9 % des rugs mesures sont plus lents qu elle, et que la fenetre compte surtout des cycles de sondage. */
+if (c.fenetre && c.fenetre.rugsAuDela != null) {
+  console.log(`  ⚠️ fenetre: ${c.fenetre.rugsAuDela}/${c.fenetre.rugsDates} rug(s) mesures l ont DEPASSEE `
+    + `(${c.fenetre.partAuDela} %) · plus lent observe ${c.fenetre.slowestRugH} h · p95 ${c.fenetre.p95RugH} h`);
+}
 console.log(`  resolus a ${c.updatedAt} : ${c.resolvedTotal}  ·  non resolus : ${c.unresolved}`);
 console.log(`  taux de base sur les RESOLUS : ${c.baseRate == null ? 'n/a' : (c.baseRate * 100).toFixed(1) + '%'}`);
 

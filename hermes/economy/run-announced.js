@@ -20,6 +20,13 @@ const c = gradeAnnounced(rows, process.argv[2] || new Date().toISOString());
 
 console.log(`\n  bulletin des regles annoncees — ${c.updatedAt}`);
 console.log(`  base disponible : ${c.tokensAvailable} tokens · fenetre de maturite ${c.maturityWindowHours}h\n`);
+/* La fenetre publie son propre taux d erreur: sans lui, « survecu » se lit comme definitif
+ * alors que 4,9 % des rugs mesures sont plus lents qu elle. */
+if (c.fenetre && c.fenetre.rugsAuDela != null) {
+  console.log(`  ⚠️ fenetre: ${c.fenetre.rugsAuDela}/${c.fenetre.rugsDates} rug(s) mesures l ont DEPASSEE `
+    + `(${c.fenetre.partAuDela} %) · plus lent observe ${c.fenetre.slowestRugH} h`);
+  console.log(`     un token « survecu » peut encore rugger; et la fenetre compte des cycles de sondage (60 min) autant que des heures.`);
+}
 
 const pc = (x) => (x == null ? '   n/a' : (x * 100).toFixed(1).padStart(5) + '%');
 const signe = (x) => (x == null ? '   n/a' : (x >= 0 ? '+' : '') + x.toFixed(1) + ' pts');

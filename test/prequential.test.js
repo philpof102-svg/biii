@@ -12,7 +12,7 @@
  * resolue n'est ni une reussite ni un echec, et une abstention n'est pas un verdict « sur ».
  */
 const assert = require('node:assert');
-const { runPrequential, outcomeKnownAt, tauxPublie, MIN_RESOLUS,
+const { runPrequential, gradeAnnounced, outcomeKnownAt, tauxPublie, MIN_RESOLUS,
   DANGER, SAFE, ABSTAIN } = require('../lib/prequential');
 
 let pass = 0, fail = 0;
@@ -332,6 +332,59 @@ t('une base jugee sous le plancher est retenue, comme tout autre taux', () => {
   assert.strictEqual(carte.baseRateJuge, null, 'une base sur 10 appels ne se publie pas');
   assert.strictEqual(carte.baseRateJugeN, 10, 'son compte reste lisible');
   assert.strictEqual(carte.liftVsBaseJuge, null, 'et aucun ecart ne se derive d un taux retenu');
+});
+
+/* ── la fenetre de maturite publie sa propre marge d'erreur ──────────────────────────────────────
+ * Chaque verdict « survecu » de ce fichier repose sur `maturityH`. `lib/scorecard.js` calcule
+ * `beyondWindow` — les rugs plus lents que la fenetre — et les deux graders ne destructuraient que
+ * `maturityH`. Mesure du 2026-08-06: 71 rugs sur 1454 (4,9 %) depassaient la fenetre de 4 h. */
+console.log('\nla fenetre de maturite dit ce qu elle rate');
+
+/** n rugs dont la duree de vie vaut `h` heures. */
+const faireRugs = (n, h) => Array.from({ length: n }, (_, i) => ({
+  addr: '0x' + h + '_' + i, firstSeen: iso(T0 + i * H), lastSeen: iso(T0 + i * H + h * H),
+  outcome: 'rugged', ruggedAt: iso(T0 + i * H + h * H) }));
+
+t('★ un rug PLUS LENT que la fenetre est compte et publie', () => {
+  /* ⚠️ LA PROPORTION DE LENTS EST LOAD-BEARING, et la premiere version de ce cas l'avait ratee: avec
+   * 5 lents sur 45 (11 %), le p95 tombe DANS les lents, la fenetre s'etire jusqu'a eux et plus rien ne
+   * la depasse — la fixture fabriquait le zero qu'elle devait refuter. Il faut moins de 5 % de lents
+   * pour que le p95 reste chez les rapides. L'assertion a attrape la fixture au lieu de passer a vide. */
+  const c = runPrequential([...faireRugs(100, 1), ...faireRugs(2, 100)], iso(T0 + 5000 * H),
+    { rules: [{ key: 'k', label: 'k', predict: () => DANGER }] });
+  assert.strictEqual(c.fenetre.rugsDates, 102, 'les 102 rugs dates doivent etre comptes');
+  assert.ok(c.fenetre.rugsAuDela >= 1, 'les rugs lents doivent etre comptes au-dela de la fenetre');
+  assert.ok(c.fenetre.partAuDela > 0);
+  assert.strictEqual(c.fenetre.slowestRugH, 100, 'le plus lent est rapporte, meme s il ne fixe pas la fenetre');
+  assert.match(c.fenetre.note, /peut donc encore rugger/);
+});
+
+t('★ le cas OPPOSE: si TOUS les rugs tiennent dans la fenetre, rien n est signale', () => {
+  const rows = Array.from({ length: 40 }, (_, i) => ({
+    addr: '0xr' + i, firstSeen: iso(T0 + i * H), lastSeen: iso(T0 + i * H + H),
+    outcome: 'rugged', ruggedAt: iso(T0 + i * H + H) }));
+  const c = runPrequential(rows, iso(T0 + 5000 * H),
+    { rules: [{ key: 'k', label: 'k', predict: () => DANGER }] });
+  assert.strictEqual(c.fenetre.rugsAuDela, 0, 'aucun rug ne depasse une fenetre qui les couvre tous');
+  assert.strictEqual(c.fenetre.partAuDela, 0);
+});
+
+t('sans aucun rug date, la fenetre le DIT au lieu de se taire', () => {
+  const rows = Array.from({ length: 30 }, (_, i) => ({
+    addr: '0xs' + i, firstSeen: iso(T0 + i * H), lastSeen: iso(T0 + i * H + 4000 * H), outcome: 'live' }));
+  const c = runPrequential(rows, iso(T0 + 5000 * H),
+    { rules: [{ key: 'k', label: 'k', predict: () => SAFE }] });
+  assert.strictEqual(c.fenetre.rugsDates, 0);
+  assert.match(c.fenetre.note, /aucun rug date/);
+});
+
+t('le bulletin des paris publie la MEME confession que la marche', () => {
+  const rows = [...faireRugs(100, 1), ...faireRugs(2, 100)];
+  const a = runPrequential(rows, iso(T0 + 5000 * H), { rules: [{ key: 'k', label: 'k', predict: () => DANGER }] });
+  const b = gradeAnnounced(rows, iso(T0 + 5000 * H),
+    { rules: [{ key: 'k', label: 'k', predict: () => DANGER }],
+      announced: [{ key: 'k', label: 'k', announcedAt: iso(T0 - 1000 * H), predicted: {}, basis: {}, note: 'x' }] });
+  assert.deepStrictEqual(b.fenetre, a.fenetre, 'les deux graders doivent avouer la meme chose');
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);
