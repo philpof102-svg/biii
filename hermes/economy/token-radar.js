@@ -678,6 +678,25 @@ function recordBlackout(db, nowIso) {
     db[c.addr].siblingPagesRead = f.siblingPagesRead;
     db[c.addr].siblingPageCap = f.siblingPageCap;
     db[c.addr].siblingScanStoppedBy = f.siblingScanStoppedBy;
+    /* ⚠️ LE DENOMINATEUR DE LA DENSITE, ET C'EST LUI QUI PORTE LE SIGNAL. `traceFeeder` le renvoyait
+     * deja (lib/feeder.js) et cette ligne le jetait — le champ le plus discriminant du lot tombait a
+     * trois lignes des trois temoins qu'on prenait soin de garder.
+     *
+     * Mesure du 2026-08-06, sur les tokens dont le VRAI compte de freres franchit 20:
+     *   · seuil franchi des la 1re page      106 tok ·  8 financeurs ·  97,1 % de rugs
+     *   · seuil franchi seulement EN PROFONDEUR 27 tok ·  5 financeurs ·   3,7 %
+     * 93,4 points d'ecart entre deux groupes que le compte pagine declare identiques. Ce que separait
+     * la lecture d'une page n'etait pas un compte tronque: c'etait une DENSITE — combien de
+     * destinataires distincts par transaction. Vingt portefeuilles payes d'affilee est la signature
+     * d'une usine; vingt-neuf atteints en trois cents transactions est un portefeuille qui vit depuis
+     * longtemps. `siblingCount / siblingTxScanned` rend cette densite EXACTE et permanente.
+     *
+     * ⛔ SANS CE CHAMP, LA DENSITE N'EST PAS RECONSTRUCTIBLE APRES COUP. Les pages de l'explorateur
+     * bougent: une relecture demain ne redonne pas le balayage d'aujourd'hui. `siblingPagesRead` n'en
+     * est qu'un proxy grossier — la derniere page est partielle, donc 6 pages ne valent pas 300
+     * transactions. Chaque heure ecoulee sans l'ecrire est une heure de resolution perdue pour de bon,
+     * exactement comme pour les champs de fraicheur au-dessus. */
+    db[c.addr].siblingTxScanned = f.siblingTxScanned;
     if (f.identicalAmountSiblings >= SIBLING_ALERT || f.siblingCount >= SIBLING_ALERT) clusters.push({ ...c, f });
 
     // The one rule this session that survived its own backtest. Measured over 62 tokens with funding data:
