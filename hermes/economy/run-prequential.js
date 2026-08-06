@@ -41,6 +41,13 @@ for (const r of c.cards) {
   const marque = r.derived ? '📐' : r.isStatic ? '🧱' : '✋';
   console.log(`    ${marque} ${r.label.slice(0, 43).padEnd(44)} ${pc(r.precision)} ${pc(r.safeRugRate)} ${pc(r.recall)} ${pc(r.markedShare)}   ${String(r.dangerResolved).padStart(4)}  ${String(r.safeResolved).padStart(4)}  (${r.dangerOpen}/${r.abstained})`);
   for (const m of r.tropMince || []) console.log(`        ⚠️ RETENU ${m}`);
+  /* L'ecart contre la base des appels REELLEMENT juges. Sans lui, une regle qui s'abstient beaucoup se
+   * compare a une population qu'elle n'a pas jugee et y gagne des points gratuitement. */
+  if (r.liftVsBaseJuge != null) {
+    console.log(`        base des appels juges ${pc(r.baseRateJuge)} sur n=${r.baseRateJugeN}`
+      + `  ·  ecart REEL ${r.liftVsBaseJuge >= 0 ? '+' : ''}${r.liftVsBaseJuge} pts`
+      + (r.abstained ? `  (${r.abstained} abstentions exclues des deux cotes)` : ''));
+  }
   // Le seuil derive doit se montrer. S'il converge vers celui qu'on a choisi a la main, la regle
   // « independante » est la meme regle, et le controle qu'on croyait exercer n'existe pas.
   if (r.thresholdMedian != null) {

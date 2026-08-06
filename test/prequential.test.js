@@ -289,5 +289,50 @@ t('sous quatre lectures, on ne juge pas le seuil — trop peu pour dire qu il es
   assert.strictEqual(carte.thresholdFige, null, 'trois lectures ne suffisent pas a conclure');
 });
 
+/* ── la base contre laquelle une regle se compare ────────────────────────────────────────────────
+ * `baseRate` porte sur TOUS les tokens resolus de la marche, y compris ceux sur lesquels la regle
+ * s'est abstenue. Une regle qui s'abstient sur les cas faciles se compare donc a une population
+ * qu'elle n'a pas jugee, et y gagne des points gratuitement — le piege que la note du fichier denonce
+ * tout en y tombant. Mesure du 2026-08-06: cinq regles sur onze concernees, jusqu'a 7,1 points. */
+console.log('\nune regle se compare a la population qu ELLE a jugee, pas a une autre');
+
+t('★ l abstention gonfle l ecart contre la base GLOBALE, jamais contre la base JUGEE', () => {
+  // 30 rugs juges DANGER, 30 survivants juges SUR, 30 survivants sur lesquels la regle s abstient.
+  const rows = [...lot(30, 'D', 'rugged', 1), ...lot(30, 'S', 'live', 2), ...lot(30, 'A', 'live', 3)];
+  const regle = { key: 'k', label: 'k',
+    predict: (x) => (x.sym === 'A' ? ABSTAIN : x.sym === 'D' ? DANGER : SAFE) };
+  const c = runPrequential(rows, iso(T0 + 5000 * H), { rules: [regle] });
+  const carte = c.cards[0];
+  assert.strictEqual(carte.abstained, 30, 'la fixture doit produire des abstentions, sinon rien n est teste');
+  assert.strictEqual(carte.precision, 1, 'les 30 appels DANGER ont tous rugge');
+
+  // base globale = 30 rugs / 90 resolus ; base jugee = 30 rugs / 60 appels notes.
+  assert.strictEqual(c.baseRate, 0.3333, 'base globale sur les 90 tokens resolus');
+  assert.strictEqual(carte.baseRateJuge, 0.5, 'base sur les 60 tokens REELLEMENT juges');
+  assert.strictEqual(carte.baseRateJugeN, 60);
+
+  const contreGlobale = +((carte.precision - c.baseRate) * 100).toFixed(1);
+  assert.strictEqual(contreGlobale, 66.7, 'contre la base globale, la regle parait valoir 66,7 points');
+  assert.strictEqual(carte.liftVsBaseJuge, 50, 'contre la population jugee, elle en vaut 50');
+  assert.ok(carte.liftVsBaseJuge < contreGlobale, 'les 30 survivants ecartes gonflaient l ecart');
+});
+
+t('★ le cas OPPOSE: sans abstention, les deux bases sont IDENTIQUES', () => {
+  const rows = [...lot(30, 'D', 'rugged', 1), ...lot(30, 'S', 'live', 2)];
+  const c = runPrequential(rows, iso(T0 + 5000 * H), { rules: [parSymbole] });
+  const carte = c.cards[0];
+  assert.strictEqual(carte.abstained, 0, 'aucune abstention dans ce cas');
+  assert.strictEqual(carte.baseRateJuge, c.baseRate, 'sans abstention, la distinction disparait');
+  assert.strictEqual(carte.liftVsBaseJuge, +((carte.precision - c.baseRate) * 100).toFixed(1));
+});
+
+t('une base jugee sous le plancher est retenue, comme tout autre taux', () => {
+  const rows = [...lot(5, 'D', 'rugged', 1), ...lot(5, 'S', 'live', 2)];
+  const carte = runPrequential(rows, iso(T0 + 5000 * H), { rules: [parSymbole] }).cards[0];
+  assert.strictEqual(carte.baseRateJuge, null, 'une base sur 10 appels ne se publie pas');
+  assert.strictEqual(carte.baseRateJugeN, 10, 'son compte reste lisible');
+  assert.strictEqual(carte.liftVsBaseJuge, null, 'et aucun ecart ne se derive d un taux retenu');
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exitCode = 1;
