@@ -107,12 +107,30 @@ t('un auto-paiement est refuse avant tout le reste', () => {
   assert.equal(r.excluded[0].reason, 'self_payment');
 });
 
-t('une entree vide rend un resultat vide, pas une erreur ni une couverture de 1', () => {
+t('★ une entree vide rend NULL, pas 0 et pas 1 — trois etats, pas deux', () => {
+  /* ⚠️ CE CAS ASSERTAIT `coverage === 0`, et son commentaire disait « couverture 0 sur vide, jamais 1 ».
+   * L arbitrage etait entre DEUX valeurs et prenait la plus prudente, ce qui etait le bon reflexe sur une
+   * liste trop courte: `0/0` n est pas zero, il est INDEFINI. Un `0` de couverture se lit « on a regarde
+   * et on n a rien couvert »; sur une entree vide, il n y avait rien a couvrir. La distinction porte:
+   * `provenShare: 0` accuse un acteur de n avoir rien prouve alors qu il n avait rien a prouver. */
   for (const vide of [[], null, undefined, 'pas un tableau']) {
     const r = P.assess(vide, {});
     assert.equal(r.counted.length, 0, JSON.stringify(vide));
-    assert.equal(r.coverage, 0, 'couverture 0 sur vide, jamais 1');
+    assert.strictEqual(r.coverage, null, 'rien a couvrir: null, ni 0 ni 1 — ' + JSON.stringify(vide));
+    assert.strictEqual(r.coverageOf, 0, 'et le denominateur voyage avec, pour qu un null ne soit pas muet');
+    assert.strictEqual(r.delivery.provenShare, null, 'aucune livraison a prouver n est pas une part nulle');
+    assert.strictEqual(r.delivery.provenOf, 0);
   }
+});
+
+t('★ le cas OPPOSE: un denominateur NON vide rend un vrai chiffre, y compris un vrai zero', () => {
+  /* Sans ce cas, un `null` cable en dur passerait exactement comme le correctif. */
+  const actors = { a: acteur('a', { funder: '0xF1' }), b: acteur('b', { funder: '0xF2' }) };
+  const r = P.assess([{ from: 'a', to: 'b', amount: 40, at: 0 }], actors);
+  assert.strictEqual(r.coverage, 1, 'une arete comptee sur une arete fournie: couverture pleine');
+  assert.strictEqual(r.coverageOf, 1);
+  assert.strictEqual(r.delivery.provenShare, 0, 'une arete comptee sans preuve de livraison: un VRAI zero');
+  assert.strictEqual(r.delivery.provenOf, 1, 'et il repose sur un denominateur de 1, qui se lit');
 });
 
 console.log('\nla reciprocite a une FENETRE, sinon elle punit le commerce normal');
