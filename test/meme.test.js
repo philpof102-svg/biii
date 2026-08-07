@@ -342,12 +342,55 @@ t('une chaine inconnue ne certifie rien — elle abstient', async () => {
   assert.strictEqual(r.canonical, null);
 });
 
+/* ── la liste servie porte son plafond ───────────────────────────────────────────────────────────
+ * Les sept retours rendaient `candidates: <liste>.slice(0, 12)` sans publier le total. Le verdict n'en
+ * souffrait pas — `canonical` se calcule sur la liste complete — mais un appelant qui enumere
+ * `candidates` pour juger lui-meme travaillait sur une troncature muette. */
+const nPaires = (n) => async () => ({ pairs: Array.from({ length: n }, (_, i) => ({
+  chainId: 'base', baseToken: { symbol: 'ZZZ', address: '0x' + String(i).padStart(40, '0'), name: 'z' },
+  liquidity: { usd: 1000000 - i }, volume: { h24: 1 }, url: 'u' })) });
+
+t('★ au-dela du plafond, la liste est coupee ET le total voyage avec elle', async () => {
+  const r = await vetMeme({ symbol: 'ZZZ', fetchImpl: nPaires(20) });
+  assert.strictEqual(r.candidates.length, 12, 'la liste servie est plafonnee a douze');
+  assert.strictEqual(r.candidatesTotal, 20, 'et le VRAI compte se lit a cote');
+  assert.strictEqual(r.candidatesCapped, true, 'et un drapeau dit que quelque chose a ete coupe');
+});
+
+t('★ le cas OPPOSE: sous le plafond, rien n est coupe et le drapeau reste FAUX', async () => {
+  /* Sans ce cas, un `candidatesCapped` cable a `true` passerait exactement comme le correctif. */
+  const r = await vetMeme({ symbol: 'ZZZ', fetchImpl: nPaires(3) });
+  assert.strictEqual(r.candidates.length, 3);
+  assert.strictEqual(r.candidatesTotal, 3, 'le total egale la liste quand rien ne depasse');
+  assert.strictEqual(r.candidatesCapped, false);
+});
+
+t('★ une liste vide parce qu on n a PAS PU LIRE se distingue d une liste vide mesuree', async () => {
+  /* Le chemin d erreur rendait `candidates: []` tout court — octet pour octet la reponse d un symbole
+   * reellement sans contrat. `candidatesTotal: null` dit « inconnu », le `0` dit « mesure, et rien ». */
+  const casse = await vetMeme({ symbol: 'ZZZ', fetchImpl: async () => { throw new Error('ECONNRESET boum'); } });
+  assert.strictEqual(casse.status, 'unknown');
+  assert.deepStrictEqual(casse.candidates, []);
+  assert.strictEqual(casse.candidatesTotal, null, 'non lu: le total est INCONNU, pas zero');
+  assert.strictEqual(casse.canonical, null, 'et la forme de la reponse ne change pas selon le verdict');
+
+  const vide = await vetMeme({ symbol: 'ZZZ', fetchImpl: async () => ({ pairs: [] }) });
+  assert.strictEqual(vide.candidatesTotal, 0, 'lu et vide: le total vaut ZERO, et les deux se distinguent');
+});
+
+t('la cause de l echec voyage avec le refus, au lieu d etre avalee', async () => {
+  const r = await vetMeme({ symbol: 'ZZZ', fetchImpl: async () => { throw new Error('ECONNRESET boum'); } });
+  assert.match(r.reason, /ECONNRESET boum/, 'le motif reel doit remonter — « unavailable » seul ne dit rien');
+  assert.match(r.reason, /NOTHING was measured/);
+});
+
 (async () => {
   for (const [nom, fn] of files) {
     try { await fn(); pass++; console.log('  ok   ' + nom); }
     catch (e) { fail++; console.log('  FAIL ' + nom + '\n       ' + e.message); }
   }
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
+
   if (pass + fail !== files.length) {
     console.log('✗ ' + files.length + ' cas empiles mais ' + (pass + fail) + ' deroules');
     process.exit(1);
