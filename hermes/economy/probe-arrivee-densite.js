@@ -41,6 +41,10 @@ const SEUIL_COMPTE = 20;
 const SEUIL_DENSITE = 0.40;
 const RACINE = path.join(__dirname, '..', '..');
 const REL_DB = 'data/token-radar/tokens.json';
+const REL_TROUS = 'data/token-radar/blackouts.json';
+/* L'instant d'arret de la mesure est lu AVANT tout le reste: il borne la fenetre des trous comme celle
+ * des tokens, et deux `Date.now()` distincts feraient deriver les deux d'un chouia. */
+const MAINTENANT = Date.parse(process.argv[2] || new Date().toISOString());
 
 /* ── 1. QUAND L'INSTRUMENT A-T-IL ETE MIS EN SERVICE ? Git, pas les donnees. ──────────────────────── */
 /* `-S` rend les commits ou le NOMBRE d'occurrences du terme change; le plus ancien est l'introduction. */
@@ -56,10 +60,37 @@ try {
   }
 } catch (e) { erreurGit = e.message; }
 
+/* ── 1 bis. ET COMBIEN DE CE TEMPS L'INSTRUMENT A-T-IL REELLEMENT TOURNE ? ────────────────────────
+ * La premiere version de cette sonde divisait par le temps MURAL — comme si le radar avait tourne sans
+ * interruption depuis sa mise en service. Il ne tourne pas sans interruption: la machine dort. Le
+ * 2026-08-07 le detecteur a enregistre un trou de 11,8 h en plein milieu de la fenetre, et diviser par
+ * le mural gonflait la duree de 1,9x — donc DIVISAIT les taux par presque deux, dans le sens rassurant
+ * (« l attente est plus longue qu on croit, mais le rythme est ce qu il est »).
+ * Le depot sait deja: `lib/watch-gap.js` detecte les trous et `data/token-radar/blackouts.json` les
+ * garde. Le helper existait; l appelant a fort enjeu ne l appelait pas. C est le motif le plus cher de
+ * ce depot, commis ici meme.
+ * ⛔ TROIS ETATS, PAS DEUX. Si le journal des trous ne se lit pas, on NE retombe PAS sur le mural: ce
+ * repli surestimerait l uptime, donc sous-estimerait les taux, toujours du cote rassurant. On refuse. */
+let trousH = null, trousLus = 0, erreurTrous = null;
+if (miseEnService) {
+  try {
+    const journal = JSON.parse(fs.readFileSync(path.join(RACINE, REL_TROUS), 'utf8'));
+    if (!Array.isArray(journal)) throw new Error('le journal n est pas un tableau');
+    let somme = 0;
+    for (const t of journal) {
+      const d = Date.parse(t.from), f = Date.parse(t.to);
+      if (!Number.isFinite(d) || !Number.isFinite(f)) continue;
+      /* Intersection avec la fenetre de mesure: un trou d avant la mise en service ne compte pas. */
+      const chevauchement = Math.min(f, MAINTENANT) - Math.max(d, miseEnService);
+      if (chevauchement > 0) { somme += chevauchement; trousLus++; }
+    }
+    trousH = somme / 3600000;
+  } catch (e) { erreurTrous = e.message; }
+}
+
 /* ── 2. CE QUI EST ARRIVE DEPUIS ─────────────────────────────────────────────────────────────────── */
 const rows = Object.entries(JSON.parse(fs.readFileSync(path.join(RACINE, REL_DB), 'utf8')))
   .map(([addr, v]) => ({ addr, ...v }));
-const MAINTENANT = Date.parse(process.argv[2] || new Date().toISOString());
 const { maturityH } = maturityWindow(rows);
 const issue = (t) => outcomeKnownAt(t, MAINTENANT, maturityH);
 
@@ -88,7 +119,9 @@ const complets = financeurs.filter((f) => f.arret === 'end');
 const utiles = complets.filter((f) => f.diverge && f.resolus > 0);   // ce que le chiffrage exige
 
 /* ── 3. UN TAUX, ET SA DISPERSION — parce qu'un taux sur k petit n'est pas un taux ───────────────── */
-const heures = miseEnService ? (MAINTENANT - miseEnService) / 3600000 : null;
+const mural = miseEnService ? (MAINTENANT - miseEnService) / 3600000 : null;
+/* Le SEUL denominateur admissible: le temps ou l'instrument tournait. `null` si on ne sait pas. */
+const heures = (mural !== null && trousH !== null) ? mural - trousH : null;
 
 console.log('\n  ── L INSTRUMENT ──\n');
 if (erreurGit) {
@@ -100,7 +133,22 @@ if (erreurGit) {
 } else {
   console.log('    mis en service   ' + new Date(miseEnService).toISOString() + '  (commit ' + commitService + ')');
   console.log('    mesure arretee a ' + new Date(MAINTENANT).toISOString());
-  console.log('    duree mesuree    ' + heures.toFixed(2) + ' h');
+  console.log('    temps MURAL      ' + mural.toFixed(2) + ' h');
+  if (erreurTrous) {
+    console.log('    ⛔ ' + REL_TROUS + ' illisible: ' + erreurTrous);
+    console.log('       AUCUN taux ne se publie. Retomber sur le mural surestimerait l uptime, donc');
+    console.log('       sous-estimerait les taux — toujours du cote rassurant. Le compte reste lisible.');
+  } else {
+    console.log('    dont AVEUGLE     ' + trousH.toFixed(2) + ' h  (' + trousLus + ' trou(s) enregistre(s) par lib/watch-gap.js)');
+    console.log('    UPTIME reel      ' + heures.toFixed(2) + ' h   <- le seul denominateur d un taux');
+    if (trousH > 0.05) {
+      console.log('  ⚠️ Diviser par le mural gonflerait la duree de '
+        + (mural / heures).toFixed(2) + 'x et diviserait donc tous les taux d autant.');
+    }
+    console.log('  ⚠️ BORNE DU JOURNAL: il ne contient que les trous DETECTES. La premiere entree est');
+    console.log('     reconstruite a la main (le detecteur n existait pas encore); un trou anterieur a lui');
+    console.log('     manquerait. L uptime publie est donc un PLAFOND, et les taux des PLANCHERS.');
+  }
 }
 
 console.log('\n  ── CE QUI EST ARRIVE ──\n');
