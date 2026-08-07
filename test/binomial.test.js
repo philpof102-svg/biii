@@ -127,10 +127,27 @@ t('★ un effectif sous le plancher RETIENT le taux et garde le compte', () => {
 });
 
 t('un effectif superieur ou egal a n est ignore — on ne fabrique pas des tirages', () => {
-  for (const eff of [31, 99, 0, -2, null]) {
+  for (const eff of [31, 99, null, undefined]) {
     const r = proportionAvecBornes(1, 31, { effectif: eff });
     assert.strictEqual(r.effectif, 31, 'effectif=' + String(eff) + ' ne doit pas elargir l echantillon');
+    assert.ok(r.taux !== null, 'effectif=' + String(eff) + ' doit tout de meme publier');
   }
+});
+
+t('★ un effectif de ZERO REFUSE — il ne retombe pas sur n, qui est l estimation la plus rassurante', () => {
+  /* Le defaut reel: une sonde affichait « 0 financeur(s) » et, deux lignes plus bas, un intervalle
+   * calcule sur 10 tokens. Zero tirage identifie n est pas « pas d information de groupement ». */
+  for (const eff of [0, -2, 1.5, NaN]) {
+    const r = proportionAvecBornes(9, 10, { effectif: eff });
+    assert.strictEqual(r.taux, null, 'effectif=' + String(eff) + ': aucun taux ne doit sortir');
+    assert.strictEqual(r.basse, null);
+    assert.strictEqual(r.haute, null);
+    assert.ok(typeof r.raison === 'string' && r.raison.length > 0, 'le refus doit DIRE pourquoi');
+    /* Trois etats, encore: ce refus n est PAS « retenu par plancher ». */
+    assert.strictEqual(r.retenu, false, 'un effectif absurde n est pas un plancher non atteint');
+  }
+  /* Et le cas OPPOSE: sans le champ, on publie toujours. */
+  assert.ok(proportionAvecBornes(9, 10).taux !== null, 'sans effectif declare, le calcul se fait sur n');
 });
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
