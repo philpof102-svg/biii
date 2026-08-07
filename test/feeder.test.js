@@ -194,6 +194,29 @@ t('★ LES DEUX BORNES: un deployeur REELLEMENT sans entrant dit toujours exacte
   assert.strictEqual(r.fundingRead, true, 'et il DIT que la lecture a bien eu lieu');
 });
 
+t('★ sans financeur, le DEPLOYEUR est quand meme rendu — c est la seule identite qui reste', async () => {
+  /* ⚠️ CE CAS EXISTE A CAUSE D'UNE PERTE MESUREE EN AVAL, PAS D'UN DOUTE SUR CE MODULE.
+   * Mesure du 2026-08-07 sur la base de production: ZERO des 51 tokens en etat `no_funder` porte un
+   * `deployer`, alors que cette branche le renvoie. `token-radar.js` fait `continue` sur `!f.funder`
+   * AVANT la ligne qui persiste `db[addr].deployer`, trois lignes au-dessus des temoins qu'il prend
+   * soin de garder — la meme forme que la perte de `siblingTxScanned` deja corrigee dans ce fichier.
+   *
+   * Ce que ca coute: un token sans financeur n'a AUCUNE autre unite de regroupement que son deployeur.
+   * En le jetant, on rend ces 51 lignes definitivement incomptables en tirages independants.
+   *
+   * ⛔ Ce test ne repare rien — `token-radar.js` a un sha256 epingle et l'editer arreterait son cron.
+   * Il epingle le fait que la donnee EST disponible ici, pour que la reparation en aval ne soit pas
+   * refusee un jour au motif que « le tracer ne la donne pas ». */
+  const r = await tracer({ entrant: { items: [] } });
+  assert.strictEqual(r.funder, null, 'la premisse: aucun financeur identifie');
+  assert.strictEqual(r.deployer, '0xDEPLOYEUR', 'et pourtant le deployeur est bel et bien rendu');
+  /* Cas OPPOSE: la branche qui REFUSE (explorateur muet) ne doit rien affirmer sur le deployeur non plus,
+   * sinon on ne saurait pas distinguer « lu et sans financeur » de « pas lu ». */
+  const muet = await traceFeeder('base', '0xTOKEN', { fetchImpl: explorateurMuetSurEntrants });
+  assert.strictEqual(muet.ok, false, 'la non-reponse reste un refus');
+  assert.notStrictEqual(muet.fundingRead, r.fundingRead, 'les deux etats restent distinguables');
+});
+
 t('★ un `items` absent compte comme une non-reponse (derive de schema, fail-closed)', async () => {
   const r = await traceFeeder('base', '0xTOKEN', { fetchImpl: async (url) => {
     if (/\/transactions\/0x/.test(url)) return { timestamp: '2026-01-01T12:00:00Z' };
