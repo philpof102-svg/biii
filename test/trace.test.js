@@ -290,6 +290,35 @@ const { whatMoved } = require('../lib/trace.js');
     assert.notStrictEqual(compteMuet.hops[0].balanceTrx, compteVide.hops[0].balanceTrx);
   });
 
+  /* ── la liste de candidats porte son total ─────────────────────────────────────────────────────
+   * `readBridgeExit` rendait `candidateReceivers: repeated.slice(0, 4)` sans dire combien il y en
+   * avait. Or sa propre note affirme qu'« une valeur de 20 octets repetee est le destinataire
+   * probable »: quatre candidats servis se lisent donc comme quatre pistes a suivre. Le balayage
+   * glisse octet par octet, si bien qu'un calldata dense en produit des dizaines — montrer 4 sur 4 et
+   * 4 sur 101 n'engage pas la meme confiance, et rien ne les distinguait.
+   * ⚠️ Le total eleve vient en partie du glissement lui-meme; c'est une propriete PREEXISTANTE de la
+   * fonction, pas un defaut introduit ici. Elle rend seulement la coupe muette plus trompeuse. */
+  const crAdrs = Array.from({ length: 6 }, (_, i) => String(i + 1).repeat(40));
+  const crDense = await readBridgeExit('base', '0xabc', async () => ({
+    decoded_input: { parameters: [{ name: 'data', value: '0x' + crAdrs.concat(crAdrs).join('') }] } }));
+  const crSansRepet = await readBridgeExit('base', '0xabc', async () => ({
+    decoded_input: { parameters: [{ name: 'data', value: '0x' + '00'.repeat(40) }] } }));
+
+  t('★ au-dela du plafond, les candidats sont coupes ET le total voyage', () => {
+    assert.strictEqual(crDense.candidateReceivers.length, 4, 'la liste servie est plafonnee a quatre');
+    assert.ok(crDense.candidateReceiversTotal > 4,
+      'la fixture doit produire plus de quatre candidats, sinon le test ne dit rien — obtenu '
+      + crDense.candidateReceiversTotal);
+    assert.strictEqual(crDense.candidateReceiversCapped, true);
+  });
+
+  t('★ le cas OPPOSE: sans candidat repete, rien n est coupe et le drapeau reste FAUX', () => {
+    /* Sans ce cas, un `capped` cable a `true` passerait exactement comme le correctif. */
+    assert.strictEqual(crSansRepet.candidateReceivers.length, 0);
+    assert.strictEqual(crSansRepet.candidateReceiversTotal, 0);
+    assert.strictEqual(crSansRepet.candidateReceiversCapped, false);
+  });
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })().catch((e) => {

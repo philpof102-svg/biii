@@ -147,5 +147,47 @@ t('it is pure — no network, no clock, no disk', () => {
   }
 });
 
+/* ── la liste de symboles porte son total ───────────────────────────────────────────────────────
+ * `symbols` est une ILLUSTRATION plafonnee a douze, et `priorFunded` ne peut pas en tenir lieu: il
+ * compte des TOKENS, or un financeur peut en lancer trente sous cinq symboles. Sans `symbolsTotal`,
+ * un appelant qui compte la liste ne distingue pas « douze symboles » de « douze montres sur vingt ». */
+console.log('\nune liste plafonnee doit dire combien elle cache:');
+
+const nSymboles = (n, over) => Array.from({ length: n }, (_, i) =>
+  tok({ funder: '0xCCC', sym: 'S' + i, firstSeen: T(i), ...over }));
+
+t('★ au-dela du plafond, la liste est coupee ET le total voyage', () => {
+  const a = assess(build(nSymboles(20, { outcome: 'rugged' })), '0xccc');
+  assert.equal(a.symbols.length, 12, 'la liste servie est plafonnee a douze');
+  assert.equal(a.symbolsTotal, 20, 'et le VRAI compte de symboles distincts se lit a cote');
+});
+
+t('★ `priorFunded` NE PEUT PAS tenir lieu de total — il compte des tokens, pas des symboles', () => {
+  /* Vingt tokens lances sous TROIS symboles seulement. C est le cas qui separe les deux quantites, et
+   * sans lui on pourrait croire que `priorFunded` suffisait: dans la fixture precedente il vaut 20 comme
+   * `symbolsTotal`, par coincidence de construction. Une assertion qui ne peut pas echouer ne prouve
+   * rien, et la premiere version de ce cas en etait une. */
+  const vingtTokensTroisSymboles = Array.from({ length: 20 }, (_, i) =>
+    tok({ funder: '0xDDD', sym: 'S' + (i % 3), firstSeen: T(i), outcome: 'rugged' }));
+  const a = assess(build(vingtTokensTroisSymboles), '0xddd');
+  assert.equal(a.priorFunded, 20, 'vingt tokens finances');
+  assert.equal(a.symbolsTotal, 3, 'mais seulement trois symboles distincts');
+  assert.notEqual(a.priorFunded, a.symbolsTotal, 'les deux quantites divergent — l une ne remplace pas l autre');
+});
+
+t('★ le cas OPPOSE: sous le plafond, le total EGALE la liste', () => {
+  /* Sans ce cas, un `symbolsTotal` cable sur une constante passerait comme le correctif. */
+  const a = assess(build(nSymboles(3, { outcome: 'rugged' })), '0xccc');
+  assert.equal(a.symbols.length, 3);
+  assert.equal(a.symbolsTotal, 3);
+});
+
+t('la branche « clean so far » publie le total elle aussi — les deux sorties, pas une', () => {
+  const a = assess(build(nSymboles(20, { outcome: 'live' })), '0xccc');
+  assert.equal(a.verdict, 'funder_clean_so_far');
+  assert.equal(a.symbols.length, 12);
+  assert.equal(a.symbolsTotal, 20);
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
