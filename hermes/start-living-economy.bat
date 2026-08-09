@@ -5,7 +5,7 @@ echo   MainStreet / BIII  --  living economy launcher
 echo ============================================================
 echo.
 
-echo [1/3] Hermes gateway (scheduler + biii-watch sentinel)...
+echo [1/4] Hermes gateway (scheduler + biii-watch sentinel)...
 start "hermes-gateway" /min wsl.exe bash /mnt/d/Users/VolKov/veilleIA/biii/hermes/fleet-run.sh gateway
 
 echo [2/4] Fleet console on http://localhost:4799 ...
@@ -24,7 +24,8 @@ echo   Fleet console : http://localhost:4799       grid + LLM spend + run journa
 echo   Sell server   : biii-production.up.railway.app   LIVE, x402 0.25 USDC
 echo   Sentinel      : biii-watch, every 30m, free (no_agent)
 echo.
-echo   The two minimized windows (hermes-gateway / fleet-console) keep the local
-echo   pieces alive. Close them to stop. Railway services stay up on their own.
+echo   The three minimized windows (hermes-gateway / fleet-console /
+echo   hermes-dashboard) keep the local pieces alive. Close them to stop.
+echo   Railway services stay up on their own.
 echo.
 pause
