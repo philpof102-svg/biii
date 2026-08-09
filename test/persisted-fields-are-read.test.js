@@ -102,8 +102,11 @@ const DECLARES = {
   siblingCountCensored: 'temoin: le compte est-il un plancher',
   identicalAmountSiblings: 'compte de virements identiques, lu par le digest',
   industrialFunder: 'copie de `siblingCount` au-dessus du seuil; la regle lit la source',
+  /* ✅ `symbolVerdict` A QUITTE CETTE LISTE LE 2026-08-09, et c'est le garde qui l'a exige: la regle
+   * `thin-sous-le-seuil` le LIT desormais dans `lib/prequential.js`, donc son marqueur de dette devenait
+   * un mensonge. Une allowlist qu'on n'allege jamais finit par masquer les vrais orphelins — c'est
+   * exactement ce que ce fichier teste par ailleurs (« l'allowlist ne contient pas de champ FANTOME »). */
   // — ⚠️ CANDIDATS MESURES ET NON NOTES. Ceux-la sont la vraie dette, et ils sont nommes comme telle.
-  symbolVerdict: '⚠️ CANDIDAT MESURE, NON NOTE — 1830 lignes; rappel 51->83,5 % en contrefactuel (2026-08-08)',
   funderTrace: '⚠️ CANDIDAT MESURE, NON NOTE — 1309 lignes; `no_creator` rugge a 93,2 % (2026-08-08)',
   freshDeployer: '⚠️ CANDIDAT MESURE, NON NOTE — 1115 lignes; +58,9 pts sur lectures completes (2026-08-08)',
   relaunchOfRugged: '⚠️ CANDIDAT MESURE, NON NOTE — 781 lignes; jamais mesure, jamais note',

@@ -34,9 +34,40 @@ t('★ AUCUNE annonce n est antidatee — sinon la note vers l avant est de l in
   for (const a of ANNOUNCED) {
     const d = Date.parse(a.announcedAt);
     assert.ok(Number.isFinite(d), a.key + ': date d annonce illisible');
-    assert.ok(d > derniere,
+    /* ⛔ LA REFERENCE PROPRE A L ENTREE PASSE AVANT LA CONSTANTE GLOBALE, et ce n est pas cosmetique.
+     *
+     * La constante fige la derniere observation connue le jour ou les PREMIERES annonces ont ete
+     * ecrites. Elle ne bouge pas — la bouger invaliderait retroactivement ces entrees-la. Mais du coup
+     * elle vieillit: mesure du 2026-08-09, 116,9 heures d observations s etaient accumulees derriere
+     * elle. Une annonce neuve datee juste apres cette vieille frontiere aurait passe ce test en avalant
+     * cinq jours d in-sample dans sa « note vers l avant ». Le garde etait juste le jour de son
+     * ecriture et avait decay en silence.
+     *
+     * Chaque entree ecrite depuis porte donc `lastObservationAtAnnounce`, et c'est ELLE qui fait foi
+     * quand elle existe. Strictement plus dur que la constante, jamais plus permissif. */
+    const ref = a.lastObservationAtAnnounce || OBSERVATION_LA_PLUS_RECENTE_A_L_ANNONCE;
+    const refMs = Date.parse(ref);
+    assert.ok(Number.isFinite(refMs), a.key + ': reference d observation illisible — ' + ref);
+    assert.ok(refMs >= derniere, a.key + ': sa reference (' + ref + ') est ANTERIEURE a la constante '
+      + 'globale — une entree ne peut pas s offrir une frontiere plus ancienne que le depot');
+    assert.ok(d > refMs,
       a.key + ': annoncee le ' + a.announcedAt + ', soit AVANT ou PENDANT les observations qui ont '
-      + 'servi a fabriquer le chiffre (' + OBSERVATION_LA_PLUS_RECENTE_A_L_ANNONCE + ')');
+      + 'servi a fabriquer le chiffre (' + ref + ')');
+  }
+});
+
+/* ⚠️ LE MIROIR DU GARDE PRECEDENT: il ne sert a rien si personne ne porte la reference stricte. Une
+ * entree neuve qui l omettrait retomberait sur la constante globale — c est-a-dire sur la permissivite
+ * que le garde vient de corriger. On exige donc qu au moins une entree la porte, et que celles qui la
+ * portent la placent bien APRES la constante. Sans ce cas, le champ pourrait disparaitre d un
+ * refactoring sans qu aucun test ne bronche. */
+t('★ la reference stricte est REELLEMENT utilisee par au moins une annonce', () => {
+  const strictes = ANNOUNCED.filter((a) => typeof a.lastObservationAtAnnounce === 'string');
+  assert.ok(strictes.length >= 1,
+    'aucune annonce ne porte `lastObservationAtAnnounce`: le garde renforce ne s applique a personne');
+  for (const a of strictes) {
+    assert.ok(Date.parse(a.lastObservationAtAnnounce) > Date.parse(OBSERVATION_LA_PLUS_RECENTE_A_L_ANNONCE),
+      a.key + ': sa reference stricte n est pas plus recente que la constante — elle n apporte rien');
   }
 });
 
