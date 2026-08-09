@@ -20,7 +20,8 @@
  * differentes. Une sortie constante passerait tous les tests ci-dessus sans rien decider.
  */
 const assert = require('node:assert');
-const { planRadarStorage, applyRadarStorage, planTick, startRadarTicks } = require('../lib/radar-tick');
+const { planRadarStorage, applyRadarStorage, planTick, planDemarrage, ageBaseMinutes,
+  startRadarTicks } = require('../lib/radar-tick');
 
 /* ⛔ LE HARNAIS COMPTE SES PROPRES CAS, ET IL SAIT ATTENDRE. Un `t()` synchrone qui recoit une fonction
  * rendant une Promise la marque « ok » immediatement: l'assertion tombe APRES le bilan et le cas passe
@@ -167,9 +168,67 @@ t('un radar qui sort non-zero est signale comme tel, pas avale', async () => {
   });
 });
 
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * LE RATTRAPAGE DE DEMARRAGE — et le trou qu il ouvrirait s il etait inconditionnel.
+ *
+ * Sans lui: `setInterval` ne tire qu a T+60 min, donc un conteneur qui redemarre plus souvent ne
+ * collecte JAMAIS pendant que le journal affiche « ACTIF » a chaque demarrage. Un instrument mort
+ * indiscernable d un instrument vert — le motif de ce depot.
+ * Avec lui, INCONDITIONNEL: une boucle de plantage relancerait une collecte complete a chaque
+ * redemarrage, sur le seul endpoint qui sert des getLogs larges sur Base et sans repli gratuit.
+ * D ou la condition sur l AGE, et les deux directions sont testees.
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+t('age ILLISIBLE: on collecte — ne pas pouvoir lire n est pas une preuve de fraicheur', () => {
+  for (const a of [null, undefined, NaN, 'abc', Infinity]) {
+    const d = planDemarrage({ minutes: 60, ageMinutes: a });
+    assert.strictEqual(d.run, true, 'age=' + String(a) + ' doit declencher le rattrapage');
+    assert.ok(/ILLISIBLE/.test(d.raison), 'la raison doit dire que l age manque: ' + d.raison);
+  }
+});
+
+t('base en retard: rattrapage — base fraiche: pas de rattrapage (les DEUX sens)', () => {
+  const retard = planDemarrage({ minutes: 60, ageMinutes: 180 });
+  const frais = planDemarrage({ minutes: 60, ageMinutes: 5 });
+  assert.strictEqual(retard.run, true, 'trois heures de retard doivent rattraper');
+  assert.strictEqual(frais.run, false, 'cinq minutes ne justifient pas une collecte complete');
+  assert.ok(/retard de 180 min/.test(retard.raison), retard.raison);
+  assert.ok(/rien a rattraper/.test(frais.raison), frais.raison);
+  /* La BORNE voyage avec le chiffre: l intervalle est nomme dans les deux raisons. */
+  assert.ok(/60/.test(retard.raison) && /60/.test(frais.raison), 'l intervalle doit apparaitre');
+});
+
+t('radar inactif: aucun rattrapage, quel que soit l age', () => {
+  for (const a of [null, 9999]) {
+    assert.strictEqual(planDemarrage({ minutes: 0, ageMinutes: a }).run, false);
+  }
+});
+
+t('ageBaseMinutes sur un dossier illisible rend null, il ne jette pas', () => {
+  assert.strictEqual(ageBaseMinutes('/chemin/qui/n/existe/pas'), null);
+});
+
+t('demarrage: une base EN RETARD planifie le rattrapage, une base FRAICHE non', () => {
+  const fait = (age) => {
+    let differe = null;
+    const r = startRadarTicks({
+      minutes: 60, ageMinutes: age, repoDir: REPO, volumeRoot: undefined, inspect: vue({}), io: {},
+      lancer: () => Promise.resolve({ code: 0 }), log: () => {},
+      planifier: () => ({ unref() {} }), differer: (fn) => { differe = fn; return { unref() {} }; },
+    });
+    return { differe, r };
+  };
+  const retard = fait(180), frais = fait(5);
+  assert.strictEqual(typeof retard.differe, 'function', 'une base en retard doit planifier un rattrapage');
+  assert.strictEqual(frais.differe, null, 'une base fraiche ne doit RIEN planifier au demarrage');
+  /* Temoin: les deux appels different bien par leur decision, pas par hasard. */
+  assert.strictEqual(retard.r.rattrapage.run, true);
+  assert.strictEqual(frais.r.rattrapage.run, false);
+});
+
 /* Le bilan attend les cas asynchrones. Et il verifie son PROPRE compte: une suite qui n a rien
  * execute doit echouer bruyamment plutot que d imprimer « 0 passed, 0 failed » et sortir 0. */
-const ATTENDUS = 12;
+const ATTENDUS = 17;
 Promise.all(encours).then(() => {
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   if (pass + fail !== ATTENDUS) {
