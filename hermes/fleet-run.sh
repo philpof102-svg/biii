@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # fleet-run.sh — launch ONE living-economy service in the FOREGROUND (via exec) so the wsl.exe window
 # that calls it stays alive keeping the service up. Called by start-living-economy.bat as:
-#   wsl.exe bash <this> gateway   |   wsl.exe bash <this> console
+#   wsl.exe bash <this> gateway   |   wsl.exe bash <this> console   |   wsl.exe bash <this> dashboard
 # If the service is already running, exit 0 immediately (the window just closes).
 export PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:${PATH:-}
 export HERMES_HOME=/root/.hermes-biii
@@ -27,6 +27,6 @@ case "$1" in
     exec "$HERMES_BIN" dashboard --port 4711 --host 127.0.0.1 --no-open
     ;;
   *)
-    echo "usage: fleet-run.sh gateway|console"; sleep 2; exit 2
+    echo "usage: fleet-run.sh gateway|console|dashboard"; sleep 2; exit 2
     ;;
 esac
