@@ -42,7 +42,7 @@ t('★ financeur NON trace: aucun taux, et la raison dit pourquoi', () => {
     const o = observationThin({ status: 'thin', siblingCount: sc });
     assert.strictEqual(o.rate, null, 'siblingCount=' + String(sc) + ' ne doit rien publier');
     assert.strictEqual(o.boundChecked, false);
-    assert.ok(/RETENU/.test(o.why), 'la raison doit dire que le taux est retenu: ' + o.why);
+    assert.ok(/WITHHELD/.test(o.why), 'la raison doit dire que le taux est retenu: ' + o.why);
     assert.ok(typeof o.howToCheck === 'string', 'il faut dire COMMENT lever la retenue');
   }
 });
@@ -52,14 +52,14 @@ t('★ financeur AU-DESSUS du seuil: la borne est verifiee et le taux reste rete
   assert.strictEqual(o.boundChecked, true, 'la borne EST verifiee, ce n est pas une ignorance');
   assert.strictEqual(o.applies, false);
   assert.strictEqual(o.rate, null, 'au-dessus du seuil, publier un taux serait publier un plafond');
-  assert.ok(/plafond/.test(o.why), o.why);
+  assert.ok(/ceiling/.test(o.why), o.why);
 });
 
 t('★ symbole NON verifie: « pas verifie » n est pas « pas thin »', () => {
   for (const s of ['not_a_candidate', 'unknown', undefined, null, 42]) {
     const o = observationThin({ status: s, siblingCount: 3 });
     assert.strictEqual(o.rate, null, 'status=' + String(s) + ' ne doit rien publier');
-    assert.ok(/n est pas/.test(o.why), o.why);
+    assert.ok(/not "checked and not thin"/.test(o.why), o.why);
   }
 });
 
@@ -116,7 +116,14 @@ t('★ le chiffre est LU dans l annonce, pas recopie', () => {
    * l annonce serait remplacee par une entree neuve. On verifie donc l IDENTITE avec la source. */
   assert.strictEqual(o.rate, PARI.predicted.dangerRate);
   assert.strictEqual(o.announcedAt, PARI.announcedAt);
-  assert.strictEqual(o.label, PARI.label);
+  /* ⛔ LA PROSE DE L ENGAGEMENT EST TOUJOURS SERVIE VERBATIM, sous un champ qui dit ce qu elle est.
+   * `label` porte desormais notre propre description anglaise (l annonce est en francais et
+   * `announced-rules.js` interdit de la modifier), mais `announcementLabel` relaie l originale — sinon
+   * on servirait une reformulation en pretendant citer un engagement. */
+  assert.strictEqual(o.announcementLabel, PARI.label,
+    'la prose de l annonce doit rester servie TELLE QUELLE, sinon le pari n est plus citable');
+  assert.notStrictEqual(o.label, PARI.label, 'et `label` doit etre notre description, pas un relais');
+  assert.ok(o.label.length > 20, 'qui doit dire quelque chose: ' + o.label);
 });
 
 /* ── 4. CE QUE LA REPONSE DOIT DIRE D ELLE-MEME ───────────────────────────────────────────────────── */
@@ -132,7 +139,7 @@ t('★ la divulgation refuse explicitement l affirmation sur l actif', () => {
   const o = observationThin({ status: 'thin', siblingCount: 3 });
   assert.strictEqual(o.disclosure, DIVULGATION);
   assert.ok(/POPULATION/.test(o.disclosure), 'la divulgation doit nommer la population');
-  assert.ok(/jamais une affirmation sur cet/.test(o.disclosure),
+  assert.ok(/never a claim about this asset/.test(o.disclosure),
     'elle doit interdire explicitement la lecture « ce token va rugger »');
   /* Toutes les formes, y compris les refus, portent la divulgation: c est precisement quand on ne
    * publie pas de taux qu un appelant est tente d en inferer un. */
@@ -177,7 +184,7 @@ t('★ CABLAGE — un token que ce noeud a deja observe leve la retenue, sans ap
   assert.ok(r.observedRisk, 'le champ doit exister');
   assert.strictEqual(r.observedRisk.boundChecked, true, 'la borne doit etre verifiee depuis notre base');
   assert.strictEqual(r.observedRisk.siblingCount, 3);
-  assert.strictEqual(r.observedRisk.siblingCountSource, 'observation de ce noeud',
+  assert.strictEqual(r.observedRisk.siblingCountSource, 'this node own observation',
     'la PROVENANCE doit voyager: un chiffre sans elle se lit comme verifie a l instant');
   assert.strictEqual(r.observedRisk.siblingCountObservedAt, '2026-08-09T00:00:00.000Z');
   assert.ok(typeof r.observedRisk.rate === 'number', 'un taux doit sortir: ' + JSON.stringify(r.observedRisk));
@@ -190,7 +197,7 @@ t('★ CABLAGE, cas OPPOSE — un token jamais observe garde sa retenue et DIT p
     fetchImpl: async () => paires(HORS) });
   assert.strictEqual(r.observedRisk.rate, null, 'rien ne doit se publier sur un token inconnu de nous');
   assert.strictEqual(r.observedRisk.boundChecked, false);
-  assert.ok(/jamais ete observe/.test(r.observedRisk.siblingCountSource),
+  assert.ok(/never been observed/.test(r.observedRisk.siblingCountSource),
     'la source doit dire pourquoi la retenue tient: ' + r.observedRisk.siblingCountSource);
 });
 
@@ -210,11 +217,83 @@ t('la valeur FOURNIE par l appelant prime sur la base, et le dit', async () => {
   const r = await vetMeme({ symbol: 'TEST', chainId: 'base', address: ADR, dbPath: db, siblingCount: 2,
     fetchImpl: async () => paires(ADR) });
   assert.strictEqual(r.observedRisk.siblingCount, 2, 'l appelant a trace lui-meme, sa valeur est plus fraiche');
-  assert.strictEqual(r.observedRisk.siblingCountSource, 'fourni par l appelant');
+  assert.strictEqual(r.observedRisk.siblingCountSource, 'supplied by the caller');
   assert.strictEqual(r.observedRisk.applies, true);
 });
 
-const ATTENDUS = 15;
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * LA GARDE DE LANGUE — et pourquoi elle vaut plus que la correction qu'elle protège.
+ *
+ * Mesuré le 2026-08-09: cet outil s'est mis à porter DEUX divulgations, celle de `vetMeme` en anglais
+ * et la mienne en français. `till_vet_meme` est exposé à des agents TIERS via le MCP hébergé, et tout
+ * le reste de la réponse — description de l'outil, `reason`, `disclosure` — est anglophone.
+ *
+ * ⛔ CE N'EST PAS COSMÉTIQUE. La divulgation est la pièce critique: c'est elle qui dit « jamais une
+ * affirmation sur cet actif ». Une mise en garde que son lecteur ne peut pas lire n'est pas une mise
+ * en garde. Et le défaut était INVISIBLE jusqu'à ce que quelqu'un compare les deux champs à la main.
+ *
+ * ⚠️ La garde teste la SORTIE RÉELLE de toutes les branches, jamais le texte source: un balayage du
+ * fichier confondrait les commentaires — qui restent en français, c'est le style de la maison — avec
+ * les chaînes servies. Elle appelle donc la fonction et regarde ce qui sort.
+ *
+ * ⚠️ Et les marqueurs sont choisis pour ne PAS crier au loup: des mots-outils français qui n'existent
+ * pas isolés en anglais technique. Une garde qui produit des faux positifs se fait désactiver — ce
+ * dépôt l'a déjà écrit à propos d'un autre garde.
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+/* ⚠️ LE JEU DE MARQUEURS A ÉTÉ CALIBRÉ EMPIRIQUEMENT, dans les deux sens, contre les 33 chaînes que ce
+ * module sert réellement — pas choisi de tête. Mon premier jet (`les`, `n est`, `financeur`…) laissait
+ * passer « le symbole n a pas ete verifie »: la mutation ne mordait pas, donc la garde était une
+ * décoration. Ce sont des mots-outils français qui n'existent pas isolés en anglais technique. */
+const MARQUEURS_FR = /\b(le|la|les|du|des|une|pas|est|sur|avec|sans|dans|pour|ce|cette|qui|par|ete|aucune?)\b/i;
+
+/* ⛔ LES IDENTIFIANTS SONT EXCLUS, ET C'EST UNE DÉCISION, PAS UNE ÉCHAPPATOIRE.
+ * `reading` nomme l'entrée gelée de `announced-rules.js` et doit rester littéralement identique des
+ * deux côtés; `announcementLabel` est la prose de l'engagement, servie TELLE QUELLE pour qui veut la
+ * source. Les traduire casserait la chose même qu'ils désignent. Tout le reste est de la prose servie
+ * à un tiers et doit être lisible par lui. */
+const IDENTIFIANTS = new Set(['reading', 'announcementLabel', 'announcedAt', 'side']);
+
+const formesServies = () => [
+  observationThin({ status: 'thin', siblingCount: 3 }),
+  observationThin({ status: 'genuine', siblingCount: 3 }),
+  observationThin({ status: 'thin', siblingCount: SEUIL_FRERES }),
+  observationThin({ status: 'thin' }),
+  observationThin({ status: 'unknown', siblingCount: 3 }),
+  observationThin({ status: 'thin', siblingCount: 3, gradedForward: 9 }),
+];
+
+const fautesDeLangue = (formes) => {
+  const out = [];
+  for (const o of formes) {
+    for (const [k, v] of Object.entries(o)) {
+      if (typeof v !== 'string' || IDENTIFIANTS.has(k)) continue;
+      const m = MARQUEURS_FR.exec(v);
+      if (m) out.push(k + ': «' + m[1] + '» dans "' + v.slice(0, 70) + '…"');
+    }
+  }
+  return out;
+};
+
+t('★ GARDE DE LANGUE — aucune chaine SERVIE ne part en francais', () => {
+  const formes = formesServies();
+  assert.strictEqual(formes.length, 6, 'sanity: les six branches doivent etre couvertes');
+  const fautes = fautesDeLangue(formes);
+  assert.deepStrictEqual(fautes, [],
+    'chaine(s) servie(s) en francais — un agent tiers lit cette reponse:\n       ' + fautes.join('\n       '));
+});
+
+t('★ la garde MORD — teste sur les MEMES chaines, avec du francais injecte', () => {
+  /* ⛔ Ce cas existe parce que la premiere version de cette garde a PASSE sa propre mutation. On ne
+   * verifie donc pas la regex dans le vide: on rejoue la MEME fonction de detection sur les memes
+   * formes, avec un champ remplace par du francais reel — celui-la meme qui etait passe. */
+  const formes = formesServies().map((o) => ({ ...o, why: 'le symbole n a pas ete verifie' }));
+  const fautes = fautesDeLangue(formes);
+  assert.ok(fautes.length >= 6, 'la garde doit attraper le francais injecte dans CHAQUE forme, vu '
+    + fautes.length + ' — sinon elle est une decoration');
+  assert.ok(fautes.every((f) => f.startsWith('why:')), 'et elle doit nommer le champ fautif: ' + fautes[0]);
+});
+
+const ATTENDUS = 17;
 Promise.all(encours).then(() => {
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   if (pass + fail !== ATTENDUS) {
