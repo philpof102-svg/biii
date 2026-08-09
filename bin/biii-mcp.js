@@ -351,6 +351,25 @@ function instantMs(v) {
   return { fourni: true, ms: Number.isFinite(d) ? d : null };
 }
 
+/**
+ * fenetreDe — LA lecture des bornes de fenetre pour les outils de livres (till_export, till_meter).
+ *
+ * Les deux routes portaient la MEME paire de lignes recopiee, et le defaut etait dans les deux — c'est le
+ * motif « le correctif va sur une route et pas sur sa jumelle » pris en amont: il n'y a plus qu'un endroit.
+ * On ne valide RIEN ici: on transmet les valeurs telles quelles a `ledger.boundStrict`, l'unique regle,
+ * pour qu'une borne illisible soit REFUSEE au lieu d'etre jetee en silence (mesure dans lib/ledger.js).
+ *
+ * ⚠️ Les bornes sont en SECONDES unix (block time), pas en millisecondes — c'est pourquoi `instantMs`
+ * juste au-dessus, qui distingue pourtant deja « fourni » de « illisible », n'est PAS reutilisee ici:
+ * elle rend des millisecondes, et une borne au mauvais facteur 1000 ne refuse pas, elle repond faux.
+ */
+function fenetreDe(a) {
+  const w = {};
+  if (a.fromBlockTime !== undefined) w.fromBlockTime = a.fromBlockTime;
+  if (a.toBlockTime !== undefined) w.toBlockTime = a.toBlockTime;
+  return w;
+}
+
 async function callTool(name, a = {}) {
   if (name === 'till_vet_merchant') {
     const g = exigeAdresse(a.address); if (g.error) return g;
@@ -785,9 +804,11 @@ async function callTool(name, a = {}) {
     // (QuickBooks/Xero/Excel import it). Same non-custodial discipline: every row carries its txHash +
     // Basescan link so the accountant re-verifies on Base — a pointer to the chain, never a book to trust.
     const receipts = (Array.isArray(a.receipts) ? a.receipts : []).filter((r) => r && r.txHash);
-    const window = {};
-    if (Number.isFinite(a.fromBlockTime)) window.fromBlockTime = Number(a.fromBlockTime);
-    if (Number.isFinite(a.toBlockTime)) window.toBlockTime = Number(a.toBlockTime);
+    /* Les bornes descendent BRUTES: c'est `ledger.boundStrict` qui les lit, en un seul endroit pour les
+     * trois routes des livres. Le `Number.isFinite(...)` qui filtrait ici etait un test de TYPE — faux pour
+     * `"1783555200"` — et une borne rejetee laissait `window` vide, donc un total de TOUS LES TEMPS rendu
+     * sous une question datee (mesure et detail dans lib/ledger.js). */
+    const window = fenetreDe(a);
     const ex = X.buildExport(receipts, { window, brand: a.brand });
     // La divulgation doit atteindre l'agent au bout du fil: `...ex` porte deja summary.undatedExcluded et
     // la phrase dans `disclosure`, mais `note` est ce qu'un appelant lit en premier — elle le dit aussi.
@@ -800,9 +821,9 @@ async function callTool(name, a = {}) {
     // USAGE → BILL, stateless, split by trust: settled receipts are provable (on-chain), the verdict
     // count is self-reported (advisory reads aren't chain artifacts). The plan is injected by the partner.
     const receipts = (Array.isArray(a.receipts) ? a.receipts : []).filter((r) => r && r.txHash);
-    const window = {};
-    if (Number.isFinite(a.fromBlockTime)) window.fromBlockTime = Number(a.fromBlockTime);
-    if (Number.isFinite(a.toBlockTime)) window.toBlockTime = Number(a.toBlockTime);
+    // MEME lecture de bornes que till_export — c'etait deja la meme paire de lignes recopiee, et le defaut
+    // etait dans les deux. Une facture sur la mauvaise fenetre est le cas cher des deux.
+    const window = fenetreDe(a);
     const bill = meterUsage(receipts, { plan: a.plan, verdictCount: a.verdictCount, window });
     const manque = bill.provable.undatedExcluded
       ? `⚠ ${bill.provable.undatedExcluded} receipt(s) had no on-chain block time and are NOT billed in this dated period — this total is UNDER-charged. `
@@ -930,6 +951,17 @@ async function handleRpc(m) {
      * Naming the unknown tool leaks nothing: `tools/list` is public and unauthenticated by design. The
      * CWE-209 concern is about internal detail (stack traces, paths, upstream errors), and that stays in
      * the server log — which is why the failed-tool branch keeps its deliberately uninformative message. */
+    /* UN REFUS QUE NOUS AVONS VALIDE N'EST PAS UNE PANNE — meme distinction que « unknown tool » juste
+     * en dessous, et pour la meme raison: la cause est ETABLIE, pas devinee. Le message generique existe
+     * parce que ce catch ne peut pas savoir si l'entree ou l'amont a lache; quand la validation a elle-meme
+     * pose le drapeau, il le sait. Sans cette branche, `window.fromBlockTime is present but unreadable`
+     * ressortait en « failed » nu: l'appelant apprenait que son export n'avait pas abouti, jamais QUE sa
+     * borne etait illisible ni COMMENT la corriger — et un refus muet ramene tout droit a renvoyer la
+     * meme requete. -32602 est le code du protocole pour exactement ce cas.
+     * Aucun detail interne ne sort: le texte est le notre, il ne cite ni trace, ni chemin, ni erreur amont. */
+    if (method === 'tools/call' && e && e.invalidParams === true) {
+      return { jsonrpc: '2.0', id, error: { code: -32602, message: String(e.message) } };
+    }
     const unknownTool = method === 'tools/call' && /^unknown tool /.test(String(e && e.message));
     if (unknownTool) {
       return { jsonrpc: '2.0', id, error: { code: -32601,
