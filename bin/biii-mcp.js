@@ -158,11 +158,12 @@ const TOOLS = [
       token: { type: 'string', description: '0x contract address of the token' },
       claimedIssuer: { type: 'string', description: 'what it claims to be, e.g. "BlackRock"' },
       claimedSymbol: { type: 'string', description: 'e.g. "BUIDL", "TSLAx"' } }, required: ['token'] } },
-  { name: 'till_vet_meme', description: 'Which contract is the REAL memecoin among 10+ look-alikes? Fail-closed verdict from live market data (DexScreener). Returns: genuine (one contract dominates liquidity), ambiguous (top-2 tied — never certified), impersonation (the address you passed is NOT the dominant one), thin (no credible liquidity). Advisory + re-verifiable.',
+  { name: 'till_vet_meme', description: 'Which contract is the REAL memecoin among 10+ look-alikes? Fail-closed verdict from live market data (DexScreener). Returns: genuine (one contract dominates liquidity), ambiguous (top-2 tied — never certified), impersonation (the address you passed is NOT the dominant one), thin (no credible liquidity). Advisory + re-verifiable. ALSO returns `observedRisk`, kept SEPARATE from the verdict on purpose: `status` answers IDENTITY ("is this the contract you think it is?"), `observedRisk` carries what this node has MEASURED about outcomes. Its rate is WITHHELD unless the bound is verified — the reading was only measured where the launch funder had paid fewer than 20 sibling wallets, and outside that branch it separates almost nothing, so a number there would be a ceiling dressed as a signal. The bound is checked for free against this node\'s own observation database; pass `siblingCount` yourself if you have traced the funder. Every shape carries `siblingCountSource` (where the number came from) and a disclosure: it is a POPULATION statistic, never a claim that this particular token will rug. `inSample: true` means the bet has graded nothing forward yet.',
     inputSchema: { type: 'object', properties: {
       symbol: { type: 'string', description: 'memecoin symbol, e.g. "TOSHI", "BRETT"' },
       chainId: { type: ['string', 'number'], description: 'optional chain filter — the DexScreener slug ("base", "solana", "ethereum") or an EVM chain id (8453 = Base). A chain we cannot map returns NO candidates rather than silently searching every chain: being handed a Solana contract after asking for Base is worse than being handed nothing.' },
-      address: { type: 'string', description: 'optional specific contract address to judge' } }, required: ['symbol'] } },
+      address: { type: 'string', description: 'optional specific contract address to judge' },
+      siblingCount: { type: 'number', description: 'optional: how many sibling wallets the launch funder has paid, if YOU have traced it. Supplying it lifts the withholding on `observedRisk`. Omit it and this node checks its own observation database for free; omit it AND the token is unknown here, and the rate stays WITHHELD rather than guessed.' } }, required: ['symbol'] } },
   { name: 'till_receipt', description: 'Produce the chain-anchored receipt for a VERIFIED payment (txHash + basescan link). Refuses without verification.',
     inputSchema: { type: 'object', properties: {
       to: { type: 'string' }, amountUsd: { type: 'string' }, label: { type: 'string' },
@@ -648,7 +649,11 @@ async function callTool(name, a = {}) {
      * qui ne correspondait a aucun slug DexScreener, donc en « tout ecarter ». On passe la valeur TELLE
      * QUELLE; lib/meme.js accepte le slug comme l'identifiant numerique et refuse ce qu'il ne sait pas
      * traduire. Voir l'en-tete de candidatesFrom pour la mesure en production. */
-    const result = await vetMeme({ symbol: a.symbol, chainId: a.chainId, address: a.address });
+    /* `siblingCount` n'est transmis que s'il est un NOMBRE. Passer une chaine ou `null` ferait echouer
+     * la borne cote service — et le module la traiterait comme « non trace », ce qui est correct mais
+     * silencieux. Mieux vaut ne rien transmettre et laisser la base repondre. */
+    const result = await vetMeme({ symbol: a.symbol, chainId: a.chainId, address: a.address,
+      siblingCount: typeof a.siblingCount === 'number' ? a.siblingCount : undefined });
     return { ...result, note: 'ADVISORY. genuine = one contract dominates liquidity (>3x runner-up); ambiguous = top-2 tied (never certified); re-verify on DexScreener/Basescan.' };
   }
   if (name === 'till_rug_powers') {

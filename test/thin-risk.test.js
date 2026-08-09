@@ -142,7 +142,79 @@ t('★ la divulgation refuse explicitement l affirmation sur l actif', () => {
   }
 });
 
-const ATTENDUS = 11;
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * LE CABLAGE: la borne devient-elle VRAIMENT verifiable en ligne ?
+ *
+ * Sans trace du financeur, `observedRisk` existe mais son taux est retenu POUR TOUJOURS — un champ servi
+ * qui ne dit jamais rien. Le chemin branche est celui qui ne coute AUCUN appel reseau: notre propre base
+ * d'observation. Ces cas verifient qu'il leve reellement la retenue, et qu'il dit d'ou vient le chiffre.
+ *
+ * ⚠️ Base FABRIQUEE et injectee: lire la vraie base ferait bouger la reponse a chaque run du radar, et un
+ * test dont le resultat change tout seul finit desactive.
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { vetMeme } = require('../lib/meme');
+const { _clearCache } = require('../lib/funder-history');
+
+const ADR = '0x' + 'a'.repeat(40);
+const HORS = '0x' + 'b'.repeat(40);
+const paires = (adr) => ({ pairs: [{ chainId: 'base', baseToken: { symbol: 'TEST', address: adr, name: 'T' },
+  liquidity: { usd: 500000 }, volume: { h24: 1 }, url: 'https://x' }] });
+
+function baseFabriquee(siblingCount) {
+  const p = path.join(os.tmpdir(), 'thin-risk-db-' + siblingCount + '.json');
+  fs.writeFileSync(p, JSON.stringify({ [ADR]: { siblingCount, lastSeen: '2026-08-09T00:00:00.000Z' } }));
+  return p;
+}
+
+t('★ CABLAGE — un token que ce noeud a deja observe leve la retenue, sans appel reseau', async () => {
+  _clearCache();
+  const db = baseFabriquee(3);
+  const r = await vetMeme({ symbol: 'TEST', chainId: 'base', address: ADR, dbPath: db,
+    fetchImpl: async () => paires(ADR) });
+  assert.ok(r.observedRisk, 'le champ doit exister');
+  assert.strictEqual(r.observedRisk.boundChecked, true, 'la borne doit etre verifiee depuis notre base');
+  assert.strictEqual(r.observedRisk.siblingCount, 3);
+  assert.strictEqual(r.observedRisk.siblingCountSource, 'observation de ce noeud',
+    'la PROVENANCE doit voyager: un chiffre sans elle se lit comme verifie a l instant');
+  assert.strictEqual(r.observedRisk.siblingCountObservedAt, '2026-08-09T00:00:00.000Z');
+  assert.ok(typeof r.observedRisk.rate === 'number', 'un taux doit sortir: ' + JSON.stringify(r.observedRisk));
+});
+
+t('★ CABLAGE, cas OPPOSE — un token jamais observe garde sa retenue et DIT pourquoi', async () => {
+  _clearCache();
+  const db = baseFabriquee(3);
+  const r = await vetMeme({ symbol: 'TEST', chainId: 'base', address: HORS, dbPath: db,
+    fetchImpl: async () => paires(HORS) });
+  assert.strictEqual(r.observedRisk.rate, null, 'rien ne doit se publier sur un token inconnu de nous');
+  assert.strictEqual(r.observedRisk.boundChecked, false);
+  assert.ok(/jamais ete observe/.test(r.observedRisk.siblingCountSource),
+    'la source doit dire pourquoi la retenue tient: ' + r.observedRisk.siblingCountSource);
+});
+
+t('★ CABLAGE — un token observe AU-DESSUS du seuil ne publie toujours rien', async () => {
+  _clearCache();
+  const db = baseFabriquee(50);
+  const r = await vetMeme({ symbol: 'TEST', chainId: 'base', address: ADR, dbPath: db,
+    fetchImpl: async () => paires(ADR) });
+  assert.strictEqual(r.observedRisk.boundChecked, true, 'la borne EST verifiee — ce n est pas une ignorance');
+  assert.strictEqual(r.observedRisk.applies, false);
+  assert.strictEqual(r.observedRisk.rate, null);
+});
+
+t('la valeur FOURNIE par l appelant prime sur la base, et le dit', async () => {
+  _clearCache();
+  const db = baseFabriquee(50);
+  const r = await vetMeme({ symbol: 'TEST', chainId: 'base', address: ADR, dbPath: db, siblingCount: 2,
+    fetchImpl: async () => paires(ADR) });
+  assert.strictEqual(r.observedRisk.siblingCount, 2, 'l appelant a trace lui-meme, sa valeur est plus fraiche');
+  assert.strictEqual(r.observedRisk.siblingCountSource, 'fourni par l appelant');
+  assert.strictEqual(r.observedRisk.applies, true);
+});
+
+const ATTENDUS = 15;
 Promise.all(encours).then(() => {
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   if (pass + fail !== ATTENDUS) {
