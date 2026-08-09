@@ -24,7 +24,8 @@ echo   Fleet console : http://localhost:4799       grid + LLM spend + run journa
 echo   Sell server   : biii-production.up.railway.app   LIVE, x402 0.25 USDC
 echo   Sentinel      : biii-watch, every 30m, free (no_agent)
 echo.
-echo   The two minimized windows (hermes-gateway / fleet-console) keep the local
-echo   pieces alive. Close them to stop. Railway services stay up on their own.
+echo   The three minimized windows (hermes-gateway / fleet-console /
+echo   hermes-dashboard) keep the local pieces alive. Close them to stop.
+echo   Railway services stay up on their own.
 echo.
 pause
