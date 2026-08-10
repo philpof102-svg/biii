@@ -57,7 +57,7 @@ t('★ financeur AU-DESSUS du seuil: la borne est verifiee et le taux reste rete
 
 t('★ symbole NON verifie: « pas verifie » n est pas « pas thin »', () => {
   for (const s of ['not_a_candidate', 'unknown', undefined, null, 42]) {
-    const o = observationThin({ status: s, siblingCount: 3 });
+    const o = observationThin({ status: s, siblingCount: 3, siblingCountCensored: false });
     assert.strictEqual(o.rate, null, 'status=' + String(s) + ' ne doit rien publier');
     assert.ok(/not "checked and not thin"/.test(o.why), o.why);
   }
@@ -66,7 +66,7 @@ t('★ symbole NON verifie: « pas verifie » n est pas « pas thin »', () => {
 /* ── 2. CE QUI SE PUBLIE, ET SEULEMENT LA ─────────────────────────────────────────────────────────── */
 
 t('dans la branche mesuree, `thin` sert le taux DANGER de l annonce', () => {
-  const o = observationThin({ status: 'thin', siblingCount: 3 });
+  const o = observationThin({ status: 'thin', siblingCount: 3, siblingCountCensored: false });
   assert.strictEqual(o.applies, true);
   assert.strictEqual(o.side, 'danger');
   assert.strictEqual(o.rate, PARI.predicted.dangerRate, 'le taux servi doit etre CELUI DU PARI');
@@ -75,15 +75,15 @@ t('dans la branche mesuree, `thin` sert le taux DANGER de l annonce', () => {
 });
 
 t('dans la branche mesuree, un symbole VERIFIE non-thin sert le taux SUR', () => {
-  const o = observationThin({ status: 'genuine', siblingCount: 3 });
+  const o = observationThin({ status: 'genuine', siblingCount: 3, siblingCountCensored: false });
   assert.strictEqual(o.side, 'safe');
   assert.strictEqual(o.rate, PARI.predicted.safeRate);
   assert.strictEqual(o.funders, PARI.basis.safeFunders);
 });
 
 t('★ TEMOIN — les deux cotes ne servent pas le meme chiffre', () => {
-  const d = observationThin({ status: 'thin', siblingCount: 3 });
-  const s = observationThin({ status: 'genuine', siblingCount: 3 });
+  const d = observationThin({ status: 'thin', siblingCount: 3, siblingCountCensored: false });
+  const s = observationThin({ status: 'genuine', siblingCount: 3, siblingCountCensored: false });
   assert.notStrictEqual(d.rate, s.rate, 'sortie constante: le statut n est lu par personne');
   assert.ok(d.rate > s.rate, 'le cote thin doit etre le plus dangereux des deux');
 });
@@ -111,7 +111,7 @@ t('★ la regle notee s abstient aussi sur un symbole non verifie — les deux p
 });
 
 t('★ le chiffre est LU dans l annonce, pas recopie', () => {
-  const o = observationThin({ status: 'thin', siblingCount: 1 });
+  const o = observationThin({ status: 'thin', siblingCount: 1, siblingCountCensored: false });
   /* Si quelqu un recopiait 0.884 en dur ici, ce test passerait aujourd hui et mentirait le jour ou
    * l annonce serait remplacee par une entree neuve. On verifie donc l IDENTITE avec la source. */
   assert.strictEqual(o.rate, PARI.predicted.dangerRate);
@@ -133,7 +133,7 @@ t('★ l etat IN-SAMPLE est dit, pas cache — et il a TROIS etats, pas deux', (
    * « personne ne me l'a dit » en « rien n'a ete note ». Mesure du 2026-08-10: aucune des deux routes
    * servies ne fournit ce chiffre, donc l'affirmation etait GELEE — vraie aujourd'hui, fausse des la
    * premiere notation, et jamais corrigee. Non fourni => `null`. */
-  const sansChiffre = observationThin({ status: 'thin', siblingCount: 3 });
+  const sansChiffre = observationThin({ status: 'thin', siblingCount: 3, siblingCountCensored: false });
   assert.strictEqual(sansChiffre.inSample, null, 'non fourni n est pas zero');
   assert.strictEqual(sansChiffre.gradedForward, null);
   assert.ok(/nobody told me/.test(sansChiffre.gradedForwardNote || ''),
@@ -151,14 +151,14 @@ t('★ l etat IN-SAMPLE est dit, pas cache — et il a TROIS etats, pas deux', (
 });
 
 t('★ la divulgation refuse explicitement l affirmation sur l actif', () => {
-  const o = observationThin({ status: 'thin', siblingCount: 3 });
+  const o = observationThin({ status: 'thin', siblingCount: 3, siblingCountCensored: false });
   assert.strictEqual(o.disclosure, DIVULGATION);
   assert.ok(/POPULATION/.test(o.disclosure), 'la divulgation doit nommer la population');
   assert.ok(/never a claim about this asset/.test(o.disclosure),
     'elle doit interdire explicitement la lecture « ce token va rugger »');
   /* Toutes les formes, y compris les refus, portent la divulgation: c est precisement quand on ne
    * publie pas de taux qu un appelant est tente d en inferer un. */
-  for (const o2 of [observationThin({ status: 'thin' }), observationThin({ status: 'unknown', siblingCount: 3 }),
+  for (const o2 of [observationThin({ status: 'thin' }), observationThin({ status: 'unknown', siblingCount: 3, siblingCountCensored: false }),
     observationThin({ status: 'thin', siblingCount: 99 })]) {
     assert.strictEqual(o2.disclosure, DIVULGATION, 'un REFUS doit porter la divulgation lui aussi');
   }
@@ -185,9 +185,15 @@ const HORS = '0x' + 'b'.repeat(40);
 const paires = (adr) => ({ pairs: [{ chainId: 'base', baseToken: { symbol: 'TEST', address: adr, name: 'T' },
   liquidity: { usd: 500000 }, volume: { h24: 1 }, url: 'https://x' }] });
 
-function baseFabriquee(siblingCount) {
-  const p = path.join(os.tmpdir(), 'thin-risk-db-' + siblingCount + '.json');
-  fs.writeFileSync(p, JSON.stringify({ [ADR]: { siblingCount, lastSeen: '2026-08-09T00:00:00.000Z' } }));
+/* ⛔ `siblingCountCensored` FAIT PARTIE DE LA FIXTURE, et son absence est un cas a part entiere.
+ * Un enregistrement sans ce drapeau ne prouve PAS que le compte est complet — c'est le troisieme etat,
+ * et le service retient desormais dessus. Le defaut par defaut est donc `false` ici (compte etabli),
+ * et le cas « drapeau absent » est teste explicitement plus bas. */
+function baseFabriquee(siblingCount, censored = false) {
+  const p = path.join(os.tmpdir(), 'thin-risk-db-' + siblingCount + '-' + String(censored) + '.json');
+  const ligne = { siblingCount, lastSeen: '2026-08-09T00:00:00.000Z' };
+  if (censored !== null) ligne.siblingCountCensored = censored;
+  fs.writeFileSync(p, JSON.stringify({ [ADR]: ligne }));
   return p;
 }
 
@@ -269,12 +275,12 @@ const MARQUEURS_FR = /\b(le|la|les|du|des|une|pas|est|sur|avec|sans|dans|pour|ce
 const IDENTIFIANTS = new Set(['reading', 'announcementLabel', 'announcedAt', 'side']);
 
 const formesServies = () => [
-  observationThin({ status: 'thin', siblingCount: 3 }),
-  observationThin({ status: 'genuine', siblingCount: 3 }),
+  observationThin({ status: 'thin', siblingCount: 3, siblingCountCensored: false }),
+  observationThin({ status: 'genuine', siblingCount: 3, siblingCountCensored: false }),
   observationThin({ status: 'thin', siblingCount: SEUIL_FRERES }),
   observationThin({ status: 'thin' }),
-  observationThin({ status: 'unknown', siblingCount: 3 }),
-  observationThin({ status: 'thin', siblingCount: 3, gradedForward: 9 }),
+  observationThin({ status: 'unknown', siblingCount: 3, siblingCountCensored: false }),
+  observationThin({ status: 'thin', siblingCount: 3, siblingCountCensored: false, gradedForward: 9 }),
 ];
 
 const fautesDeLangue = (formes) => {
@@ -308,7 +314,69 @@ t('★ la garde MORD — teste sur les MEMES chaines, avec du francais injecte',
   assert.ok(fautes.every((f) => f.startsWith('why:')), 'et elle doit nommer le champ fautif: ' + fautes[0]);
 });
 
-const ATTENDUS = 17;
+/* ── UN PLANCHER N'ETABLIT PAS UNE BORNE SUPERIEURE (mesure du 2026-08-10) ────────────────────────── */
+
+t('★ cote SUR: un compte CENSURE ne prouve pas « < 20 » — le taux est RETENU', () => {
+  /* `token-radar.js:660` pose `siblingCountCensored` quand l historique n a pas tenu dans le scan:
+   * `siblingCount` n est alors qu une BORNE INFERIEURE. La branche « sure » etant definie par
+   * `< SEUIL`, une borne SUPERIEURE, le plancher ne peut pas l etablir. Mesure: 44,2 pct de cette
+   * branche reposait sur une borne absente, et les deux populations n ont rien a voir — 13,5 pct de
+   * rugs cote planchers contre 76,8 cote comptes prouves. */
+  const r = observationThin({ status: 'genuine', siblingCount: 5, siblingCountCensored: true });
+  assert.strictEqual(r.rate, null, 'aucun taux sur une borne non etablie');
+  assert.strictEqual(r.boundChecked, false);
+  assert.ok(/FLOOR, not a count/.test(r.why), 'et la raison doit NOMMER le plancher: ' + r.why);
+});
+
+t('★ TEMOIN: un compte PROUVE sous le seuil sert toujours son taux', () => {
+  /* Sans ce cas, retenir sur TOUS les comptes passerait le test ci-dessus et tuerait la lecture. */
+  const r = observationThin({ status: 'genuine', siblingCount: 5, siblingCountCensored: false });
+  assert.strictEqual(r.applies, true, 'un compte etabli reste dans la branche mesuree');
+  assert.ok(typeof r.rate === 'number' && r.rate > 0, 'et il sert un taux: ' + r.rate);
+});
+
+t('★ LES DEUX COTES sont touches — toute la regle vit SOUS le seuil', () => {
+  /* ⛔ J AVAIS ECRIT L INVERSE, ET C ETAIT FAUX. J ai d abord affirme une « asymetrie »: le cote danger
+   * epargne parce qu un plancher de 50 prouve bien `>= 20`. Mais l annonce dit: « cote DANGER: les
+   * `thin` SOUS le seuil; cote SUR: les non-`thin` SOUS le seuil ». LES DEUX cotes vivent sous 20 — le
+   * `>= 20` est la branche SATUREE, ou rien ne se publie de toute facon. Mon « temoin » testait donc
+   * `siblingCount: 50`, c est-a-dire ni l un ni l autre des deux cotes.
+   * La censure atteint donc les DEUX cotes egalement, puisque toute la regle repose sur `< 20`. */
+  for (const st of ['thin', 'genuine']) {
+    const cens = observationThin({ status: st, siblingCount: 5, siblingCountCensored: true });
+    assert.strictEqual(cens.rate, null, st + ': un plancher ne prouve pas « < 20 »');
+    const vrai = observationThin({ status: st, siblingCount: 5, siblingCountCensored: false });
+    assert.ok(typeof vrai.rate === 'number', st + ': un compte etabli sert son taux');
+  }
+  /* Et AU-DESSUS du seuil, la retenue vient de la SATURATION, pas de la censure — deux raisons
+   * distinctes qui ne doivent pas se confondre dans le message. */
+  const haut = observationThin({ status: 'thin', siblingCount: 50, siblingCountCensored: true });
+  assert.strictEqual(haut.boundChecked, true, 'au-dessus du seuil, la borne EST etablie par le plancher');
+  assert.ok(/ceiling dressed as a signal/.test(haut.why), 'et la raison est la saturation: ' + haut.why);
+});
+
+t('le TROISIEME etat (drapeau absent) retient aussi — « on ne sait pas » n est pas « etabli »', () => {
+  const r = observationThin({ status: 'genuine', siblingCount: 5, siblingCountCensored: null });
+  assert.strictEqual(r.rate, null);
+  const s = observationThin({ status: 'genuine', siblingCount: 5 });   // champ totalement absent
+  assert.strictEqual(s.rate, null, 'un champ ABSENT ne vaut pas `false`');
+});
+
+t('★ CABLAGE, le cas qui manquait — un token dont le compte est un PLANCHER retient', async () => {
+  /* ⛔ 1183 des 2339 lignes de la vraie base n ont PAS ce drapeau, et 925 l ont a `true`. Ce cas verifie
+   * que la retenue traverse toute la chaine `funder-history` -> `meme` -> `thin-risk`, et pas seulement
+   * le module pur — c est la composition qui sert, pas la fonction isolee. */
+  _clearCache();
+  const db = baseFabriquee(3, true);
+  const r = await vetMeme({ symbol: 'TEST', chainId: 'base', address: ADR, dbPath: db,
+    fetchImpl: async () => paires(ADR) });
+  assert.ok(r.observedRisk, 'le champ doit exister');
+  assert.strictEqual(r.observedRisk.rate, null, 'aucun taux sur une borne non etablie');
+  assert.strictEqual(r.observedRisk.boundChecked, false);
+  assert.ok(/FLOOR, not a count/.test(r.observedRisk.why), r.observedRisk.why);
+});
+
+const ATTENDUS = 22;
 Promise.all(encours).then(() => {
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   if (pass + fail !== ATTENDUS) {
