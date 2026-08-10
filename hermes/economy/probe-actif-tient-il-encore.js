@@ -168,3 +168,43 @@ console.log('   mesure aujourd hui     ' + (dedans.nF >= MIN_RESOLUS
   : 'RETENU — ' + dedans.nF + ' financeurs seulement'));
 console.log('   ⚠️ population d observation de CE noeud, pas un echantillon aleatoire de Base.');
 console.log('   ⚠️ `ruggedAt` est une DETECTION, pas une mort.');
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * SECTION 6 — AJOUTEE LE 2026-08-10 : LA BANDE EST-ELLE UNE PROPRIETE DU MONDE OU DE NOTRE BUDGET ?
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * `token-radar.js:660` le dit lui-meme: « siblingCount is a FLOOR, not a count, whenever the funder's
+ * history did not fit inside the scan », et il ecrit un drapeau `siblingCountCensored`. Aucun
+ * consommateur ne le lisait.
+ */
+console.log('');
+console.log('== SECTION 6 — la bande mesure-t-elle le MONDE ou notre BUDGET DE TRACAGE ? ==');
+{
+  const porte = lignes.filter((t) => Object.prototype.hasOwnProperty.call(t, 'siblingCountCensored'));
+  const vrais = lignes.filter((t) => t.siblingCountCensored === false && typeof t.siblingCount === 'number');
+  const cens = lignes.filter((t) => t.siblingCountCensored === true && typeof t.siblingCount === 'number');
+  console.log('   tokens portant le drapeau  ' + porte.length + ' / ' + lignes.length
+    + '   (⚠️ les autres sont un TROISIEME etat: ni compte ni plancher)');
+  const vMax = vrais.length ? Math.max(...vrais.map((t) => t.siblingCount)) : null;
+  const vAtteint = vrais.filter((t) => t.siblingCount >= SEUIL).length;
+  console.log('   traces JUSQU AU BOUT       ' + vrais.length + '   max observe: ' + vMax
+    + '   atteignant ' + SEUIL + ': ' + vAtteint);
+  const cAtteint = cens.filter((t) => t.siblingCount >= SEUIL).length;
+  console.log('   traces INTERROMPUS         ' + cens.length + '   atteignant ' + SEUIL + ': ' + cAtteint);
+  console.log('');
+  /* ⛔ LE CAS OPPOSE, sans lequel « censure = bande » serait vrai par construction et ne dirait rien. */
+  console.log('   contre-epreuve — censures SOUS le seuil : ' + cens.filter((t) => t.siblingCount < SEUIL).length);
+  console.log('   (s il y en a, censure et appartenance a la bande ne sont pas la MEME chose par definition)');
+  console.log('');
+  const total = vAtteint + cAtteint;
+  if (total > 0) {
+    console.log('   💎 DANS LA BANDE: ' + cAtteint + ' planchers contre ' + vAtteint + ' vrais comptes — '
+      + (100 * cAtteint / total).toFixed(1) + ' pct de la bande est un TRACAGE INTERROMPU.');
+    console.log('   ⛔ Le seuil de ' + SEUIL + ' separe donc, en pratique, « trace complet » de « trace');
+    console.log('      interrompu » — et « interrompu » est une propriete de NOTRE BUDGET, pas du financeur.');
+    console.log('   ⚠️ Ce qui NE veut PAS dire que la regle est fausse: un plancher >= ' + SEUIL + ' est un vrai');
+    console.log('      >= ' + SEUIL + ', donc l appartenance est correcte, et l ecart contre la base est reel.');
+    console.log('      Mais la SEMANTIQUE annoncee — « financeur industriel » — n est pas ce qui est mesure.');
+    console.log('   🔑 CONSEQUENCE: augmenter SIBLING_MAX_PAGES changerait la composition de la bande sans');
+    console.log('      qu aucun financeur n ait change de comportement. Le seuil appartient a l instrument.');
+  }
+}
