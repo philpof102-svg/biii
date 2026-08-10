@@ -30,6 +30,8 @@
  *       Un correctif applique a un seul site d'appel n'est pas applique.
  */
 const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
 const { buildOpenApi, challenge402, priceMicro } = require('../lib/openapi.js');
 const { candidatesFrom } = require('../lib/meme.js');
 const T = require('../lib/till.js');
@@ -182,6 +184,33 @@ t('la description de chainId ne promet plus le comportement qui effacait tout', 
   const ch = doc().paths['/x402/vet-meme'].post.requestBody.content['application/json'].schema.properties.chainId;
   assert.match(ch.description, /slug/i, 'la forme slug doit etre documentee');
   assert.match(ch.description, /NO candidates/i, 'et le fail-closed sur chaine inconnue doit etre dit');
+});
+
+t('★ tout champ DECLARE par une route payante doit etre LU par son handler', () => {
+  /* ⛔ LE GATE NE PORTE PAS SUR UN CHAMP, IL PORTE SUR LA CLASSE. Deux fois maintenant, un champ a ete
+   * cable dans `bin/biii-mcp.js` et RATE dans `lib/server.js`, sur la MEME route payante: `chainId` le
+   * 2026-07-27 (un contrat Solana certifie « genuine » a un client qui avait demande Base et paye pour
+   * la reponse), puis `siblingCount` le 2026-08-09 — la retenue de `observedRisk` restait alors
+   * INCONTOURNABLE pour qui PAIE, tandis que la route MCP gratuite la levait. Le palier payant
+   * delivrait strictement moins que le gratuit.
+   *
+   * ⚠️ C'est une verification de SOURCE, et elle le dit: elle prouve que le handler NOMME le champ, pas
+   * qu'il en fait le bon usage. C'est deliberement le maillon faible qu'elle couvre — l'oubli pur —
+   * parce que c'est celui qui s'est produit, deux fois. */
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'server.js'), 'utf8');
+  const d = doc();
+  let vus = 0;
+  for (const [route, noeud] of Object.entries(d.paths)) {
+    const sch = noeud.post.requestBody.content['application/json'].schema;
+    for (const champ of Object.keys(sch.properties || {})) {
+      vus++;
+      assert.ok(src.includes('b.' + champ),
+        route + ' declare `' + champ + '` mais lib/server.js ne le lit jamais — un champ documente que '
+        + 'le handler ignore est une promesse que le client payant ne peut pas encaisser');
+    }
+  }
+  /* ⛔ Un gate qui n'a RIEN examine passe en vert: il compte ce qu'il a inspecte. */
+  assert.ok(vus >= 6, 'le gate doit avoir inspecte des champs, pas zero: ' + vus);
 });
 
 t('le document ne publie PAS l adresse du marchand', () => {

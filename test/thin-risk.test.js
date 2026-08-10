@@ -128,11 +128,26 @@ t('★ le chiffre est LU dans l annonce, pas recopie', () => {
 
 /* ── 4. CE QUE LA REPONSE DOIT DIRE D ELLE-MEME ───────────────────────────────────────────────────── */
 
-t('★ l etat IN-SAMPLE est dit, pas cache', () => {
-  assert.strictEqual(observationThin({ status: 'thin', siblingCount: 3 }).inSample, true,
-    'a zero appel note, la mesure est in-sample et doit le dire');
-  assert.strictEqual(observationThin({ status: 'thin', siblingCount: 3, gradedForward: 12 }).inSample, false);
-  assert.strictEqual(observationThin({ status: 'thin', siblingCount: 3, gradedForward: 12 }).gradedForward, 12);
+t('★ l etat IN-SAMPLE est dit, pas cache — et il a TROIS etats, pas deux', () => {
+  /* ⛔ CE CAS DISAIT `true`, ET IL CERTIFIAIT LE DEFAUT. `gradedForward = 0` par defaut transformait
+   * « personne ne me l'a dit » en « rien n'a ete note ». Mesure du 2026-08-10: aucune des deux routes
+   * servies ne fournit ce chiffre, donc l'affirmation etait GELEE — vraie aujourd'hui, fausse des la
+   * premiere notation, et jamais corrigee. Non fourni => `null`. */
+  const sansChiffre = observationThin({ status: 'thin', siblingCount: 3 });
+  assert.strictEqual(sansChiffre.inSample, null, 'non fourni n est pas zero');
+  assert.strictEqual(sansChiffre.gradedForward, null);
+  assert.ok(/nobody told me/.test(sansChiffre.gradedForwardNote || ''),
+    'et le silence doit se NOMMER, sinon un null se lit comme une donnee absente sans raison');
+
+  /* TEMOIN — un zero EXPLICITE reste un vrai zero: sans ce cas, rendre `null` partout passerait. */
+  const zeroDit = observationThin({ status: 'thin', siblingCount: 3, gradedForward: 0 });
+  assert.strictEqual(zeroDit.inSample, true, 'un zero ANNONCE est une mesure, pas un silence');
+  assert.strictEqual(zeroDit.gradedForward, 0);
+  assert.strictEqual(zeroDit.gradedForwardNote, undefined, 'rien a expliquer quand le chiffre est la');
+
+  const note = observationThin({ status: 'thin', siblingCount: 3, gradedForward: 12 });
+  assert.strictEqual(note.inSample, false);
+  assert.strictEqual(note.gradedForward, 12);
 });
 
 t('★ la divulgation refuse explicitement l affirmation sur l actif', () => {
