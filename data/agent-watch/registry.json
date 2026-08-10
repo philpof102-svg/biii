@@ -7,7 +7,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ac.inference.sh/mcp",
-      "lastSeen": "2026-08-10T05:08:47.788Z"
+      "lastSeen": "2026-08-10T15:15:19.595Z"
     },
     "https://tandem.ac/mcp": {
       "verdict": "answers",
@@ -16,7 +16,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ac.tandem/docs-mcp",
-      "lastSeen": "2026-08-10T05:08:49.779Z"
+      "lastSeen": "2026-08-10T15:15:21.667Z"
     },
     "https://www.hood.ag/api/mcp": {
       "verdict": "unreachable",
@@ -25,7 +25,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ag.hood/name-service",
-      "lastSeen": "2026-08-10T05:08:50.704Z"
+      "lastSeen": "2026-08-10T15:15:22.579Z"
     },
     "https://mcp.lona.agency/mcp": {
       "verdict": "unauditable",
@@ -34,7 +34,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "agency.lona/trading",
-      "lastSeen": "2026-08-10T05:08:52.824Z"
+      "lastSeen": "2026-08-10T15:15:24.698Z"
     },
     "https://agoclnqfyinwjxdmjnns.supabase.co/functions/v1/mcp": {
       "verdict": "unauditable",
@@ -43,7 +43,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.1325/mcp",
-      "lastSeen": "2026-08-10T05:08:54.934Z"
+      "lastSeen": "2026-08-10T15:15:26.875Z"
     },
     "https://mcp.aarna.ai/mcp": {
       "verdict": "answers",
@@ -52,7 +52,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.aarna/atars-mcp",
-      "lastSeen": "2026-08-10T05:08:56.338Z"
+      "lastSeen": "2026-08-10T15:15:28.229Z"
     },
     "https://mcp.abmeter.ai": {
       "verdict": "unauditable",
@@ -61,7 +61,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.abmeter/abmeter",
-      "lastSeen": "2026-08-10T05:08:58.200Z"
+      "lastSeen": "2026-08-10T15:15:29.794Z"
     },
     "https://api.adadvisor.ai/mcp": {
       "verdict": "unauditable",
@@ -70,7 +70,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.adadvisor/mcp-server",
-      "lastSeen": "2026-08-10T05:08:59.358Z"
+      "lastSeen": "2026-08-10T15:15:30.991Z"
     },
     "https://mcp.adramp.ai": {
       "verdict": "unauditable",
@@ -79,7 +79,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.adramp/google-ads",
-      "lastSeen": "2026-08-10T05:09:02.913Z"
+      "lastSeen": "2026-08-10T15:15:34.651Z"
     },
     "https://api.adside.ai/mcp": {
       "verdict": "unauditable",
@@ -88,7 +88,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.adside/adside",
-      "lastSeen": "2026-08-10T07:09:58.575Z"
+      "lastSeen": "2026-08-10T15:15:35.740Z"
     },
     "https://mcp.adweave.ai/meta-ads-mcp": {
       "verdict": "unauditable",
@@ -97,7 +97,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.adweave/meta-ads-mcp",
-      "lastSeen": "2026-08-10T07:09:59.645Z"
+      "lastSeen": "2026-08-10T15:15:36.948Z"
     },
     "https://agentberg.ai/mcp": {
       "verdict": "unauditable",
@@ -106,7 +106,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agentberg/agentberg",
-      "lastSeen": "2026-08-10T07:10:03.742Z"
+      "lastSeen": "2026-08-10T15:15:39.451Z"
     },
     "https://api.agentdm.ai/api/v1/grid": {
       "verdict": "unauditable",
@@ -115,7 +115,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agentdm/agentdm",
-      "lastSeen": "2026-08-10T07:10:04.876Z"
+      "lastSeen": "2026-08-10T15:15:40.667Z"
     },
     "https://api.agentdm.ai/mcp/v1/grid": {
       "verdict": "unauditable",
@@ -695,7 +695,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.bowmark/bowmark",
-      "lastSeen": "2026-08-10T05:08:45.578Z"
+      "lastSeen": "2026-08-10T15:15:17.542Z"
     },
     "https://api.bowmark.ai/mcp?s=r": {
       "verdict": "answers",
@@ -704,7 +704,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.bowmark/bowmark",
-      "lastSeen": "2026-08-10T05:08:46.751Z"
+      "lastSeen": "2026-08-10T15:15:18.666Z"
     },
     "https://api.inference.sh/mcp": {
       "verdict": "answers",
@@ -713,7 +713,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ac.inference.sh/mcp",
-      "lastSeen": "2026-08-10T05:08:48.807Z"
+      "lastSeen": "2026-08-10T15:15:20.600Z"
     },
     "https://mcp.agenticaffiliate.ai/mcp": {
       "verdict": "unauditable",
@@ -740,7 +740,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.afmr/discovery",
-      "lastSeen": "2026-08-10T07:10:02.293Z"
+      "lastSeen": "2026-08-10T15:15:38.138Z"
     },
     "https://agentplaybooks.ai/api/mcp/manage": {
       "verdict": "answers",
@@ -776,7 +776,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "agency.goji/goji",
-      "lastSeen": "2026-08-10T05:08:51.723Z"
+      "lastSeen": "2026-08-10T15:15:23.684Z"
     },
     "https://rx.agentlookups.ai/mcp": {
       "verdict": "answers",
@@ -857,7 +857,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.adoraads/beauty",
-      "lastSeen": "2026-08-10T05:09:00.693Z"
+      "lastSeen": "2026-08-10T15:15:32.460Z"
     },
     "https://mcp.adplane.ai": {
       "verdict": "unauditable",
@@ -866,8 +866,8 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.adplane/google-ads",
-      "lastSeen": "2026-08-10T05:09:01.689Z"
+      "lastSeen": "2026-08-10T15:15:33.571Z"
     }
   },
-  "offset": 93
+  "offset": 18
 }
