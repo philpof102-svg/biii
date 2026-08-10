@@ -5,10 +5,16 @@
  * ================================================================================================
  * `siblingCountCensored` EST-IL UN PREDICTEUR, ET PAS SEULEMENT UNE RESERVE SUR UNE BORNE ?
  *
- * La passe precedente a montre qu'un PLANCHER ne peut pas etablir « < seuil ». Celle-ci va plus loin:
- * en mesurant les TROIS regles de financeur, le meme motif revient partout — les tokens dont le tracage
- * a ete INTERROMPU ruggent BEAUCOUP MOINS que ceux traces jusqu'au bout. Le drapeau ne serait donc pas
- * qu'une reserve: il porterait de l'information.
+ * ⛔ REPONSE, ET ELLE A CHANGE EN COURS DE ROUTE — cet en-tete portait l'hypothese que la sonde a
+ * ensuite REFUTEE, et le laisser tel quel aurait fait d'elle un piege.
+ *
+ * L'hypothese: en mesurant les trois regles de financeur, le meme motif revenait partout — dans les
+ * branches « sures », les tokens au tracage INTERROMPU ruggeaient beaucoup MOINS (13,5 pct) que ceux
+ * traces jusqu'au bout (76,8). J'allais conclure que le drapeau porte un signal que les regles jettent.
+ *
+ * La mesure sur la population ENTIERE inverse le sens: planchers 86,0 pct contre comptes propres
+ * 76,8 pct. Le « moins dangereux » etait CONDITIONNEL a l'appartenance a la branche, pas une propriete
+ * du drapeau — renversement de type Simpson. Voir le verdict en section 3, et la CAUSE en section 4.
  *
  * ⛔ AUCUNE des trois regles ne le lit au moment de PREDIRE — pas meme celle qui s'appelle
  * `funder-derived-uncensored`, dont seul le SEUIL est derive de comptes propres; sa prediction
@@ -113,3 +119,66 @@ console.log('-- verdict --');
 console.log('');
 console.log('⛔ Cette sonde n ANNONCE aucun pari et ne MODIFIE aucune regle: annoncer est une decision');
 console.log('   d operateur, et toucher `funder-20` deplacerait les poteaux d un pari deja annonce.');
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * SECTION 4 — POURQUOI la branche « sure » de `funder-derived-uncensored` est PIRE que le hasard
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════
+ * La section precedente a mesure le fait sans l'expliquer. Celle-ci l'explique, et l'explication est
+ * plus grave que le fait.
+ */
+console.log('');
+console.log('== SECTION 4 — pourquoi la branche « sure » nettoyee rugge PLUS que la base ==');
+{
+  const r = RULES.find((x) => x.key === 'funder-derived-uncensored');
+  const seuil = r.threshold(lignes);
+  const propres = lignes.filter((t) => t.siblingCountCensored === false && typeof t.siblingCount === 'number')
+    .map((t) => t.siblingCount).sort((a, b) => a - b);
+  const q = (p) => propres[Math.floor(propres.length * p)];
+  console.log('   seuil derive           ' + seuil);
+  console.log('   comptes PROPRES        n=' + propres.length + '  mediane=' + q(0.5)
+    + '  q75=' + q(0.75) + '  q90=' + q(0.9) + '  max=' + propres[propres.length - 1]);
+  /* ⛔ UN SEUIL QUI TOMBE SUR UN PLATEAU NE SEPARE PAS: q75 et q90 valent la MEME valeur, donc le
+   * quantile ne choisit pas un point de coupure, il choisit un PIC. */
+  if (q(0.75) === q(0.9)) {
+    console.log('   ⛔ q75 == q90: le seuil tombe sur un PLATEAU, pas sur un point de coupure.');
+  }
+
+  const safeP = resolus.filter((o) => typeof o.t.siblingCount === 'number'
+    && o.t.siblingCount < seuil && o.t.siblingCountCensored === false);
+  const parVal = new Map();
+  for (const o of safeP) {
+    const v = o.t.siblingCount;
+    if (!parVal.has(v)) parVal.set(v, { n: 0, r: 0 });
+    const e = parVal.get(v); e.n++; if (o.rug) e.r++;
+  }
+  console.log('');
+  console.log('   la branche SAFE nettoyee, par valeur (n=' + safeP.length + '):');
+  for (const [v, e] of [...parVal.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 5)) {
+    console.log('     ' + String(v).padStart(3) + ' x ' + String(e.n).padStart(4)
+      + '  ->  ' + (100 * e.r / e.n).toFixed(1) + ' pct de rugs');
+  }
+  const un = parVal.get(1);
+  if (un && safeP.length) {
+    console.log('');
+    console.log('   💎 LA VALEUR 1 PESE ' + (100 * un.n / safeP.length).toFixed(1)
+      + ' pct DE LA BRANCHE et rugge a ' + (100 * un.r / un.n).toFixed(1) + ' pct.');
+    console.log('      Un financeur a UN SEUL frere est un DEPLOIEMENT UNIQUE — et un deploiement unique');
+    console.log('      rugge plus que la base. Le seuil de ' + seuil + ' est donc presque decoratif: cette');
+    console.log('      branche ne mesure pas « peu de freres », elle mesure « exactement un ».');
+    console.log('   ⚠️ Une branche dominee par UNE valeur ne mesure pas un seuil: elle mesure cette valeur.');
+  }
+
+  /* ── LE POINT LE PLUS GRAVE: LE SIGNE S'INVERSE SELON LA CENSURE ────────────────────────────────── */
+  const bas = (cens) => resolus.filter((o) => typeof o.t.siblingCount === 'number'
+    && o.t.siblingCount < seuil && o.t.siblingCountCensored === cens);
+  const t = (a) => (a.length ? (100 * a.filter((x) => x.rug).length / a.length).toFixed(1) + ' pct' : 'n/d');
+  const bp = bas(false), bc = bas(true);
+  console.log('');
+  console.log('   ⛔ ET LE SIGNE S INVERSE SELON LA CENSURE, ce qui est pire qu une borne imprecise:');
+  console.log('      compte BAS et PROUVE   n=' + bp.length + '  ->  ' + t(bp));
+  console.log('      compte BAS et CENSURE  n=' + bc.length + '  ->  ' + t(bc));
+  console.log('      Melanger les deux ne brouille pas une borne: ca mélange DEUX RELATIONS DE SENS');
+  console.log('      OPPOSES sous un seul nom. Un taux moyen entre elles ne decrit aucune des deux.');
+  console.log('   ⛔ On ne DIT PAS pourquoi un compte bas censure se comporte ainsi — un tracage arrete');
+  console.log('      tot n est pas une propriete de l operateur. Structure, jamais intention.');
+}
