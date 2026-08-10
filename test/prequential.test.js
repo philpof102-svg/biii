@@ -387,5 +387,35 @@ t('le bulletin des paris publie la MEME confession que la marche', () => {
   assert.deepStrictEqual(b.fenetre, a.fenetre, 'les deux graders doivent avouer la meme chose');
 });
 
+/* ── UN PARI INERTE N'EST PAS UN PARI JEUNE ───────────────────────────────────────────────────────── */
+
+t('★ une regle qui s abstient sur TOUS ses eligibles rend `inerte`, pas `trop-peu`', () => {
+  /* ⛔ Les deux etats produisaient le meme mot et le meme affichage, alors que l un s ameliore avec le
+   * temps et l autre JAMAIS. Mesure du 2026-08-10: `natif-b20`, pari ANNONCE, rendait 488 abstentions
+   * sur 488 eligibles — sa `predict` lit `t.addr`, un champ absent de TOUTES les lignes (l adresse est
+   * la CLE de l objet). Un pari mort deguise en pari jeune. */
+  const rows = [...faireRugs(40, 1)];
+  const muette = { key: 'm', label: 'm', predict: () => ABSTAIN };
+  const c = gradeAnnounced(rows, iso(T0 + 5000 * H), { rules: [muette],
+    announced: [{ key: 'm', label: 'm', announcedAt: iso(T0 - 1000 * H), predicted: {}, basis: {}, note: 'x' }] })
+    .cards[0];
+  assert.strictEqual(c.verdict, 'inerte', 'abstention totale => inerte');
+  assert.ok(/ne peut rien dire/.test(c.note), 'et la note doit le DIRE en clair: ' + c.note);
+  assert.strictEqual(c.abstained, c.eligible, 'temoin de coherence: toutes les abstentions comptees');
+});
+
+t('★ TEMOIN: une regle qui s abstient BEAUCOUP mais pas partout reste `trop-peu`', () => {
+  /* Sans ce cas, rendre `inerte` des la moindre abstention passerait le test ci-dessus et effacerait
+   * la distinction qu on vient d introduire. */
+  const rows = [...faireRugs(40, 1)];
+  let n = 0;
+  const presque = { key: 'p', label: 'p', predict: () => (++n === 1 ? DANGER : ABSTAIN) };
+  const c = gradeAnnounced(rows, iso(T0 + 5000 * H), { rules: [presque],
+    announced: [{ key: 'p', label: 'p', announcedAt: iso(T0 - 1000 * H), predicted: {}, basis: {}, note: 'x' }] })
+    .cards[0];
+  assert.notStrictEqual(c.verdict, 'inerte', 'UN seul appel non-abstenu suffit a sortir de l inertie');
+  assert.strictEqual(c.verdict, 'trop-peu', 'et sous le plancher il reste trop-peu: ' + c.verdict);
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exitCode = 1;
