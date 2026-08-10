@@ -76,6 +76,37 @@ function req(server, path) {
     assert.equal(i.body.triangleReputation.decision, 'REFUSE');
   });
 
+  /* ── `registryComplete` VOYAGE-T-IL JUSQU AU VERDICT ? ──────────────────────────────────────────────
+   * Il etait CHARGE par `loadAssetRegistry()` puis JETE par les deux routes REST, alors que le jumeau
+   * MCP le passait. Consequence: `lib/asset.js` fait `registryComplete === true`, donc un `null` ne
+   * pouvait JAMAIS produire `confirmed: true` — la route PAYANTE rendait un verdict plus faible que la
+   * route MCP gratuite. Les deux cas ci-dessous se tiennent l un l autre: sans le second, passer
+   * `null` partout passerait le premier. */
+  /* ⚠️ LA BRANCHE VISEE EST LA COLLISION DE SYMBOLE, et elle exige un symbole CONNU (`OUSG`) porte par
+   * une AUTRE adresse. `claimedSymbol=WRONG` tombe sur une impersonation d un autre type, sans champ
+   * `confirmed` — mon premier essai visait la mauvaise branche et les deux cas echouaient. */
+  const IMPOSTEUR = '0x' + '2b'.repeat(20);   // absent du registre, mais revendique OUSG
+
+  await t('★ registre NON etabli complet → impersonation NON confirmee, et la phrase le DIT', async () => {
+    const r = await req(server, '/asset?token=' + IMPOSTEUR + '&claimedSymbol=OUSG');
+    assert.equal(r.body.verdict.status, 'impersonation', 'la DECISION reste le refus');
+    assert.equal(r.body.verdict.confirmed, false, 'mais rien n est AFFIRME sur un registre non prouve');
+    assert.match(r.body.verdict.reason, /not proof of fraud/,
+      'et le refus doit dire qu il n est pas une preuve de fraude');
+  });
+
+  await t('★ TEMOIN: registre PROUVE complet → le meme cas devient CONFIRME (impossible avant le correctif)', async () => {
+    const complet = build({ merchant: '0x' + 'ab'.repeat(20), findPayment: async () => null,
+      assetRegistry: { ...REGISTRY, complete: true } });
+    await new Promise((r) => complet.listen(0, r));
+    const r = await req(complet, '/asset?token=' + IMPOSTEUR + '&claimedSymbol=OUSG');
+    assert.equal(r.body.verdict.status, 'impersonation');
+    assert.equal(r.body.verdict.confirmed, true,
+      'sur un registre explicitement complet, le verdict est MERITE — c est ce que le champ jete interdisait');
+    assert.doesNotMatch(r.body.verdict.reason, /not proof of fraud/, 'et la phrase cesse de se couvrir');
+    await complet.close();
+  });
+
   await server.close();
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
