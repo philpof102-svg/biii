@@ -197,6 +197,19 @@ t('★ tout champ DECLARE par une route payante doit etre LU par son handler', (
    * ⚠️ C'est une verification de SOURCE, et elle le dit: elle prouve que le handler NOMME le champ, pas
    * qu'il en fait le bon usage. C'est deliberement le maillon faible qu'elle couvre — l'oubli pur —
    * parce que c'est celui qui s'est produit, deux fois. */
+  /* ⚠️ LA LIMITE CONNUE, ECRITE PLUTOT QUE CONTOURNEE. Ce gate exige la forme `b.<champ>` dans le
+   * dispatch. Une route qui passerait le corps ENTIER a une lentille (`unLens(b)`) le ferait donc
+   * echouer A TORT — c'est exactement ce qui est arrive a une sonde jumelle le 2026-08-10, qui a
+   * accuse `till_resolve` d'ignorer sept champs de signature alors que son handler fait
+   * `bindingLens(a, …)` et que `lib/identity.js` les lit (19, 16, 6 occurrences).
+   *
+   * ⛔ ET ELARGIR LA RECHERCHE AUX MODULES `lib/` NE REPARE RIEN — essaye et mesure le meme jour: les
+   * lentilles n'emploient pas le prefixe `b.`, donc le champ reste introuvable et le gate crie pareil.
+   * Le seul elargissement qui marcherait chercherait l'identifiant NU, et `address` ou `symbol` se
+   * trouvent partout: on echangerait un faux positif contre un faux negatif silencieux, ce qui est pire.
+   *
+   * La conduite a tenir le jour ou ca arrive: EXEMPTER cette route explicitement, en nommant la
+   * lentille qui consomme le corps. Une exemption se lit; un gate elargi se croit. */
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'server.js'), 'utf8');
   const d = doc();
   let vus = 0;
