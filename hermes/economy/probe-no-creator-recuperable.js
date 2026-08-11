@@ -35,7 +35,30 @@ const ECHANTILLON = Math.min(Number(process.argv[2]) || 20, 60);
 const rows = Object.entries(JSON.parse(fs.readFileSync(
   path.join(RACINE, 'data/token-radar/tokens.json'), 'utf8'))).map(([addr, v]) => ({ addr, ...v }));
 
-const nc = rows.filter((t) => t.funderTrace === 'no_creator');
+/* ⛔ LE CHAMP SOUS-COMPTE, ET LE MESSAGE DIT LA VERITE. Mesure du 2026-08-11 sur 2436 lignes:
+ *   funderTrace === 'no_creator'                 540
+ *   message « records no creator »               631   (les 540 y sont TOUS inclus)
+ *   message SEUL, avec funderTrace === 'failed'   91   <- meme cause, autre etiquette
+ * Ces 91 ont EXACTEMENT le profil des 540 — 0 `deployer`, 0 `funder`, 0 `siblingCount` — contre le
+ * temoin `funderTrace === 'ok'` qui en porte 920/920/919. Deux champs du meme producteur se
+ * contredisent donc sur 3,7 pct de la base: le message dit « l explorateur A REPONDU », le champ dit
+ * `failed`. Selectionner sur le champ seul ratait 14,4 pct de la population.
+ * ⛔ `token-radar.js` est sha256-epingle: la classification ne se corrige pas ici. Cette sonde prend
+ * donc l UNION, et le dit — mesurer la bonne population n est pas trancher laquelle des deux
+ * etiquettes est la bonne. */
+const parLeChamp = (t) => t.funderTrace === 'no_creator';
+const parLeMessage = (t) => typeof t.funderTraceError === 'string'
+  && t.funderTraceError.indexOf('records no creator') > -1;
+const nc = rows.filter((t) => parLeChamp(t) || parLeMessage(t));
+{
+  const champSeul = rows.filter((t) => parLeChamp(t) && !parLeMessage(t)).length;
+  const msgSeul = rows.filter((t) => !parLeChamp(t) && parLeMessage(t)).length;
+  console.log('  ⚠️ population prise en UNION: ' + nc.length + ' (champ ' + rows.filter(parLeChamp).length
+    + ' · message ' + rows.filter(parLeMessage).length + ' · message SEUL ' + msgSeul
+    + ' · champ SEUL ' + champSeul + ')');
+  if (msgSeul) console.log('     ces ' + msgSeul + ' portent `funderTrace: failed` alors que leur message dit'
+    + ' que l explorateur A REPONDU — meme cause, etiquette differente.');
+}
 const ok = rows.filter((t) => t.funderTrace === 'ok');
 
 console.log('\n  ── CE QUE LA BASE SAIT DEJA ──\n');
