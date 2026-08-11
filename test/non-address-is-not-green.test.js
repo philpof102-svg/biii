@@ -103,5 +103,37 @@ t('★ le refus est fail-closed — et on NOMME qu il accuse au lieu de dire « 
     'si ce verdict change (UNKNOWN, refus explicite...), c est une DECISION PRODUIT: mettre a jour ce cas AVEC elle');
 });
 
+/* ── LA PROSE EST UNE SURFACE AUSSI, ET ELLE N'AVAIT PAS ETE CORRIGEE ──────────────────────────────
+ * Corriger la DECISION n'a pas corrige le TEXTE. Mesure du 2026-08-11, apres le premier correctif:
+ *   `vetLocal('alice.base.eth').disclosure` valait
+ *     « Not on this node's known-bad floor (812 addresses, current). NOT a clean bill... »
+ *   soit MOT POUR MOT la disclosure d'une vraie adresse propre. Elle AFFIRME « pas sur la liste »
+ *   alors que `screen.reason` dit « not a 0x address » — rien n'a ete crible.
+ * ⛔ Cause: le ternaire testait `meta.available` (la LISTE est-elle chargee) et n'avait que DEUX
+ *   branches pour TROIS etats. L'etat « liste chargee mais entree non criblable » tombait sur la
+ *   branche POSITIVE. Un humain lit la phrase, pas le champ `allowed`. */
+t('★ la PROSE discrimine aussi — une non-adresse ne recoit pas la disclosure d une adresse propre', () => {
+  const bon = vetLocal(ADRESSE, { knownBad: floor }).disclosure;
+  assert.ok(bon && bon.length, 'temoin: une adresse valide porte bien une disclosure');
+  for (const v of NON_ADRESSES) {
+    const d = vetLocal(v, { knownBad: floor }).disclosure;
+    assert.notEqual(d, bon,
+      JSON.stringify(v) + ' recoit la disclosure MOT POUR MOT d une adresse propre');
+    assert.ok(!/Not on this node/i.test(String(d)),
+      JSON.stringify(v) + ' : la prose AFFIRME « pas sur la liste » alors que rien n a ete crible');
+  }
+});
+
+t('★ et elle NOMME le troisieme etat — « pas criblable » n est ni « propre » ni « liste absente »', () => {
+  const d = String(vetLocal('alice.base.eth', { knownBad: floor }).disclosure);
+  assert.ok(/not a 0x address|not an address|pas une adresse/i.test(d),
+    'la disclosure doit dire POURQUOI rien n a ete crible, pas seulement que rien ne l a ete');
+  /* ⛔ TEMOIN OPPOSE: le message « aucune liste chargee » reste distinct de celui-ci — sans quoi on
+   * aurait fondu deux pannes differentes dans une seule phrase. */
+  const sansListe = vetLocal(ADRESSE, { knownBad: { set: new Set(), available: false, sources: [], count: 0 } });
+  assert.notEqual(String(sansListe.disclosure), d,
+    '« liste absente » et « entree non criblable » doivent rester DEUX phrases distinctes');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
