@@ -1,5 +1,9 @@
 # BIII
 
+> Safe-to-pay verdicts on Base, with the evidence attached: **28 tools**, **55 modules**,
+> **116 test files**, **54 probes** that publish their own bounds. Non-custodial, descriptor-only,
+> every verdict re-verifiable on-chain.
+
 **Spoken "B3". Written BIII — a B with three bars.**
 The real-world USDC till on Base: an independent merchant accepts USDC in person with just a
 phone. Non-custodial (their own wallet), no terminal, no PSP, no KYB middleman.

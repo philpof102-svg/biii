@@ -57,6 +57,41 @@ t('le nombre d outils MCP annonce est celui du serveur', () => {
     `le README n annonce pas « ${outils.length} tools »`);
 });
 
+/* ⛔ 2026-08-11 — CE CAS EXISTE PARCE QUE LE GATE CI-DESSUS M'A LAISSE PASSER.
+ * J'ai ajoute en tete du README un resume disant « 29 MCP tools », alors que le serveur en expose 28
+ * (mon comptage avait pris `till_b`, un fragment tronque, pour un outil). La suite est restee VERTE:
+ * `README.includes('**28 tools**')` verifie qu'un chiffre JUSTE est PRESENT, jamais qu'un chiffre
+ * FAUX est ABSENT. Le README affirmait donc deux comptes contradictoires, sans un mot.
+ * 💎 Une assertion de PRESENCE ne borne rien. Celle-ci borne: AUCUN autre compte d'outils n'est tolere. */
+t('le README n annonce AUCUN autre compte d outils que le vrai', () => {
+  const mcp = lire('bin/biii-mcp.js');
+  const outils = [...new Set([...mcp.matchAll(/name:\s*'(till_[a-z_]+)'/g)].map((m) => m[1]))];
+  assert.ok(outils.length > 0, 'aucun outil trouve: la forme du source a change, ce test est aveugle');
+  const annonces = [...new Set([...README.matchAll(/\*\*(\d+) tools\*\*/g)].map((m) => Number(m[1])))];
+  assert.ok(annonces.length > 0, 'le README n annonce aucun compte d outils — le cas precedent doit deja echouer');
+  const faux = annonces.filter((n) => n !== outils.length);
+  assert.deepEqual(faux, [],
+    `le README porte ${annonces.length} compte(s) d outils distincts; ${faux.join(', ')} ne vaut/valent pas ${outils.length}`);
+});
+
+/* ⛔ Les trois chiffres du resume d en-tete, RECOMPTES. Ils ont ete ajoutes le 11/08 et rien ne les
+ * surveillait: exactement le « litteral gele » que ce fichier existe pour empecher. Un gate ne protege
+ * que ce qu'il COMPTE. */
+t('les trois volumes annonces en tete sont ceux de l arbre', () => {
+  const compter = (dossier, garde) =>
+    fs.readdirSync(path.join(RACINE, dossier)).filter(garde).length;
+  const volumes = [
+    [compter('lib', (f) => f.endsWith('.js')), 'modules'],
+    [compter('test', (f) => f.endsWith('.js')), 'test files'],
+    [compter(path.join('hermes', 'economy'), (f) => f.startsWith('probe-') && f.endsWith('.js')), 'probes'],
+  ];
+  for (const [n, mot] of volumes) {
+    assert.ok(n > 0, `aucun ${mot} compte: l arborescence a change, ce test est aveugle`);
+    assert.ok(README.includes(`**${n} ${mot}**`),
+      `le README n annonce pas « ${n} ${mot} » — l arbre a bouge, le texte non`);
+  }
+});
+
 t('chaque outil MCP existant est NOMME dans le README', () => {
   const mcp = lire('bin/biii-mcp.js');
   const outils = [...new Set([...mcp.matchAll(/name:\s*'(till_[a-z_]+)'/g)].map((m) => m[1]))];
