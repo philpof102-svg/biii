@@ -276,6 +276,69 @@ const PAYE = '0x' + '1'.repeat(40);
    * d'informer. La divulgation remplace le refus; c'est un choix, il est donc epingle. */
   check('non-crible n\'est PAS traite comme known-bad', nonCrible.payment.knownBad, false);
 
+  /* ── LA SYMETRIE MANQUANTE: L'EXPLORATEUR NON LU N'AVAIT PAS SA NOTE ──────────────────────────────
+   *
+   * Le crible non concluant produit `unscreened` (ci-dessus). L'EXPLORATEUR non lu ne produisait RIEN.
+   * Mesure du 2026-08-11, explorateur muet et crible OK:
+   *     screen=clear · resolved=false · flaggedScam=false · isContract=false · verified=false
+   *     verdict=caution · unscreened=ABSENTE · aucune note sur l'explorateur
+   *
+   * ⛔ TROIS `false` d'un coup, qui se lisent comme TROIS FAITS alors qu'ils sont UNE SEULE ABSENCE.
+   * `resolved` portait bien le troisieme etat — mais il etait ECRIT ET LU PAR PERSONNE: le miroir exact
+   * du gate `rules-read-written-fields` (une regle qui lit un champ jamais ecrit), retourne.
+   *
+   * ⚠️ SANS SURCLAMER: le verdict reste `caution`, jamais un feu vert — ce module etait deja prudent.
+   * Le defaut est de DIVULGATION, pas un fail-open. Le correctif est donc une NOTE, pas un refus:
+   * exactement la doctrine que ce fichier enonce pour le crible (« la divulgation remplace le refus »). */
+  /* ⚠️ CE CAS DOIT STUBBER, LUI AUSSI — et le decouvrir a coute une mesure fausse.
+   * Premier jet: je lisais `crible.payment.resolved` en attendant `false`, parce que mon essai manuel
+   * l'avait rendu `false`. Le test, lui, l'a rendu VRAI: `vetAgent` appelle
+   * `https.get(base.blockscout.com/...)` EN DUR, donc le resultat depend de la CONNECTIVITE au moment
+   * du run. Un cas non deterministe n'est pas un cas — il passe ou echoue selon le reseau.
+   * ⛔ Et c'est un fait sur la SUITE, pas seulement sur ce cas: `npm test` fait un appel sortant reel
+   * a chaque execution, alors que le README annonce « all offline ». Rapporte tel quel. */
+  {
+    const httpsMod = require('node:https');
+    const vraiGet = httpsMod.get;
+    httpsMod.get = () => ({ on: (ev, cb) => { if (ev === 'error') process.nextTick(() => cb(new Error('stub: explorateur muet'))); return {}; } });
+    try {
+      const muet = await vetAgent({ payTo: PAYE, knownBadScreen: plancherReel, screenFn: screenAddress });
+      check('explorateur non lu: `resolved` est bien false', muet.payment.resolved, false);
+      check('explorateur non lu: la sortie le DIT', typeof muet.unresolved === 'string', true);
+      /* ⛔ Les trois champs qui s'effondrent ensemble: sans la note, ils se lisent comme TROIS FAITS. */
+      check('explorateur non lu: flaggedScam n\'est pas un fait', muet.payment.flaggedScam, false);
+      check('explorateur non lu: le verdict ne devient PAS un feu vert', muet.verdict === 'clean', false);
+    } finally {
+      httpsMod.get = vraiGet;
+    }
+  }
+
+  /* ⛔ CAS OPPOSE — sans lui, poser la note PARTOUT passerait pour un correctif. Un explorateur qui a
+   * REPONDU ne doit porter AUCUNE note: du bruit sur une garde de securite finit desactive.
+   * ⚠️ `info` n'est PAS injectable — `vetAgent` appelle `https.get(base.blockscout.com/...)` en dur.
+   * On stubbe donc le TRANSPORT, comme le reste de ce fichier le fait pour `https.request`. */
+  {
+    const httpsMod = require('node:https');
+    const vraiGet = httpsMod.get;
+    httpsMod.get = (u, o, cb) => {
+      const fn = typeof o === 'function' ? o : cb;
+      const res = new (require('node:events').EventEmitter)();
+      fn(res);
+      process.nextTick(() => {
+        res.emit('data', JSON.stringify({ is_scam: false, is_contract: false, is_verified: true }));
+        res.emit('end');
+      });
+      return { on: () => ({}) };
+    };
+    try {
+      const avecInfo = await vetAgent({ payTo: PAYE, knownBadScreen: plancherReel, screenFn: screenAddress });
+      check('explorateur LU: `resolved` vrai', avecInfo.payment.resolved, true);
+      check('explorateur LU: pas de note parasite', avecInfo.unresolved === undefined, true);
+    } finally {
+      httpsMod.get = vraiGet;     // ⛔ restaurer, sinon les cas suivants mesurent un monde truque
+    }
+  }
+
   /* ── UNE LISTE D'OUTILS NON LUE N'EST PAS UNE LISTE VIDE ──────────────────────────────────────────
    *
    * Mesure du 2026-07-28: `tools/list` qui meurt et `tools/list` qui rend `[]` sortaient du MEME verdict
