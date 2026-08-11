@@ -78,7 +78,15 @@ const DECLARES = {
   liqMissSince: 'horodatage de la premiere lecture manquee',
   // — texte pour un humain
   firstReason: 'phrase publiee, pas une variable de decision',
-  funderTraceError: 'message d erreur, lisible par un humain',
+  /* ⚠️ MESURE DU 2026-08-11, qui change ce qu'on peut en faire: 673 lignes sur 2436 (27,6 pct) en
+   * portent un, et le champ dit VRAI sans exception — 0/673 de ces lignes ont un `funder`, contre
+   * 74,5 pct des lignes sans erreur. Mais la VENTILATION des messages compte plus que le total:
+   *   631  « the explorer ANSWERED but records no creator for this address »  -> LIMITE DE LA SOURCE
+   *    34  « the explorer did not answer for this token address »             -> panne, reessayable
+   *     8  « could not resolve the deploying wallet »
+   * ⇒ 94 pct de ces « erreurs » ne sont PAS des pannes: l'explorateur repond, il n'a simplement pas
+   * l'information. Reessayer ces 631 ne changerait rien. Deux etats opposes sous un seul nom. */
+  funderTraceError: 'message d erreur, lisible par un humain (94 pct = limite de source, pas panne)',
   identityWarning: 'phrase publiee; la variable de decision serait `symbolVerdict`',
   rejudgedReason: 'phrase publiee lors d un re-jugement',
   // — re-jugement et diagnostics
