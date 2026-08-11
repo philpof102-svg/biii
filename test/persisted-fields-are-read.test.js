@@ -117,7 +117,20 @@ const DECLARES = {
   // — ⚠️ CANDIDATS MESURES ET NON NOTES. Ceux-la sont la vraie dette, et ils sont nommes comme telle.
   funderTrace: '⚠️ CANDIDAT MESURE, NON NOTE — 1309 lignes; `no_creator` rugge a 93,2 % (2026-08-08)',
   freshDeployer: '⚠️ CANDIDAT MESURE, NON NOTE — 1115 lignes; +58,9 pts sur lectures completes (2026-08-08)',
-  relaunchOfRugged: '⚠️ CANDIDAT MESURE, NON NOTE — 781 lignes; jamais mesure, jamais note',
+  /* ⛔ « jamais mesure » ETAIT FAUX — TROIS sondes existent (`probe-relance-de-rugge`,
+   * `-est-elle-circulaire`, `-combien-d-operateurs`), et la raison est corrigee ici le 2026-08-11.
+   * Re-mesure sur la base fraiche (2436 tokens), avec ses bornes, parce qu'un chiffre sans borne se
+   * fait citer tout seul:
+   *   A symbole vu + predecesseur RUGGE   914 tk  97,4 % [96,1-98,3]  39 financeurs
+   *   B symbole vu, AUCUN predecesseur     53 tk  71,7 % [57,7-83,2]  16 financeurs -> RETENU (<20)
+   *   C symbole jamais vu                1239 tk  71,5 %             166 financeurs
+   *   A-B = +25,7 pts, intervalles DISJOINTS   (au 2026-08-08: 775 tk / 37 fin. / +19,4 pts)
+   *   B-C = +0,2 pt, chevauchants ⇒ la REPETITION seule ne dit rien; c'est la qualification qui porte.
+   * ✅ Tient sur les symboles COURTS (+57,9) ET LONGS (+20,1) ⇒ pas un artefact de collision.
+   * ⛔ MAIS A-B par TIRAGE est IMPOSSIBLE: B n'a que 18 financeurs, sous le plancher de 20. Le seul
+   * controle qui tranche ne peut donc pas etre etabli a l'unite honnete, et A groupe 905 tokens
+   * derriere 38 financeurs (23,8 chacun). C'est pour ca qu'il reste CANDIDAT et pas regle. */
+  relaunchOfRugged: '⚠️ CANDIDAT MESURE, NON NOTE — 914 lignes; A-B +25,7 pts disjoints, mais B RETENU (18 financeurs < 20) (2026-08-11)',
 };
 
 console.log('un champ ecrit par le radar est-il lu par quelque chose qui NOTE ?');
