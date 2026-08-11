@@ -157,6 +157,48 @@ t('une seule page: le financeur EST prouvablement le premier', async () => {
  * champ pourrait invalider la mesure qui le rend interessant. C'est un ARBITRAGE entre justesse et
  * continuite des donnees, donc une decision d'operateur. Ce cas FIGE l'etat mesure pour que le choix
  * se fasse en le voyant. Si le comportement change, ce test doit changer AVEC la decision. */
+/* ── LE COTE ENTRANT N'A PAS RECU LA DOCTRINE DU COTE SORTANT ─────────────────────────────────────
+ *
+ * Ce fichier dit lui-meme, a propos de la fratrie: « la borne voyage desormais en CHAMPS
+ * (`siblingPagesRead`, `siblingPageCap`, `siblingScanStoppedBy`), lisibles par machine » — parce
+ * qu'« une phrase que seul un humain relit » etait le mauvais endroit pour porter une borne.
+ * Cote SORTANT, `siblingsRead` gouverne SIX champs. Cote ENTRANT, seul `funderIsProvablyFirst`
+ * porte le drapeau, et TROIS champs derives de la meme liste tronquee n'en portent aucun:
+ *
+ *   mesure 2026-08-11, 1 item avec et sans `next_page_params`:
+ *     fundedAt           2026-01-01T10:00:00Z  ->  IDENTIQUE
+ *     fundingToDeployMs  7200000               ->  IDENTIQUE
+ *     freshlyFunded      true                  ->  IDENTIQUE
+ *     funderIsProvablyFirst  true              ->  false   (seul a discriminer)
+ *
+ * `fundedAt` vient de `first = funders[funders.length - 1]`, le plus ancien VU. Sur une page
+ * tronquee, un financement ANTERIEUR est invisible: la date est fausse, donc l'ecart aussi, donc
+ * `freshlyFunded` aussi. Son `null` existe deja, mais pour « date indeterminable » — pas pour
+ * « lecture tronquee », qui est un etat DIFFERENT.
+ *
+ * ⚠️ CE N'EST PAS UN MENSONGE: `funderIsProvablyFirst:false` est publie, donc l'information EST dans
+ * la sortie. C'est une CHARGE deplacee sur le consommateur, qui doit savoir relier deux champs.
+ * ⛔ Contrairement a `freshDeployer`, ces trois-la ne sont PAS persistes (le radar les jette), donc
+ * les divulguer ne change AUCUNE donnee — l'arbitrage qui bloque l'autre ne s'applique pas ici. */
+t('★ la NOTE avertit sur la DATE, pas seulement sur le financeur, quand la lecture est tronquee', async () => {
+  const tronque = await tracer({ entrant: { items: BASE_ENTRANT.items, next_page_params: { block_number: 42 } } });
+  assert.match(tronque.note, /not provably the first/i, 'temoin: l avertissement financeur existe deja');
+  assert.match(tronque.note, /fundedAt|funding timestamp|funding date/i,
+    'les champs de DATE derivent de la meme liste tronquee et n etaient couverts par rien');
+  assert.match(tronque.note, /freshlyFunded/i,
+    'le drapeau « finance juste avant le deploiement » repose sur cette date');
+});
+
+t('★ et la borne voyage en CHAMP lisible par machine, comme cote fratrie', async () => {
+  const tronque = await tracer({ entrant: { items: BASE_ENTRANT.items, next_page_params: { block_number: 42 } } });
+  const complet = await tracer({});
+  assert.strictEqual(tronque.incomingRead, false, 'lecture entrante INCOMPLETE');
+  assert.strictEqual(complet.incomingRead, true, 'temoin: lecture entrante complete');
+  /* ⛔ Sans ce temoin, poser `incomingRead:false` PARTOUT passerait pour un correctif. */
+  assert.ok(!/fundedAt|freshlyFunded/i.test(complet.note),
+    'pas d avertissement de date quand il n y a rien a avertir');
+});
+
 t('★ CARACTERISATION — `freshDeployer` ne porte PAS l incompletude que le module connait', async () => {
   const tronque = await tracer({ entrant: { items: BASE_ENTRANT.items, next_page_params: { block_number: 42 } } });
   const complet = await tracer({});
