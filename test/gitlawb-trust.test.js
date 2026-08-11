@@ -88,5 +88,21 @@ t('unavailable reputation → only sub-$100 payouts proceed (fail-closed on the 
   assert.equal(bad.release, false);
 });
 
+/* ── CE QUE CES BARRES COUTENT VRAIMENT, EN PUSHES — l'unite qui parle ─────────────────────────────
+ * Mesure 2026-08-11 sur notre propre DID: 2 pushes -> 0.15, 3 -> 0.20, 4 -> 0.25. Chaque push a ajoute
+ * exactement 0.05. Le score se comporte donc en COMPTEUR D'ACTIVITE, pas en reputation gagnee.
+ * Le test ci-dessous n'affirme PAS la formule (une droite sur trois points) — il traduit les barres
+ * dans cette unite, pour qu'un futur changement de seuil annonce son cout au lieu de le taire.
+ * ⛔ Si les barres changent, ce test doit changer AVEC un chiffre de pushes assume. */
+t('le cout des barres, dit en pushes: $100 s achete en 4 pushes, $1000 en 9', () => {
+  const PAR_PUSH = 0.05;                                  // mesure, pas convention
+  const pushesPour = (bar) => Math.ceil(bar / PAR_PUSH);  // depuis 0, un DID neuf
+  assert.equal(pushesPour(requiredTrust('100')), 4, 'la barre mid vaut QUATRE pushes');
+  assert.equal(pushesPour(requiredTrust('1000')), 10, 'la barre large vaut DIX pushes depuis zero');
+  assert.equal(pushesPour(requiredTrust('99')), 0, 'sous 100 aucun push n est exige');
+  // ⚠️ et un DID neuf part de 0.05 (un push offert a l enregistrement), d'ou 9 pushes reels pour 0.5
+  assert.equal(Math.ceil((requiredTrust('1000') - 0.05) / PAR_PUSH), 9, 'depuis le 0.05 d un DID frais');
+});
+
 console.log(`\n${pass} passed · ${fail} failed`);
 process.exit(fail ? 1 : 0);
