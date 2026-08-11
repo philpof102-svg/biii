@@ -134,6 +134,42 @@ t('une seule page: le financeur EST prouvablement le premier', async () => {
   assert.ok(!/not provably the first/i.test(r.note), 'pas d avertissement quand il n y a rien a avertir');
 });
 
+/* ── ⚠️ CARACTERISATION, PAS UN CORRECTIF: `freshDeployer` IGNORE l'incompletude ──────────────────
+ *
+ * Mesure du 2026-08-11, avec temoin qui discrimine:
+ *     1 item + next_page_params -> freshDeployer=true , funderIsProvablyFirst=FALSE
+ *     1 item, lecture complete  -> freshDeployer=true , funderIsProvablyFirst=true
+ *
+ * Le module SAIT que la lecture est partielle — `incompletIncoming` existe, gouverne
+ * `funderIsProvablyFirst` et declenche l'avertissement de la note. `freshDeployer` est calcule
+ * `incoming.length === 1` et ne le consulte PAS. Or « le deployeur n'a recu QU'UNE transaction
+ * entrante » est une AFFIRMATION FORTE: sur une page tronquee, elle peut etre fausse.
+ *
+ * ⚠️ RARE, PAS IMPOSSIBLE: une page d'explorateur rend d'ordinaire ~50 items, donc « 1 item ET une
+ * page suivante » est inhabituel. Rien ne l'interdit pour autant, et rien ne le garde.
+ *
+ * 🚨 POURQUOI CA COMPTE: `freshDeployer` est le signal le PLUS predictif mesure dans ce depot
+ * (2026-08-11, base 2425 tokens / 2195 resolus: +14,3 pts d'ecart, 149 financeurs PURS, 3e etat
+ * quasi neutre a +1,5 pt). Il est ecrit par `token-radar.js:629` et lu par AUCUNE regle vivante.
+ *
+ * ⛔ POURQUOI CE N'EST PAS CORRIGE ICI: le champ est PERSISTE. Le passer a `null` quand la lecture
+ * est incomplete changerait la base sur laquelle ce +14,3 pts est mesure — ameliorer l'exactitude du
+ * champ pourrait invalider la mesure qui le rend interessant. C'est un ARBITRAGE entre justesse et
+ * continuite des donnees, donc une decision d'operateur. Ce cas FIGE l'etat mesure pour que le choix
+ * se fasse en le voyant. Si le comportement change, ce test doit changer AVEC la decision. */
+t('★ CARACTERISATION — `freshDeployer` ne porte PAS l incompletude que le module connait', async () => {
+  const tronque = await tracer({ entrant: { items: BASE_ENTRANT.items, next_page_params: { block_number: 42 } } });
+  const complet = await tracer({});
+  assert.strictEqual(complet.freshDeployer, true, 'temoin: lecture complete, un seul entrant');
+  assert.strictEqual(complet.funderIsProvablyFirst, true, 'temoin: rien a avertir');
+  /* Le champ VOISIN discrimine correctement... */
+  assert.strictEqual(tronque.funderIsProvablyFirst, false, 'le module SAIT que la lecture est partielle');
+  /* ...et celui-ci rend la MEME valeur qu'en lecture complete. C'est le defaut, epingle tel quel. */
+  assert.strictEqual(tronque.freshDeployer, true,
+    'etat MESURE: identique malgre une lecture partielle. Si ce champ devient `null`/three-state, '
+    + 'changer cette assertion AVEC la decision produit, et re-mesurer l ecart de +14,3 pts.');
+});
+
 t('★ un transfert de 0 ETH ANTERIEUR ne vole pas la place du vrai financeur', async () => {
   /* Un transfert de 0 ETH est gratuit a emettre. N importe qui peut en envoyer un a un deployeur AVANT
    * son vrai financement et se faire nommer « le premier a l avoir paye » — le code prend le plus ancien.
