@@ -4,7 +4,7 @@ This is a **pinned, verbatim copy** of `trust-core` — MainStreet's judgment ex
 dependency-free safe-to-pay classifier — vendored into BIII so a **standalone deploy is self-contained**.
 
 - **Source:** https://github.com/philpof102-svg/trust-core
-- **Pinned at:** commit `ab33fbc`, version `0.1.0`
+- **Pinned at:** commit `09a022f`, version `0.1.0`
 - **License:** MIT (see `LICENSE`)
 - **Contents:** `index.js` + `score.js` only (zero runtime dependencies).
 

@@ -26,7 +26,15 @@ const SUBJECT_TYPES = {
 // survivalRate 'x', …). A NaN score then loses EVERY comparison downstream: in preflight-core.js
 // both `>= 50` and `>= 30` are false, so it settles on PROCEED_LOW_VALUE and is published as a
 // number. The clamp read like a guarantee of the 0-100 range and was not one.
+// 2026-08-12 — and the guard that stopped NaN let `null` through as a ZERO READING. `Number(null)`
+// is 0 and `Number.isFinite(0)` is true, so `finite(null, 30)` returned 0: the fallback was dead code
+// for the one absence the producers actually emit. loadSettlements() returns null for an address with
+// NO settlements, so `daysSinceLastJob: null` scored as "paid today" — full recency, 13 points above
+// this file's own declared fallback, in the flattering direction. Three call sites carried it
+// (daysSinceLastJob 365 + 30, daysSinceLastLaunch 365); the other fourteen pass a 0 fallback, which is
+// exactly what null already coerced to, so fixing it HERE cannot move them.
 function finite(v, fallback) {
+  if (v === null) return fallback;   // an absence is not a reading of zero
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 }
