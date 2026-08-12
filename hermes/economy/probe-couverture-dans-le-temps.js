@@ -1,5 +1,14 @@
 #!/usr/bin/env node
 // probe-couverture-dans-le-temps.js — la moitie illisible se resorbe-t-elle, ou est-elle le regime ?
+//
+// ⚠️ NE PAS CONFONDRE: « couverture » designe TROIS mesures etrangeres dans ce depot, et rien ne les
+// distingue au point de lecture. Nomme ici le 2026-08-11 apres avoir failli citer l'une pour l'autre.
+//   1. `probe-couverture-refaisable.js` — TEMPORELLE / UPTIME: quelle part du temps le collecteur
+//      TOURNAIT (74,3 pct au 11/08). Ne dit RIEN de ce qui est dechiffrable.
+//   2. ICI — LISIBILITE: quelle part des tokens resolus porte les DEUX lectures (53 pct au 11/08).
+//   3. `probe-audit-independance-des-paris.js` / `probe-first-verdict-tient-il.js` — couverture du
+//      CONTROLE: combien de tokens d'un groupe portent un financeur identifie (ex. 163/574).
+// ⛔ Le produit LIT 53 pct de ce qu'il voit, et il TOURNAIT 74 pct du temps. Deux phrases, pas une.
 // ================================================================================================
 // `probe-rappel-et-cout.js` a mesure que la branche « sur » de l'union survit a 29,0 % en production
 // contre 82,9 % dans l'univers lisible: 886 tokens resolus qu'aucun drapeau ne peut lire tombent dans

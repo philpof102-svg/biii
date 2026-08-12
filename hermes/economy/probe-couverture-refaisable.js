@@ -5,6 +5,17 @@
  * ================================================================================================
  * LA COUVERTURE DU RADAR, RECALCULEE — PARCE QUE LE CHIFFRE PUBLIE ETAIT UN LITTERAL GELE.
  *
+ * ⚠️ NE PAS CONFONDRE: « couverture » designe TROIS mesures etrangeres dans ce depot, et rien ne les
+ * distingue au point de lecture. Nomme ici le 2026-08-11 apres avoir failli citer l'une pour l'autre.
+ *   1. ICI — couverture TEMPORELLE / UPTIME: quelle part du temps le collecteur TOURNAIT
+ *      (74,3 pct au 11/08 — 101,2 h aveugles sur 325,5 h). Ne dit RIEN de ce qui est dechiffrable.
+ *   2. `probe-couverture-dans-le-temps.js` — LISIBILITE: quelle part des tokens resolus porte les
+ *      DEUX lectures (53 pct au 11/08, et PLAT: aucune amelioration en cours).
+ *   3. `probe-audit-independance-des-paris.js` / `probe-first-verdict-tient-il.js` — couverture du
+ *      CONTROLE: combien de tokens d'un groupe portent un financeur identifie (ex. 163/574).
+ * ⛔ Citer « couverture 74,3 pct » a cote d'un chiffre de SIGNAL laisse croire que le produit voit
+ * 74 pct de ce qui passe. Il en LIT 53 pct, et il tournait 74 pct du temps. Deux phrases, pas une.
+ *
  * « 68,9 % de couverture, 101,2 h aveugles sur 325,5 h » est cite dans DEUX fichiers
  * (`lib/server.js`, `lib/radar-tick.js`) et RECALCULE dans AUCUN. Un nombre qu'on ne sait plus refaire
  * n'est plus une mesure: c'est une citation.
