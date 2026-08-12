@@ -1,7 +1,7 @@
 # BIII
 
 > Safe-to-pay verdicts on Base, with the evidence attached: **28 tools**, **55 modules**,
-> **117 test files**, **54 probes** that publish their own bounds. Non-custodial, descriptor-only,
+> **118 test files**, **54 probes** that publish their own bounds. Non-custodial, descriptor-only,
 > every verdict re-verifiable on-chain.
 
 **Spoken "B3". Written BIII — a B with three bars.**
