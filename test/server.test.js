@@ -44,6 +44,68 @@ const mkCharge = async (s, amountUsd) => (await req(s, 'POST', '/charge', { amou
     assert.match(r.body.note, /holds no key/);
   });
 
+  /* ── L'ETAT DU COLLECTEUR EST SERVI, ET SES QUATRE ETATS RESTENT DISTINCTS ────────────────────────
+   *
+   * ⛔ POURQUOI. Mesure du 2026-08-11: `blackouts.json` porte 111,3 h de silence en 9 trous, tous du
+   * meme profil — arret le soir/la nuit, reprise en JOURNEE, et la note du plus ancien dit « The
+   * machine slept ». Le collecteur SERVEUR existe pour ne plus dependre d'une machine qui dort, mais
+   * RIEN ne publiait s'il tournait: `/health` rendait `ok:true` sans un mot, `/radar` la couverture du
+   * registre. `radar-tick` « disait » son etat — dans ses LOGS, qui ne sortent pas du conteneur. Le
+   * doute a dure des jours faute d'une surface lisible.
+   *
+   * ⚠️ ET « ACTIF » NE SUFFIT PAS: c'est « arme », pas « tourne ». Les quatre etats doivent rester
+   * separes, sinon le champ rassure a tort:
+   *   notStarted -> ce processus n'a pas de collecteur (test, serveur lance a la main)
+   *   inactive   -> le collecteur existe et attend `RADAR_TICK_MINUTES`
+   *   armed      -> arme, JAMAIS tourne encore
+   *   running    -> arme ET a tourne; c'est `lastTickAgeMinutes` compare a `everyMinutes` qui montre
+   *                 un collecteur MORT, pas la presence du champ. */
+  await t('★ GET /health: sans collecteur dans ce processus, il dit `notStarted` — pas « inactif »', async () => {
+    const r = await req(server, 'GET', '/health');
+    assert.equal(r.body.collector.state, 'notStarted',
+      'l absence de collecteur dans CE processus n est pas une panne du collecteur');
+    assert.match(r.body.collector.note, /say nothing about the base/);
+  });
+
+  await t('★ GET /health: collecteur INACTIF — il nomme la variable qui le reveillerait', async () => {
+    const s = await mkServer({ radarEtat: () => ({ actif: false, raison: 'RADAR_TICK_MINUTES absent',
+      minutes: null, dir: null, lastTickAt: null, lastTickOk: null, ticks: 0, lastTickAgeMinutes: null }) });
+    const r = await req(s, 'GET', '/health');
+    s.close();
+    assert.equal(r.body.collector.state, 'inactive');
+    assert.match(r.body.collector.note, /RADAR_TICK_MINUTES/,
+      'dire « inactif » sans dire quoi poser laisse le lecteur devant rien');
+  });
+
+  await t('★ GET /health: ARME mais jamais tourne ne se lit PAS comme `running`', async () => {
+    const s = await mkServer({ radarEtat: () => ({ actif: true, raison: 'ok', minutes: 60, dir: '/x',
+      lastTickAt: null, lastTickOk: null, ticks: 0, lastTickAgeMinutes: null }) });
+    const r = await req(s, 'GET', '/health');
+    s.close();
+    assert.equal(r.body.collector.state, 'armed', '⛔ arme n est pas tourne');
+    assert.equal(r.body.collector.lastTickAt, null, 'aucune date inventee');
+    assert.match(r.body.collector.note, /NEVER RAN/);
+  });
+
+  await t('★ GET /health: `running` porte l AGE — c est lui qui montre un collecteur MORT', async () => {
+    const s = await mkServer({ radarEtat: () => ({ actif: true, raison: 'ok', minutes: 60, dir: '/x',
+      lastTickAt: '2026-08-11T10:00:00.000Z', lastTickOk: true, ticks: 12, lastTickAgeMinutes: 417.6 }) });
+    const r = await req(s, 'GET', '/health');
+    s.close();
+    assert.equal(r.body.collector.state, 'running');
+    assert.equal(r.body.collector.lastTickAgeMinutes, 418, 'l age est arrondi, pas tronque au hasard');
+    assert.equal(r.body.collector.everyMinutes, 60);
+    assert.equal(r.body.collector.ticks, 12);
+    /* ⛔ TEMOIN OPPOSE: un tick ECHOUE reste visible dans la surface servie. */
+    const s2 = await mkServer({ radarEtat: () => ({ actif: true, raison: 'ok', minutes: 60, dir: '/x',
+      lastTickAt: '2026-08-11T10:00:00.000Z', lastTickOk: false, ticks: 3, lastTickAgeMinutes: 5,
+      lastTickRaison: 'code 3' }) });
+    const r2 = await req(s2, 'GET', '/health');
+    s2.close();
+    assert.equal(r2.body.collector.lastTickOk, false, 'un echec ne doit pas disparaitre derriere `running`');
+    assert.equal(r2.body.collector.lastTickReason, 'code 3');
+  });
+
   await t('GET / serves the merchant PWA same-origin (so the phone app and its API share one URL)', async () => {
     const r = await req(server, 'GET', '/');
     assert.match(String(r.raw || ''), /BIII|Caisse|screen-keypad/, 'the / route serves web/index.html');

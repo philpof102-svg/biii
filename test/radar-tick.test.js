@@ -155,6 +155,74 @@ t('un radar qui JETTE ne fait pas tomber le processus de la caisse', async () =>
   });
 });
 
+/* ── 6bis. L'ETAT DOIT ETRE LISIBLE DE L'EXTERIEUR ────────────────────────────────────────────────
+ *
+ * ⛔ POURQUOI CE BLOC EXISTE. Mesure du 2026-08-11: `data/token-radar/blackouts.json` porte 111,3 h
+ * de silence en 9 trous, tous du meme profil — arret le soir ou la nuit (17:04, 19:13, 21:27, 23:33,
+ * 02:18, 03:59), reprise en JOURNEE (08:36, 08:50, 12:58, 14:04, 15:09, 15:59). La note du plus
+ * ancien le dit: « The machine slept ». La collecte depend d'un lanceur sur une machine qui dort.
+ *
+ * Le collecteur SERVEUR existe pour ca (`lib/server.js` appelle `startRadarTicks`, « la ou la machine
+ * ne s'eteint pas »). Mais RIEN ne publie s'il tourne: `/health` rend `ok:true` sans un mot du radar,
+ * `/radar` rend la couverture du registre. Le module « dit lequel des deux cas il est » — dans ses
+ * LOGS. De l'exterieur, impossible de savoir si la base collecte, et c'est pour ca que le doute a
+ * dure des jours.
+ *
+ * ⚠️ ET « ARME » NE SUFFIT PAS. Le retour de demarrage dit deja `actif`. Un etat qui s'arreterait la
+ * publierait « tout va bien » sur un collecteur qui plante a chaque tick — la meme faute que « il le
+ * VOIT » confondu avec « il BASCULE ». Il faut donc la DATE du dernier tick et son ISSUE, et les
+ * trois etats doivent rester distincts: jamais tourne · tourne et reussi · tourne et ECHOUE. */
+t('★ etat(): sans RADAR_TICK_MINUTES il dit INACTIF, et ne fabrique aucune date', () => {
+  const r = startRadarTicks({ minutes: null, log: () => {}, planifier: () => { throw new Error('rien'); } });
+  assert.strictEqual(typeof r.etat, 'function', 'le retour doit exposer etat()');
+  const e = r.etat();
+  assert.strictEqual(e.actif, false);
+  assert.strictEqual(e.lastTickAt, null, 'jamais tourne ne s ecrit pas avec une date');
+  assert.strictEqual(e.lastTickOk, null, '`null` = jamais tourne; `false` dirait « a echoue »');
+  assert.strictEqual(e.ticks, 0);
+});
+
+t('★ etat(): arme mais AVANT tout tick — actif, et toujours aucune date', () => {
+  const r = startRadarTicks({ minutes: 60, repoDir: REPO, volumeRoot: undefined, inspect: vue({}), io: {},
+    lancer: () => Promise.resolve({ code: 0 }), log: () => {}, planifier: () => ({ unref() {} }),
+    ageMinutes: 0 });
+  const e = r.etat();
+  assert.strictEqual(e.actif, true, 'temoin: il EST arme');
+  assert.strictEqual(e.lastTickAt, null, '⛔ arme n est pas tourne — ne jamais publier une date inventee');
+  assert.strictEqual(e.ticks, 0);
+});
+
+t('★ etat(): apres un tick REUSSI, la date et l issue sont posees', async () => {
+  const r = startRadarTicks({ minutes: 60, repoDir: REPO, volumeRoot: undefined, inspect: vue({}), io: {},
+    lancer: () => Promise.resolve({ code: 0 }), log: () => {}, planifier: () => ({ unref() {} }),
+    ageMinutes: 0 });
+  await Promise.resolve(r._tick());
+  const e = r.etat();
+  assert.strictEqual(e.lastTickOk, true);
+  assert.ok(typeof e.lastTickAt === 'string' && e.lastTickAt.length >= 20, 'une date ISO: ' + e.lastTickAt);
+  assert.strictEqual(e.ticks, 1);
+  assert.ok(Number.isFinite(e.lastTickAgeMinutes) && e.lastTickAgeMinutes >= 0,
+    'l AGE est ce qui permet de voir un collecteur MORT, pas la date seule');
+});
+
+t('★ etat(): apres un tick ECHOUE, il ne se lit PAS comme un succes', async () => {
+  const r = startRadarTicks({ minutes: 60, repoDir: REPO, volumeRoot: undefined, inspect: vue({}), io: {},
+    lancer: () => { throw new Error('radar: OOM'); }, log: () => {}, planifier: () => ({ unref() {} }),
+    ageMinutes: 0 });
+  await Promise.resolve(r._tick());
+  const e = r.etat();
+  assert.strictEqual(e.lastTickOk, false, '⛔ un tick qui jette doit se voir dans l etat servi');
+  assert.ok(typeof e.lastTickAt === 'string', 'la TENTATIVE est datee, meme ratee — sinon un radar qui '
+    + 'plante en boucle paraitrait « jamais lance »');
+  assert.strictEqual(e.ticks, 1, 'une tentative compte');
+  /* ⛔ TEMOIN OPPOSE: un code non nul n est pas non plus un succes. */
+  const r2 = startRadarTicks({ minutes: 60, repoDir: REPO, volumeRoot: undefined, inspect: vue({}), io: {},
+    lancer: () => Promise.resolve({ code: 3 }), log: () => {}, planifier: () => ({ unref() {} }),
+    ageMinutes: 0 });
+  await Promise.resolve(r2._tick());
+  assert.strictEqual(r2.etat().lastTickOk, false, 'code 3 n est pas ok');
+});
+
 t('un radar qui sort non-zero est signale comme tel, pas avale', async () => {
   const dit = [];
   const r = startRadarTicks({
@@ -228,7 +296,8 @@ t('demarrage: une base EN RETARD planifie le rattrapage, une base FRAICHE non', 
 
 /* Le bilan attend les cas asynchrones. Et il verifie son PROPRE compte: une suite qui n a rien
  * execute doit echouer bruyamment plutot que d imprimer « 0 passed, 0 failed » et sortir 0. */
-const ATTENDUS = 17;
+/* 17 d'origine + 4 pour `etat()` — l'etat vivant du collecteur, publie sur `/health`. */
+const ATTENDUS = 21;
 Promise.all(encours).then(() => {
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   if (pass + fail !== ATTENDUS) {
