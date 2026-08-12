@@ -524,7 +524,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.bassethound/bassethound",
-      "lastSeen": "2026-08-12T02:12:44.043Z"
+      "lastSeen": "2026-08-12T12:19:19.359Z"
     },
     "https://beatbandit.ai/api/mcp": {
       "verdict": "unauditable",
@@ -533,7 +533,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.beatbandit/beatbandit",
-      "lastSeen": "2026-08-12T02:12:45.151Z"
+      "lastSeen": "2026-08-12T12:19:20.511Z"
     },
     "https://b4-index.vercel.app/mcp": {
       "verdict": "answers",
@@ -542,7 +542,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.benroberts/b4-index",
-      "lastSeen": "2026-08-12T02:12:47.387Z"
+      "lastSeen": "2026-08-12T12:19:22.964Z"
     },
     "https://betterpost.ai/mcp": {
       "verdict": "answers",
@@ -551,7 +551,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.betterpost/server",
-      "lastSeen": "2026-08-12T02:12:48.598Z"
+      "lastSeen": "2026-08-12T12:19:24.371Z"
     },
     "https://app.bezal.ai/api/mcp": {
       "verdict": "unauditable",
@@ -560,7 +560,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.bezal/local-commerce",
-      "lastSeen": "2026-08-12T02:12:50.608Z"
+      "lastSeen": "2026-08-12T12:19:25.662Z"
     },
     "https://biddeed.ai/api/mcp": {
       "verdict": "unreachable",
@@ -569,7 +569,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.biddeed/biddeed-mcp",
-      "lastSeen": "2026-08-12T02:12:51.483Z"
+      "lastSeen": "2026-08-12T12:19:26.665Z"
     },
     "https://mcp.biddeed.ai/api/mcp": {
       "verdict": "unreachable",
@@ -578,7 +578,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.biddeed/biddeed-mcp",
-      "lastSeen": "2026-08-12T02:12:52.339Z"
+      "lastSeen": "2026-08-12T12:19:27.577Z"
     },
     "https://mcp.biel.ai/v2/{project_slug}/mcp": {
       "verdict": "unreachable",
@@ -587,7 +587,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.biel/biel-ai",
-      "lastSeen": "2026-08-12T02:12:53.228Z"
+      "lastSeen": "2026-08-12T12:19:28.480Z"
     },
     "https://bittlebits.ai/mcp": {
       "verdict": "unauditable",
@@ -596,7 +596,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.bittlebits/bittlebits",
-      "lastSeen": "2026-08-12T02:12:54.409Z"
+      "lastSeen": "2026-08-12T12:19:29.870Z"
     },
     "https://blast-radius.ai/mcp": {
       "verdict": "answers",
@@ -605,7 +605,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.blast-radius/blast-radius",
-      "lastSeen": "2026-08-12T02:12:55.386Z"
+      "lastSeen": "2026-08-12T12:19:31.101Z"
     },
     "https://mcp.bloopo.ai/mcp": {
       "verdict": "unauditable",
@@ -614,7 +614,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.bloopo/bloopo",
-      "lastSeen": "2026-08-12T02:12:56.497Z"
+      "lastSeen": "2026-08-12T12:19:32.409Z"
     },
     "https://api.bluenexus.ai/mcp": {
       "verdict": "unauditable",
@@ -623,7 +623,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.bluenexus/universal-mcp",
-      "lastSeen": "2026-08-12T02:12:57.873Z"
+      "lastSeen": "2026-08-12T12:19:33.812Z"
     },
     "https://mcp.bodenrichtwert.ai/mcp": {
       "verdict": "unauditable",
@@ -632,7 +632,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.bodenrichtwert/mcp",
-      "lastSeen": "2026-08-12T02:12:58.806Z"
+      "lastSeen": "2026-08-12T12:19:34.823Z"
     },
     "https://directory.boolsai.ai/mcp": {
       "verdict": "answers",
@@ -641,7 +641,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.boolsai/directory",
-      "lastSeen": "2026-08-12T02:12:59.755Z"
+      "lastSeen": "2026-08-12T12:19:36.136Z"
     },
     "https://grep.boolsai.ai/mcp": {
       "verdict": "answers",
@@ -650,7 +650,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.boolsai/grep",
-      "lastSeen": "2026-08-12T04:14:00.339Z"
+      "lastSeen": "2026-08-12T12:19:37.275Z"
     },
     "https://boolsai.ai/mcp": {
       "verdict": "answers",
@@ -659,7 +659,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.boolsai/scan",
-      "lastSeen": "2026-08-12T04:14:01.537Z"
+      "lastSeen": "2026-08-12T12:19:38.368Z"
     },
     "https://signals.boolsai.ai/mcp": {
       "verdict": "answers",
@@ -668,7 +668,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.boolsai/signals",
-      "lastSeen": "2026-08-12T04:14:02.450Z"
+      "lastSeen": "2026-08-12T12:19:39.481Z"
     },
     "https://borealhost.ai/mcp/": {
       "verdict": "unauditable",
@@ -677,7 +677,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.borealhost/mcp",
-      "lastSeen": "2026-08-12T04:14:04.227Z"
+      "lastSeen": "2026-08-12T12:19:41.040Z"
     },
     "https://mcp.boundaryai.ai/mcp": {
       "verdict": "unauditable",
@@ -686,7 +686,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.boundaryai/boundaryai",
-      "lastSeen": "2026-08-12T04:14:05.499Z"
+      "lastSeen": "2026-08-12T12:19:42.388Z"
     },
     "https://api.bowmark.ai/mcp": {
       "verdict": "answers",
@@ -839,7 +839,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.beket/audit",
-      "lastSeen": "2026-08-12T02:12:46.215Z"
+      "lastSeen": "2026-08-12T12:19:21.731Z"
     },
     "https://app.autoposting.ai/mcp": {
       "verdict": "unauditable",
@@ -869,5 +869,5 @@
       "lastSeen": "2026-08-12T04:14:22.740Z"
     }
   },
-  "offset": 73
+  "offset": 93
 }
