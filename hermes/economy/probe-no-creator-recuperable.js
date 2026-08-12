@@ -35,6 +35,18 @@ const ECHANTILLON = Math.min(Number(process.argv[2]) || 20, 60);
 const rows = Object.entries(JSON.parse(fs.readFileSync(
   path.join(RACINE, 'data/token-radar/tokens.json'), 'utf8'))).map(([addr, v]) => ({ addr, ...v }));
 
+/* ⚠️ CE QUE CES 91 LIGNES SONT VRAIMENT — mesure completee le 2026-08-11 au soir.
+ * Elles sont TOUTES apparues entre le 2026-07-29 et le 2026-07-30 (etalement: 0,9 jour), et
+ * `lib/feeder.js` date l'installation du drapeau `funderTrace` du 2026-07-29 15:59. Decoupage:
+ *     avant le 31/07 : 1019 lignes,  91 contradictoires (8,93 pct),  22 `no_creator` propres
+ *     a partir du 31 : 1446 lignes,   0 contradictoires (0,00 pct), 528 `no_creator` propres
+ * ⇒ ARTEFACT DE DEPLOIEMENT, borne a la fenetre d'installation: le mauvais etiquetage s'arrete NET
+ * pendant que le vrai etat passe de 2,2 a 36,5 pct. Ce n'est PAS une contradiction permanente.
+ * ⛔ CE QUE J'AI FAILLI PUBLIER: ces 91 ruggent a 98,9 pct (+16,6 pts sur un plafond de 17,7). J'allais
+ * en faire le meilleur signal de la journee. C'est un taux sur DEUX JOURS, pas une propriete du champ.
+ * ✅ L'UNION reste la bonne population — ce SONT des `no_creator` (0 deployer, 0 funder, 0
+ * siblingCount, message explicite) — mais pour cette raison-la, pas pour celle ecrite plus bas. */
+
 /* ⛔ LE CHAMP SOUS-COMPTE, ET LE MESSAGE DIT LA VERITE. Mesure du 2026-08-11 sur 2436 lignes:
  *   funderTrace === 'no_creator'                 540
  *   message « records no creator »               631   (les 540 y sont TOUS inclus)
