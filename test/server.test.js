@@ -106,6 +106,33 @@ const mkCharge = async (s, amountUsd) => (await req(s, 'POST', '/charge', { amou
     assert.equal(r2.body.collector.lastTickReason, 'code 3');
   });
 
+  /* QUEL ARBRE TOURNE. Le 2026-08-13, la copie deployee ne rendait pas `collector`: c est un champ MANQUANT
+   * qui a revele qu elle etait antique, et seulement parce que je cherchais. Le marqueur rend l ecart
+   * LISIBLE — mais il ne vaut que si ses deux etats se distinguent, et si le champ NOMME d ou il tient sa
+   * valeur: une cle de build differe par plateforme et aucune n a ete verifiee sur celle-ci. */
+  await t('★ GET /health: sans marqueur de build, il DIT qu il ne sait pas — pas un silence', async () => {
+    for (const k of ['RAILWAY_GIT_COMMIT_SHA', 'RAILWAY_DEPLOYMENT_ID', 'BIII_COMMIT', 'SOURCE_COMMIT', 'GIT_COMMIT']) delete process.env[k];
+    const s = await mkServer({});
+    const r = await req(s, 'GET', '/health');
+    s.close();
+    assert.equal(r.body.deployment.marker, null, 'aucun marqueur invente quand l environnement n en pose pas');
+    assert.equal(r.body.deployment.from, null, 'et aucune cle nommee quand aucune n a repondu');
+    assert.match(r.body.deployment.note, /WHICH tree is running/,
+      '⛔ un marqueur absent SANS phrase se lit comme « a jour » — c est l affirmation, pas le silence, qui coute');
+  });
+
+  await t('★ GET /health, cas OPPOSE: avec un marqueur, il le sert ET nomme la cle qui a repondu', async () => {
+    process.env.BIII_COMMIT = 'a682ad6c0ffee1234567890';
+    const s = await mkServer({});
+    const r = await req(s, 'GET', '/health');
+    s.close();
+    delete process.env.BIII_COMMIT;
+    assert.equal(r.body.deployment.marker, 'a682ad6c0ffe', 'tronque a 12 — de quoi comparer a `git log`, pas un identifiant');
+    assert.equal(r.body.deployment.from, 'BIII_COMMIT',
+      'servir la valeur sans dire d ou elle vient laisse indistinctes deux plateformes qui ne posent pas la meme cle');
+    assert.equal(r.body.deployment.note, undefined, 'la phrase du cas vide ne doit pas survivre au cas plein');
+  });
+
   await t('GET / serves the merchant PWA same-origin (so the phone app and its API share one URL)', async () => {
     const r = await req(server, 'GET', '/');
     assert.match(String(r.raw || ''), /BIII|Caisse|screen-keypad/, 'the / route serves web/index.html');

@@ -27,6 +27,12 @@ always on the under-charging side; a floor was read as an upper bound under 44% 
 inert bet was counted as a young one, so `natif-b20` abstained on 100% of cases; and the gitlawb trust score
 that gates our payouts is a push counter, which the tool now says out loud.
 
+One addition aimed at the other channel. The hosted server at `biii-production.up.railway.app` was measured
+the same day and is older than 2026-08-12 — established only because `/health` was missing a field, which is
+a poor way to learn what is running. `/health` now publishes a `deployment` marker read from whichever build
+variable the platform actually sets, and NAMES that variable rather than serving a bare value; when nothing
+sets one it says so, because a silent `null` there reads as "up to date".
+
 Not a release note yet — a statement of what a release would deliver. `test/unreleased-work-is-declared.test.js`
 keeps this section and the shipped tree honest with each other in both directions.
 
