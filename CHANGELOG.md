@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased
+
+**Nothing below is on npm.** `biii-mcp@0.2.1` was published 2026-07-27T20:28Z from `d928b38`, and that is
+still what an install gets today. Measured 2026-08-13 by reading the published tree out of git rather than
+downloading it: 123 commits have touched shipped code since, across 50 files.
+
+Two of those matter more than a version gap normally would.
+
+**The published tarball scores an agent that never paid as if it paid today.** `vendor/trust-core/score.js`
+at `d928b38` has no `finite(null)` guard, so a `null` reading — an absence — coerces to `0` and lands on the
+freshest possible bucket instead of the declared fallback. That is 13 points of fail-open, in the direction
+that flatters. And because `trust-core` ships through `bundleDependencies`, no consumer can fix it by
+updating a dependency: there is no `trust-core` to resolve, only the frozen copy inside the tarball. The
+only path to the fix is a republication of `biii-mcp`.
+
+**The published tarball has no outbound deadline anywhere.** Ten native clients in `lib/` acquired one
+since; at `d928b38` there are zero. A `timeout` option alone aborts nothing, and a handler that listens
+without `destroy()` hangs just the same — measured at 2519 ms for 700 ms requested.
+
+The rest, in short: the paid x402 route could not lift a hold the free one could, and `registryComplete`
+was loaded then discarded by both REST routes including the paid one; two opposite x402 failures returned
+the same message while only one of them consumes the stake; `agent-vet` returned the same GREEN verdict for
+an empty string as for a clean address, on a CORS-open route; an unreadable billing figure became a figure,
+always on the under-charging side; a floor was read as an upper bound under 44% of the `thin` branch; an
+inert bet was counted as a young one, so `natif-b20` abstained on 100% of cases; and the gitlawb trust score
+that gates our payouts is a push counter, which the tool now says out loud.
+
+Not a release note yet — a statement of what a release would deliver. `test/unreleased-work-is-declared.test.js`
+keeps this section and the shipped tree honest with each other in both directions.
+
 ## 0.2.1 — 2026-07-27
 
 Same contents as the 0.2.0 entry below — the number moved for a release-plumbing reason, not a code one.
