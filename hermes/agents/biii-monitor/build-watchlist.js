@@ -26,11 +26,17 @@ const isAddr = (a) => /^0x[0-9a-fA-F]{40}$/.test(a);
 // Quote assets sit on the other side of nearly every pool; they are infrastructure, not watch targets.
 const QUOTES = new Set(['0x4200000000000000000000000000000000000006', '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913']);
 
+// The deadline is the same one first-buyer.js uses against the same free API. Without it a stalled socket
+// never fires `end`, so this promise never settles and the regeneration hangs on page 1 forever -- the same
+// quiet blindness the header describes, one layer down: no error, no output, just a run that never returns.
+// It bounds SILENCE, not slowness: a server dribbling one byte every 20s rearms the timer indefinitely.
 const getJSON = (url) => new Promise((resolve) => {
-  https.get(url, { headers: { accept: 'application/json' } }, (res) => {
+  const req = https.get(url, { headers: { accept: 'application/json' } }, (res) => {
     let d = ''; res.on('data', (c) => (d += c));
     res.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve(null); } });
-  }).on('error', () => resolve(null));
+  });
+  req.on('error', () => resolve(null));
+  req.setTimeout(25000, () => { req.destroy(); resolve(null); });
 });
 
 (async () => {
