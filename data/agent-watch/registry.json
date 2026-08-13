@@ -160,7 +160,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agenticshelf/mcp",
-      "lastSeen": "2026-08-12T16:22:06.167Z"
+      "lastSeen": "2026-08-13T23:36:47.998Z"
     },
     "https://api.agenticshelf.ai/m/puroair/mcp": {
       "verdict": "unreachable",
@@ -169,7 +169,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agenticshelf/puroair",
-      "lastSeen": "2026-08-12T16:22:07.087Z"
+      "lastSeen": "2026-08-13T23:36:48.863Z"
     },
     "https://mcp.agenticterminal.ai/mcp": {
       "verdict": "answers",
@@ -178,7 +178,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agenticterminal/directory",
-      "lastSeen": "2026-08-12T16:22:08.531Z"
+      "lastSeen": "2026-08-13T23:36:50.275Z"
     },
     "https://ai-akari.ai/mcp-trust": {
       "verdict": "high_risk",
@@ -189,7 +189,7 @@
       ],
       "wantsSecret": [],
       "name": "ai.ai-akari/agent-trust-receipt",
-      "lastSeen": "2026-08-12T16:22:19.538Z"
+      "lastSeen": "2026-08-13T23:36:59.976Z"
     },
     "https://ai-akari.ai/mcp": {
       "verdict": "high_risk",
@@ -200,7 +200,7 @@
       ],
       "wantsSecret": [],
       "name": "ai.ai-akari/one-minute-akari",
-      "lastSeen": "2026-08-12T16:22:21.334Z"
+      "lastSeen": "2026-08-13T23:37:02.025Z"
     },
     "https://www.ai-portal.ai/mcp": {
       "verdict": "answers",
@@ -209,7 +209,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.ai-portal/ai-portal",
-      "lastSeen": "2026-08-12T16:22:22.738Z"
+      "lastSeen": "2026-08-13T23:37:03.473Z"
     },
     "https://aient.ai/mcp": {
       "verdict": "unauditable",
@@ -218,7 +218,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.aient/mcp",
-      "lastSeen": "2026-08-12T16:22:23.876Z"
+      "lastSeen": "2026-08-13T23:37:07.063Z"
     },
     "https://mcp.airshelf.ai/mcp": {
       "verdict": "answers",
@@ -227,7 +227,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.airshelf/catalog",
-      "lastSeen": "2026-08-12T16:22:25.843Z"
+      "lastSeen": "2026-08-13T23:37:09.073Z"
     },
     "https://api.aisecuritygateway.ai/mcp": {
       "verdict": "unauditable",
@@ -240,12 +240,12 @@
     },
     "https://mcp.alphacreek.ai/mcp": {
       "verdict": "answers",
-      "tools": 4,
-      "names": "get_filing_toc,get_latest_filing,list_filings,read_node_content",
+      "tools": 5,
+      "names": "get_filing_toc,get_latest_filing,list_filings,read_node_content,search_sec_event_filings",
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.alphacreek/alphacreek-mcp",
-      "lastSeen": "2026-08-12T18:23:19.868Z"
+      "lastSeen": "2026-08-13T23:37:12.249Z"
     },
     "https://mcp.alpic.ai": {
       "verdict": "unauditable",
@@ -254,7 +254,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.alpic.mcp/alpic-mcp",
-      "lastSeen": "2026-08-12T18:23:21.301Z"
+      "lastSeen": "2026-08-13T23:37:13.909Z"
     },
     "https://test.alpic.ai/": {
       "verdict": "unreachable",
@@ -263,7 +263,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.alpic.test/test-mcp-server",
-      "lastSeen": "2026-08-12T18:23:22.119Z"
+      "lastSeen": "2026-08-13T23:37:14.891Z"
     },
     "https://mcp.ambix.ai": {
       "verdict": "unauditable",
@@ -272,7 +272,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.ambix/ambix",
-      "lastSeen": "2026-08-12T18:23:23.181Z"
+      "lastSeen": "2026-08-13T23:37:16.458Z"
     },
     "https://mcp.anomalyarmor.ai/mcp": {
       "verdict": "unauditable",
@@ -731,7 +731,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.analyticslegends/sap-analytics",
-      "lastSeen": "2026-08-12T18:23:24.487Z"
+      "lastSeen": "2026-08-13T23:37:18.116Z"
     },
     "https://afmr.ai/api/rpc": {
       "verdict": "answers",
@@ -749,7 +749,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agentplaybooks/agentplaybooks",
-      "lastSeen": "2026-08-12T16:22:17.000Z"
+      "lastSeen": "2026-08-13T23:36:57.634Z"
     },
     "https://mcp.atlaso.ai/mcp": {
       "verdict": "unauditable",
@@ -767,7 +767,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.ai-advisors/mcp",
-      "lastSeen": "2026-08-12T16:22:18.130Z"
+      "lastSeen": "2026-08-13T23:36:58.722Z"
     },
     "https://mcp.goji.agency/mcp": {
       "verdict": "answers",
@@ -785,7 +785,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agentlookups/counterscript",
-      "lastSeen": "2026-08-12T16:22:10.018Z"
+      "lastSeen": "2026-08-13T23:36:51.772Z"
     },
     "https://env.agentlookups.ai/mcp": {
       "verdict": "answers",
@@ -794,7 +794,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agentlookups/groundtruth",
-      "lastSeen": "2026-08-12T16:22:11.646Z"
+      "lastSeen": "2026-08-13T23:36:53.248Z"
     },
     "https://overassessed.agentlookups.ai/mcp": {
       "verdict": "answers",
@@ -803,7 +803,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agentlookups/overassessed",
-      "lastSeen": "2026-08-12T16:22:13.499Z"
+      "lastSeen": "2026-08-13T23:36:54.627Z"
     },
     "https://contractors.agentlookups.ai/mcp": {
       "verdict": "answers",
@@ -812,7 +812,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agentlookups/plumbline",
-      "lastSeen": "2026-08-12T16:22:15.132Z"
+      "lastSeen": "2026-08-13T23:36:56.171Z"
     },
     "https://mcp.aivonic.ai": {
       "verdict": "unauditable",
@@ -821,7 +821,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.aivonic/mcp",
-      "lastSeen": "2026-08-12T16:22:26.885Z"
+      "lastSeen": "2026-08-13T23:37:10.348Z"
     },
     "https://arketo.ai/api/mcp": {
       "verdict": "unauditable",
@@ -869,5 +869,5 @@
       "lastSeen": "2026-08-13T21:35:39.231Z"
     }
   },
-  "offset": 23
+  "offset": 43
 }
