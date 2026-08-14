@@ -49,8 +49,10 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'note-refusal-'));
  * Le troisieme etat ne doit jamais se lire comme un vert. Un `return` silencieux ici rendrait
  * « 0 passed, 0 failed » — exactement la forme de succes vide condamnee ailleurs dans ce depot.
  */
-const posix = (prefixe) => (p) =>
-  p.replace(/^([A-Za-z]):[\\/]/, (_, d) => prefixe + d.toLowerCase() + '/').replace(/\\/g, '/');
+/* ⚠️ 2026-08-14: ces trois formes vivaient ICI, en propre. `runner-reachability.test.js`, ecrit cinq
+ * jours apres ce correctif, a refait le meme defaut sans les appeler — et accusait deux scripts sains.
+ * Le savoir est donc remonte dans `./bash-runner`, importe par les deux. Une copie de plus redivergerait. */
+const { bashFormes } = require('./bash-runner');
 
 /**
  * ⚠️ `env` n'est PAS decoratif — c'est le troisieme etage du meme defaut, trouve en instrumentant.
@@ -60,19 +62,7 @@ const posix = (prefixe) => (p) =>
  * imite. Mesure du 2026-08-10, avec temoin oppose: WSLENV pose -> journal relu cote Node; WSLENV
  * retire -> fichier absent. On passe des chemins DEJA traduits, donc surtout pas le drapeau `/p`.
  */
-const RUNNERS = [
-  // Linux/CI: pas de lettre de lecteur, les trois traductions coincident et celle-ci gagne d'abord.
-  { nom: 'posix', chemin: (p) => p, env: (e) => e },
-  { nom: 'gitbash', chemin: posix('/'), env: (e) => e },
-  {
-    nom: 'wsl',
-    chemin: posix('/mnt/'),
-    env: (e) => ({
-      ...e,
-      WSLENV: (e.WSLENV ? e.WSLENV + ':' : '') + 'NOTE_REFUSAL_LOG:NOTE_REFUSAL_MAX',
-    }),
-  },
-];
+const RUNNERS = bashFormes(['NOTE_REFUSAL_LOG', 'NOTE_REFUSAL_MAX']);
 
 /**
  * Choisit un bash en le faisant TRAVAILLER, pas en testant l'existence du fichier.

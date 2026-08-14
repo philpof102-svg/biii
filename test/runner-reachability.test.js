@@ -37,7 +37,17 @@
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { choisirFormeSyntaxe, verifierSyntaxe } = require('./bash-runner');
+
+/**
+ * ⚠️ 2026-08-14: les deux cas de controle de syntaxe de ce fichier appelaient `bash -n` avec un chemin
+ * WINDOWS. Sur la machine qui lance la passe de nuit, `bash` resout vers WSL, qui n'adresse pas `D:\...`:
+ * les deux scripts du dossier ressortaient 127 et etaient publies « script(s) shell invalide(s) » sans
+ * avoir jamais ete ouverts. En forme `/mnt/d/...` ils sortent tous les deux en 0 — ils etaient VALIDES.
+ * Le savoir vit maintenant dans `./bash-runner`, ecrit pour ce meme defaut cinq jours plus tot dans
+ * `note-refusal.test.js` et que ce fichier n'avait pas appele.
+ */
+const { forme: FORME_BASH, echecs: ECHECS_BASH } = choisirFormeSyntaxe();
 
 let pass = 0; let fail = 0;
 const t = (n, fn) => { try { fn(); pass++; console.log('  ✓ ' + n); } catch (e) { fail++; console.log('  ✗ ' + n + '\n      ' + (e && e.message)); } };
@@ -116,7 +126,14 @@ t('le VRAI runner, lui, s execute — sinon la liste ci-dessus excuserait tout',
   assert.notStrictEqual(octets[0], 0xEF, 'aucun BOM devant le shebang du vrai runner');
   assert.ok(octets.toString('utf8').startsWith('#!'), 'shebang en tete');
   assert.ok(octets.toString('utf8').split('\n').length > 3, 'un vrai script, pas une ligne');
-  execFileSync('bash', ['-n', vrai], { stdio: 'pipe' });
+  const vu = verifierSyntaxe(FORME_BASH, vrai);
+  /* Les trois etats ne se valent pas et ne partagent pas la meme phrase: « invalide » accuse le
+   * script, « illisible » n'accuse que notre propre capacite a le lire. Les confondre est exactement
+   * ce qui a rendu ce cas rouge en affirmant une chose fausse sur un fichier sain. */
+  assert.notStrictEqual(vu.etat, 'invalide', 'le vrai runner ne passe pas `bash -n`: ' + vu.detail);
+  assert.strictEqual(vu.etat, 'valide',
+    'PAS MESURE — le vrai runner n a pas pu etre lu par bash, ce qui ne dit RIEN sur lui: ' + vu.detail
+    + '\n  formes essayees: ' + (ECHECS_BASH.join(' | ') || 'aucune'));
 });
 
 t('chaque runner planifie existe au moins une fois dans le depot', () => {
@@ -167,11 +184,22 @@ t('les scripts shell du dossier passent le controle de syntaxe', () => {
   const sh = fs.readdirSync(MONITEUR).filter((f) => f.endsWith('.sh'));
   assert.ok(sh.length >= 1, 'succes vide: aucun script shell lu');
   const casses = [];
+  const illisibles = [];
   for (const f of sh) {
-    try { execFileSync('bash', ['-n', path.join(MONITEUR, f)], { stdio: 'pipe' }); }
-    catch (e) { casses.push(f + ': ' + String(e.stderr || e.message).trim().slice(0, 80)); }
+    const vu = verifierSyntaxe(FORME_BASH, path.join(MONITEUR, f));
+    if (vu.etat === 'invalide') casses.push(f + ': ' + vu.detail);
+    else if (vu.etat === 'illisible') illisibles.push(f + ': ' + vu.detail);
   }
-  assert.deepEqual(casses, [], 'script(s) shell invalide(s):\n  ' + casses.join('\n  '));
+  /* ORDRE DELIBERE: on annonce d'abord ce qu'on n'a PAS PU LIRE. Un fichier illisible compte comme
+   * non controle, donc `casses` vide ne prouve rien tant qu'il en reste — sans cette ligne, un bash
+   * hors d'etat rendrait « aucun script invalide », c'est-a-dire un vert bati sur zero lecture. */
+  assert.deepStrictEqual(illisibles, [],
+    'PAS MESURE — script(s) que bash n a pas pu ouvrir ici. Ceci n est PAS un verdict sur eux:\n  '
+    + illisibles.join('\n  ') + '\n  formes essayees: ' + (ECHECS_BASH.join(' | ') || 'aucune'));
+  assert.deepStrictEqual(casses, [], 'script(s) shell invalide(s):\n  ' + casses.join('\n  '));
+  /* Temoin de non-vacuite: `sh.length >= 1` plus haut borne la liste lue, celui-ci borne ce qui a
+   * ete effectivement CONTROLE — les deux ne coincident que si aucun fichier n a ete saute. */
+  assert.strictEqual(casses.length + illisibles.length, 0);
 });
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

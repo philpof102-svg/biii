@@ -49,12 +49,60 @@ const EXCLUS = new Map([
     + 'd\'ecrire un nombre de tests ou que ce soit.'],
 ]);
 
+/* HELPERS partages : requis par d'autres fichiers de test, jamais lances seuls.
+ *
+ * ⚠️ Cette categorie est NEE d'un manque, le 2026-08-14. `test/bash-runner.js` a ete extrait parce que
+ * DEUX fichiers avaient, a cinq jours d'ecart, appele `bash -n` avec un chemin que le bash local ne sait
+ * pas ouvrir — et publiaient « script shell invalide » sur des fichiers jamais lus. Le helper n'est ni un
+ * test (rien ne l'a lance) ni un exclu (aucun script npm ne le lance): il est REQUIS. Le modele du garde
+ * n'avait pas ce troisieme etat, et l'aplatir sur l'un des deux autres etait exactement le defaut que ce
+ * fichier surveille.
+ *
+ * ⛔ Le mettre dans un sous-dossier pour echapper au `readdirSync` aurait « repare » le rouge en creant
+ * une zone que plus rien ne regarde — un vrai orphelin pourrait s'y cacher. Une categorie VERIFIEE vaut
+ * mieux qu'un angle mort: chaque ligne ci-dessous doit prouver qu'un fichier REELLEMENT lance la requiert. */
+const HELPERS = new Map([
+  ['bash-runner.js',
+    'comment on adresse ce depot depuis `bash` (WSL /mnt/, Git Bash /d/, POSIX). Requis par '
+    + 'note-refusal.test.js et runner-reachability.test.js, tous deux dans la suite. Son propre '
+    + 'comportement est epingle par bash-runner.test.js, qui est lance, lui.'],
+]);
+
 let pass = 0, fail = 0;
 const t = (name, fn) => { try { fn(); pass++; console.log('  ok   ' + name); } catch (e) { fail++; console.log('  FAIL ' + name + '\n       ' + e.message); } };
 
 console.log('couverture de la suite : tout fichier de test est-il reellement lance ?');
 
-const fichiers = fs.readdirSync(__dirname).filter((f) => /\.(c?js|mjs)$/.test(f) && !EXCLUS.has(f));
+const fichiers = fs.readdirSync(__dirname)
+  .filter((f) => /\.(c?js|mjs)$/.test(f) && !EXCLUS.has(f) && !HELPERS.has(f));
+
+t('chaque HELPER declare est vraiment requis par un fichier que la suite lance', () => {
+  const orphelins = [];
+  for (const [f, raison] of HELPERS) {
+    const base = f.replace(/\.(c?js|mjs)$/, '');
+    /* La relation est VERIFIEE, pas declaree: on cherche un `require('./<base>')` dans un fichier que
+     * `npm test` lance vraiment. Un helper que plus personne n'importe est un orphelin sous un autre
+     * nom — la faute meme que l'exclusion ci-dessus refuse de laisser passer. */
+    const requerants = fs.readdirSync(__dirname)
+      .filter((x) => x !== f && /\.(c?js|mjs)$/.test(x) && script.includes('test/' + x))
+      .filter((x) => new RegExp(`require\\((['"])\\./${base}\\1\\)`)
+        .test(fs.readFileSync(path.join(__dirname, x), 'utf8')));
+    if (!requerants.length) orphelins.push(f + '  — declare helper parce que: ' + raison);
+  }
+  assert.equal(orphelins.length, 0,
+    'helper(s) que PLUS AUCUN fichier lance ne requiert — donc lance par rien et requis par rien :\n       '
+    + orphelins.join('\n       '));
+  /* Temoin de non-vacuite: une liste vide ferait passer ce cas sans rien verifier. */
+  assert.ok(HELPERS.size > 0, 'succes vide: aucun helper declare, ce cas ne mesure rien');
+});
+
+t('un HELPER n\'est pas un test deguise — aucun n\'est lance par la suite', () => {
+  /* Cas oppose: si un helper etait AUSSI dans la chaine, il devrait etre un test tout court et sa ligne
+   * d'exception n'a pas lieu d'etre. Sans ce controle, la liste ci-dessus pourrait tout absorber. */
+  const deguises = [...HELPERS.keys()].filter((f) => script.includes('test/' + f));
+  assert.deepStrictEqual(deguises, [],
+    'declare(s) helper mais lance(s) par npm test: retirer leur ligne, ce sont des tests : ' + deguises.join(', '));
+});
 
 t('chaque fichier EXCLU de la suite est lance par un autre script', () => {
   const tous = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).scripts || {};
