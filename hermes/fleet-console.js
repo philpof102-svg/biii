@@ -22,12 +22,43 @@ const CRON_OUT = path.join(HOME_DIR, 'cron', 'output');
 const JOBS_JSON = path.join(HOME_DIR, 'cron', 'jobs.json');
 const jobNames = () => { try { const j = JSON.parse(fs.readFileSync(JOBS_JSON, 'utf8'));
   return Object.fromEntries((j.jobs || []).map((x) => [x.id, x.name || x.id])); } catch { return {}; } };
+/**
+ * Resume d'une sortie de cron. `ok` a TROIS etats, et c'est le point.
+ *
+ * ⛔ AVANT: `ok = !/error|traceback|failed|exception/i.test(body)` — l'ABSENCE d'un mot-cle valait
+ * REUSSITE, et `jrow` en fait le badge « clean ». Deux consequences mesurees le 2026-08-15:
+ *   - un fichier de sortie ILLISIBLE arrivait ici en chaine vide (`readJournal` faisait
+ *     `let md=''; try{...}catch{}`), aucun mot-cle ne matchait, et le run s'affichait « clean ».
+ *     Un run dont on n'a PAS PU LIRE la sortie etait presente comme un run propre.
+ *   - une sortie VIDE faisait pareil.
+ * C'est le motif que ce fichier combat deja quelques lignes plus bas — « L'EXECUTANT SE MESURE A CE
+ * QU'IL A ECRIT, PAS A CE QUE L'ORDONNANCEUR PROMET » — non applique a son propre verdict.
+ *
+ * Desormais: `false` quand un signal d'echec est PRESENT · `null` quand il n'y a rien a juger
+ * (illisible ou vide) · `true` seulement quand un corps a ete lu et ne porte aucun signal.
+ *
+ * ⚖️ BORNE ASSUMEE, non corrigee: `true` reste un « aucun echec signale », pas une reussite prouvee.
+ * La preuve serait le CODE DE SORTIE, que l'ordonnanceur connait et que ce fichier .md ne porte pas.
+ * Et le sens inverse existe aussi — un corps disant « 0 errors » compte comme un echec. Le poursuivre
+ * a coups de regex remplacerait un faux positif par trois autres; il est nomme ici plutot que chasse.
+ *
+ * @param {string|null} md  le contenu lu, ou null si la lecture a ECHOUE (ne jamais passer '' pour ca)
+ */
 function summarize(md) {
-  const body = md.split(/\n-{3,}\n/).slice(1).join('\n---\n') || md;   // drop the header block
+  if (md === null || md === undefined) {
+    return { head: '(sortie illisible)', flags: 0, ok: null, lines: [] };
+  }
+  /* On retire le bloc d'en-tete — mais `|| md` retombait sur le TEXTE ENTIER quand il n'y avait rien
+   * apres le separateur, donc un fichier reduit a son en-tete etait juge SUR SON EN-TETE et
+   * ressortait « clean ». Il faut separer « pas de separateur » (juger tout le texte, c'est le but du
+   * repli) de « separateur present, rien derriere » (le run n'a rien ecrit → rien a juger). */
+  const parts = md.split(/\n-{3,}\n/);
+  const body = parts.length > 1 ? parts.slice(1).join('\n---\n') : md;
   const lines = body.split('\n').map((s) => s.trim()).filter(Boolean);
   const flags = (body.match(/🚩|🆕/g) || []).length;
   const head = (lines.find((l) => !l.startsWith('#')) || '(sortie vide)').replace(/\s+/g, ' ');
-  const ok = !/error|traceback|failed|exception/i.test(body);
+  const echec = /error|traceback|failed|exception/i.test(body);
+  const ok = echec ? false : (lines.length ? true : null);
   return { head: head.slice(0, 200), flags, ok, lines: lines.slice(0, 10) };
 }
 function readJournal(limit = 24) {
@@ -42,7 +73,9 @@ function readJournal(limit = 24) {
   }
   entries.sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));   // ISO-ish filename → lexicographic = chronological
   return entries.slice(0, limit).map((e) => {
-    let md = ''; try { md = fs.readFileSync(e.file, 'utf8'); } catch {}
+    /* null, PAS '': une lecture qui echoue doit arriver a summarize comme « rien a juger », sinon
+     * elle se confond avec un fichier lu et vide — et les deux ressortaient « clean ». */
+    let md = null; try { md = fs.readFileSync(e.file, 'utf8'); } catch { md = null; }
     const s = summarize(md);
     const [d, t] = e.ts.split('_');
     return { job: names[e.jid] || e.jid, time: d + ' ' + String(t || '').replace(/-/g, ':'), ...s };
@@ -214,7 +247,7 @@ async function tick(){let d;try{d=await (await fetch('/api/fleet')).json()}catch
  document.getElementById('foot').textContent='Read-only partout · non-custodial · données live via le CLI Hermes + /health. Refresh 12s.';
 }
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-function jrow(r){const cls=r.flags>0?'f':'c';const badge=r.flags>0?(r.flags+' flag'+(r.flags>1?'s':'')):(r.ok?'clean':'erreur');const more=esc((r.lines||[]).join('\\n'))||'(pas de détail)';return \`<div class="jitem" onclick="this.classList.toggle('open')"><span class="jtime">\${esc(r.time)}</span><span class="jjob">\${esc(r.job)}</span><span class="jhd">\${esc(r.head)}</span><span class="jflag \${cls}">\${badge}</span><div class="jmore">\${more}</div></div>\`}
+function jrow(r){const cls=r.flags>0?'f':'c';const badge=r.flags>0?(r.flags+' flag'+(r.flags>1?'s':'')):(r.ok===null?'sans sortie':(r.ok?'clean':'erreur'));const more=esc((r.lines||[]).join('\\n'))||'(pas de détail)';return \`<div class="jitem" onclick="this.classList.toggle('open')"><span class="jtime">\${esc(r.time)}</span><span class="jjob">\${esc(r.job)}</span><span class="jhd">\${esc(r.head)}</span><span class="jflag \${cls}">\${badge}</span><div class="jmore">\${more}</div></div>\`}
 async function jtick(){let d;try{d=await (await fetch('/api/journal')).json()}catch(e){return}
  const el=document.getElementById('journal');
  if(!d.runs||!d.runs.length){el.innerHTML='<div class="foot" style="padding:14px 16px;margin:0">aucun run enregistré pour l\\'instant — la sentinelle écrit ici à chaque passage (toutes les 30 min)</div>';return}
@@ -242,7 +275,7 @@ stick();setInterval(stick,60000);
 sestick();setInterval(sestick,30000);
 </script></body></html>`;
 
-http.createServer(async (req, res) => {
+const serveur = http.createServer(async (req, res) => {
   if (req.url.startsWith('/api/fleet')) {
     try { const d = await gather(); res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify(d)); }
     catch (e) { res.writeHead(500, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: String(e.message || e) })); }
@@ -260,4 +293,12 @@ http.createServer(async (req, res) => {
     catch (e) { res.writeHead(500, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: String(e.message || e) })); }
   }
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(HTML);
-}).listen(PORT, () => console.log('fleet-console → http://localhost:' + PORT));
+});
+
+/* Le serveur ne demarre que si ce fichier est LANCE: sans cette garde, un test qui charge
+ * `summarize` ouvrirait un port et irait interroger Hermes. */
+if (require.main === module) {
+  serveur.listen(PORT, () => console.log('fleet-console → http://localhost:' + PORT));
+}
+
+module.exports = { summarize, readJournal };
