@@ -82,9 +82,16 @@ if (attendus.length === 0) {
   process.exit(2);
 }
 /* ORDRE DELIBERE: un test EN ECHEC s'annonce AVANT le decalage de comptage, parce qu'il l'EXPLIQUE.
- * `npm test` enchaine les 83 fichiers avec `&&`: le premier qui sort non-zero ARRETE la chaine, et tous
- * les suivants ne tournent jamais. Leur bilan manque alors — non pas parce que son format est inconnu,
- * mais parce qu'il n'a jamais ete imprime.
+ * `npm test` enchaine ses fichiers avec `&&` — combien exactement se lit dans `attendus.length`, tire
+ * du script au moment ou ce compteur tourne. Le premier qui sort non-zero ARRETE la chaine, et tous les
+ * suivants ne tournent jamais. Leur bilan manque alors — non pas parce que son format est inconnu, mais
+ * parce qu'il n'a jamais ete imprime.
+ *
+ * ⚠️ 2026-08-15: cette phrase disait « les 83 fichiers ». La chaine en compte 123 aujourd hui, et ce
+ * nombre bougeait a chaque test ajoute — un chiffre d ETAT COURANT fige dans un commentaire, dans le
+ * fichier dont le metier est justement de compter juste. Il est remplace par le NOM de la variable qui
+ * le calcule. La date du releve ci-dessous, elle, ne bouge pas: elle decrit ce qui a ete mesure ce
+ * jour-la, pas ce qui est vrai aujourd hui — les deux formes se ressemblent et une seule pourrit.
  *
  * ⚠️ 2026-08-03, mesure: 1 test en echec au fichier 44 sur 83 → ce script annoncait « 39 de decalage »
  * et accusait le parseur, en affirmant une cause unique pour un symptome qui en a trois. La vraie cause

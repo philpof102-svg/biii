@@ -90,7 +90,13 @@ ok((FAUX.match(motif('null')) || []).length === 1, 'DETECTION POWER: une asserti
 const BON = 'assert.strictEqual(r.note, null);';
 ok((BON.match(motif('null')) || []).length === 0, 'DETECTION POWER: la forme STRICTE n est pas comptee');
 
-console.log('  ' + n + ' checks passed — laches vs null: ' + laches.null + '/' + PLAFOND.null
+/* ⚠️ Le format de cette ligne n est pas libre. `test:total` ne reconnait que « N passed, N failed »
+ * (ou avec un point median), et un fichier qui imprime autre chose est LANCE mais jamais COMPTE: la
+ * suite reste verte pendant que le total est sous-evalue. C est la faute du 2026-07-27 — 13 suites
+ * ignorees, 101 tests, un total presente comme complet — et ma premiere version disait
+ * « 10 checks passed », ce qui l a reproduite le jour meme ou j ajoutais ce fichier. */
+console.log('  ' + n + ' passed, 0 failed');
+console.log('  laches vs null: ' + laches.null + '/' + PLAFOND.null
   + ' · vs undefined: ' + laches.undefined + '/' + PLAFOND.undefined
   + ' · strictes vs null|undefined: ' + strictes);
 console.log('  ⛔ Compte des FORMES, pas des defauts: une assertion lache n est fausse que si le sujet');
