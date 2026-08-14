@@ -335,7 +335,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.assetlog/assetlog",
-      "lastSeen": "2026-08-14T11:44:51.579Z"
+      "lastSeen": "2026-08-14T21:51:29.106Z"
     },
     "https://supershopping-mcp.atdev.ai/mcp": {
       "verdict": "unauditable",
@@ -344,7 +344,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.atdev/supershopping",
-      "lastSeen": "2026-08-14T11:44:53.549Z"
+      "lastSeen": "2026-08-14T21:51:31.605Z"
     },
     "https://api.atlasverified.ai/mcp": {
       "verdict": "unauditable",
@@ -353,7 +353,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.atlasverified/atlas-mcp",
-      "lastSeen": "2026-08-14T11:44:55.785Z"
+      "lastSeen": "2026-08-14T21:51:33.769Z"
     },
     "https://api.augmentev.ai/mcp": {
       "verdict": "unauditable",
@@ -362,7 +362,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.augmentev/paseo",
-      "lastSeen": "2026-08-14T11:44:57.360Z"
+      "lastSeen": "2026-08-14T21:51:35.325Z"
     },
     "https://travel.augworlds.ai/mcp": {
       "verdict": "unauditable",
@@ -371,7 +371,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.augworlds/travel-world",
-      "lastSeen": "2026-08-14T11:44:58.504Z"
+      "lastSeen": "2026-08-14T21:51:36.625Z"
     },
     "https://mcp.auralogs.ai/mcp": {
       "verdict": "answers",
@@ -380,7 +380,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.auralogs/auralogs",
-      "lastSeen": "2026-08-14T11:44:59.603Z"
+      "lastSeen": "2026-08-14T21:51:37.751Z"
     },
     "https://auteng.ai/mcp/docs": {
       "verdict": "answers",
@@ -389,7 +389,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.auteng/docs",
-      "lastSeen": "2026-08-14T11:45:01.252Z"
+      "lastSeen": "2026-08-14T21:51:39.181Z"
     },
     "https://auteng.ai/mcp": {
       "verdict": "unreachable",
@@ -398,7 +398,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.auteng/mcp",
-      "lastSeen": "2026-08-14T11:45:02.185Z"
+      "lastSeen": "2026-08-14T21:51:40.195Z"
     },
     "https://authoryze.ai/api/mcp": {
       "verdict": "unauditable",
@@ -407,7 +407,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.authoryze/authoryze",
-      "lastSeen": "2026-08-14T11:45:03.491Z"
+      "lastSeen": "2026-08-14T21:51:41.320Z"
     },
     "https://mcp.autonomad.ai/mcp": {
       "verdict": "unauditable",
@@ -416,7 +416,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.autonomad/travel",
-      "lastSeen": "2026-08-14T11:45:04.562Z"
+      "lastSeen": "2026-08-14T21:51:42.320Z"
     },
     "https://{api_host}/mcp": {
       "verdict": "unreachable",
@@ -425,7 +425,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.autorfp/mcp",
-      "lastSeen": "2026-08-14T11:45:06.723Z"
+      "lastSeen": "2026-08-14T21:51:44.503Z"
     },
     "https://api.auxen.ai/mcp": {
       "verdict": "unreachable",
@@ -434,7 +434,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.auxen/auxen",
-      "lastSeen": "2026-08-14T11:45:08.014Z"
+      "lastSeen": "2026-08-14T21:51:45.759Z"
     },
     "https://aviado.ai/api/mcp": {
       "verdict": "answers",
@@ -443,7 +443,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.aviado/health",
-      "lastSeen": "2026-08-14T11:45:10.950Z"
+      "lastSeen": "2026-08-14T21:51:48.581Z"
     },
     "https://mcp.neuroautomata.axonagentic.ai/mcp": {
       "verdict": "unauditable",
@@ -452,7 +452,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.axonagentic/neuroautomata",
-      "lastSeen": "2026-08-14T11:45:12.412Z"
+      "lastSeen": "2026-08-14T21:51:49.954Z"
     },
     "https://mcp.backengine.ai/mcp": {
       "verdict": "unreachable",
@@ -758,7 +758,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.atlaso/mcp",
-      "lastSeen": "2026-08-14T11:44:54.616Z"
+      "lastSeen": "2026-08-14T21:51:32.674Z"
     },
     "https://app.ai-advisors.ai/api/mcp": {
       "verdict": "unauditable",
@@ -848,7 +848,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.autoposting/autoposting",
-      "lastSeen": "2026-08-14T11:45:06.018Z"
+      "lastSeen": "2026-08-14T21:51:43.800Z"
     },
     "https://mcp.adoraads.ai/beauty": {
       "verdict": "answers",
@@ -876,7 +876,43 @@
       "wantsSecret": null,
       "name": "ai.actwise/ideation",
       "lastSeen": "2026-08-14T15:47:53.573Z"
+    },
+    "https://ai-media-studio.b77.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": null,
+      "wantsSecret": null,
+      "name": "ai.b77/ai-media-studio",
+      "lastSeen": "2026-08-14T21:51:50.909Z"
+    },
+    "https://apple-search-ads.b77.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": null,
+      "wantsSecret": null,
+      "name": "ai.b77/apple-search-ads",
+      "lastSeen": "2026-08-14T21:51:51.901Z"
+    },
+    "https://chess-results.b77.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": null,
+      "wantsSecret": null,
+      "name": "ai.b77/chess-results",
+      "lastSeen": "2026-08-14T21:51:52.882Z"
+    },
+    "https://feedback.b77.ai/mcp": {
+      "verdict": "unauditable",
+      "tools": null,
+      "names": null,
+      "movesValue": null,
+      "wantsSecret": null,
+      "name": "ai.b77/feedback",
+      "lastSeen": "2026-08-14T21:51:53.816Z"
     }
   },
-  "offset": 51
+  "offset": 71
 }
