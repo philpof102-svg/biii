@@ -19,10 +19,19 @@ const fs = require('node:fs'), path = require('node:path');
 const ROOTS = (process.env.MEMORY_ROOTS
   ? process.env.MEMORY_ROOTS.split(':')
   : ['/mnt/d/memoire claude obsidian', '/mnt/c/Users/VolKov/.claude/projects/D--Users-VolKov-veilleIA-mainstreet/memory']
-).map((r) => path.resolve(r)).filter((r) => { try { return fs.statSync(r).isDirectory(); } catch { return false; } });
+/* realpath des le depart: le verrou compare des chemins REELS, donc les racines doivent l'etre aussi,
+ * sinon une racine atteinte via un lien ne correspondrait jamais a ce qu'on resout plus bas. */
+).map((r) => { try { return fs.realpathSync(path.resolve(r)); } catch { return path.resolve(r); } })
+ .filter((r) => { try { return fs.statSync(r).isDirectory(); } catch { return false; } });
 
-const SKIP = /(^|\/)(\.git|node_modules|\.obsidian|\.trash)(\/|$)/;
-function mdFiles(max = 4000) {
+/* ⚠️ Le separateur. Cette liste ne connaissait que « / », donc sur une racine Windows elle ne
+ * filtrait RIEN. Mesure du 2026-08-15: `D:\...\.git\note.md` n'etait pas ignore. Le cout observe est
+ * nul sur les donnees actuelles — 0 fichier .md dans .git/.obsidian/.trash du vault, et 0 dans le
+ * node_modules d'un projet — donc ce n'est pas un incident, c'est un filtre qui ne filtre pas et
+ * qu'on ne verrait qu'une fois une racine posee sur un arbre qui en contient. */
+const SKIP = /(^|[\\/])(\.git|node_modules|\.obsidian|\.trash)([\\/]|$)/;
+const PLAFOND_NOTES = 4000;
+function mdFiles(max = PLAFOND_NOTES) {
   const out = [];
   const walk = (dir) => {
     if (out.length >= max) return;
@@ -37,9 +46,33 @@ function mdFiles(max = 4000) {
   for (const r of ROOTS) walk(r);
   return out;
 }
-function safeResolve(rel) {                                   // path-lock: only inside a configured root
+/**
+ * path-lock: only inside a configured root — et sur le FICHIER, pas sur le nom.
+ *
+ * ⛔ CE VERROU ETAIT LEXICAL. `path.resolve` ne suit aucun lien, donc il bornait la CHAINE et pas ce
+ * qui serait reellement lu. Mesure du 2026-08-15, sur une racine bidon du scratchpad:
+ *   note legitime dans la racine        -> lue          (temoin)
+ *   chemin franchement hors racine      -> REFUSE       (temoin)
+ *   lien SYMBOLIQUE dans la racine      -> LU           <<< le contenu hors racine est ressorti
+ *   lien DUR dans la racine             -> LU
+ * et `memory_search` a trouve le contenu hors racine (le lien dur est un fichier ordinaire pour le
+ * parcours; le lien symbolique, lui, n'est pas indexe car `isFile()` est faux).
+ *
+ * Le vecteur realiste n'est pas exotique: le vault est un depot git qui se SYNCHRONISE, et git
+ * transporte les liens symboliques dans un commit. Ce serveur est monte pour qu'un agent local
+ * RAPPELLE de la memoire — il lit ce qu'on lui nomme.
+ *
+ * ⚖️ CE QUE CE CORRECTIF NE FERME PAS, et il faut le nommer: un LIEN DUR n'a pas de cible a resoudre
+ * — c'est un second nom du meme fichier, et `realpath` rend ce nom-la. Le distinguer du fichier
+ * lui-meme n'est pas possible par le chemin. Ce qui est ferme, c'est le lien symbolique.
+ * ⚖️ Et un chemin INEXISTANT est desormais refuse plutot que lu puis rate: un verrou qui ne peut pas
+ * verifier ou mene un chemin doit refuser.
+ */
+function safeResolve(rel) {
   const p = path.resolve(String(rel || ''));
-  return ROOTS.some((r) => p === r || p.startsWith(r + path.sep)) ? p : null;
+  let reel;
+  try { reel = fs.realpathSync(p); } catch { return null; }
+  return ROOTS.some((r) => reel === r || reel.startsWith(r + path.sep)) ? reel : null;
 }
 
 const TOOLS = [
@@ -77,7 +110,20 @@ function callTool(name, a = {}) {
     const files = mdFiles();
     let index = null;
     for (const r of ROOTS) { const mi = path.join(r, 'MEMORY.md'); try { if (fs.statSync(mi).isFile()) { index = fs.readFileSync(mi, 'utf8').slice(0, 8000); break; } } catch { /* no index here */ } }
-    return { roots: ROOTS, noteCount: files.length, index, note: 'READ-ONLY. Search with memory_search, read with memory_read.' };
+    /* `noteCount` est un PLANCHER des qu'on touche le plafond: le parcours s'arrete a
+     * PLAFOND_NOTES et rendait ce nombre comme s'il etait le total. Un chiffre borne qui ne dit pas
+     * sa borne est le motif que ce depot poursuit partout — on le dit ici. */
+    const auPlafond = files.length >= PLAFOND_NOTES;
+    return {
+      roots: ROOTS,
+      noteCount: files.length,
+      noteCountIsFloor: auPlafond,
+      scanCap: PLAFOND_NOTES,
+      index,
+      note: 'READ-ONLY. Search with memory_search, read with memory_read.'
+        + (auPlafond ? ' ⚠️ Le parcours a atteint son plafond de ' + PLAFOND_NOTES
+          + ' notes: noteCount est un PLANCHER et memory_search ne voit pas tout.' : ''),
+    };
   }
   throw new Error('unknown tool ' + name);
 }
