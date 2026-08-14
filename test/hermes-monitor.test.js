@@ -103,6 +103,49 @@ t('★ un champ RENOMME ne desarme pas le garde', () => {
   assert.strictEqual(passeGarde(appel('till_vet_merchant', 'tool')), 'allow');
 });
 
+/* ── LE VENDEUR REVIENT AVEC DE NOUVEAUX MOTS ────────────────────────────────────────────────────
+ * Le garde ecrit lui-meme, apres l'audit du 2026-07-31, que sa liste de noms est « the honest limit
+ * of a name list, and the reason ARGUMENT-GUARD-DESIGN.md exists: the next vendor arrives with
+ * different words and walks straight through ». La prediction s'est realisee en QUINZE JOURS, et par
+ * le MEME vendeur: son commentaire parle de « ses 16 outils », le serveur en offre 26 le 2026-08-15.
+ *
+ * Mesure de ce jour, en executant le garde contre les 41 noms REELLEMENT offerts par les deux
+ * serveurs de paiement montes: 40 verdicts justes, zero faux positif — et `reopen_signing_window`
+ * AUTORISE. Ni DENY ni MONEY_VERB ne le voyaient: la regex exige un jeton entier, donc `reopen`,
+ * `signing` et `window` ne declenchent rien, et le `sign` de DENY n'apparait jamais comme SEGMENT
+ * dans un nom a underscores simples.
+ *
+ * ⚖️ BORNE: la liste ci-dessous est un INSTANTANE du 2026-08-15, exactement comme DENY. Elle ne
+ * promet pas d'etre complete demain — elle empeche seulement de REPERDRE ce qu'on vient de mesurer.
+ * Le vrai remede est le controle par ARGUMENTS, pas un nom de plus. */
+t('★ rouvrir une fenetre de signature est un acte, pas une lecture', () => {
+  assert.strictEqual(passeGarde(appel('reopen_signing_window')), 'block',
+    'un outil qui ROUVRE la capacite de signer appartient a la classe « jamais autonome »');
+  assert.strictEqual(passeGarde(appel('mcp__paiement__reopen_signing_window')), 'block',
+    'et sous son prefixe de serveur MCP reel, ou seul le dernier segment est examine');
+});
+
+t('★ tout ce qui depense ou signe, sur les deux serveurs montes, reste bloque', () => {
+  for (const n of ['pay_x402', 'request_transfer', 'request_swap', 'request_wallet_sign',
+    'request_payment', 'request_secret', 'request_account_change', 'claim_payment_credentials',
+    'use_service', 'world_buy_outcome', 'world_change_position', 'world_redeem', 'get_buy_link',
+    'send', 'swap', 'sign', 'send_calls', 'fund', 'initiate_x402_request', 'complete_x402_request']) {
+    assert.strictEqual(passeGarde(appel('mcp__paiement__' + n)), 'block', n + ' doit BLOQUER');
+  }
+});
+
+t('★ et AUCUNE lecture n est bloquee — sinon quelqu un retire le hook', () => {
+  /* Cas oppose, et il porte autant que le precedent: le garde dit lui-meme qu'« a guard that blocks
+   * reads gets switched off ». Une liste qui grossit sans ce temoin finit par tout bloquer. */
+  for (const n of ['discover_services', 'get_portfolio', 'get_request', 'list_credentials',
+    'list_requests', 'verify_solana_balance', 'world_find_markets', 'world_get_market',
+    'world_market_prices', 'world_orderbook', 'world_positions', 'world_filter_outcome_mints',
+    'get_wallets', 'get_transaction_history', 'get_request_status', 'search_tokens',
+    'chain_rpc_request', 'web_request', 'help']) {
+    assert.strictEqual(passeGarde(appel('mcp__paiement__' + n)), 'allow', n + ' est une LECTURE');
+  }
+});
+
 t('★ le message de blocage dit de CORRIGER le garde, pas de le desactiver', () => {
   const out = execFileSync(process.execPath, [GARDE], { input: '{casse', encoding: 'utf8' });
   const j = JSON.parse(out);

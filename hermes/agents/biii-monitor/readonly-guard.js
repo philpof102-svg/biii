@@ -42,9 +42,21 @@ const DENY = new Set([
   //
   // Not added on purpose: get_portfolio, list_credentials, list_requests, get_request,
   // discover_services. Those are reads, and a guard that blocks reads gets switched off.
+  //
+  // 2026-08-15 — LA PREDICTION CI-DESSUS S'EST REALISEE EN QUINZE JOURS, ET PAR LE MEME VENDEUR.
+  // L'audit du 2026-07-31 parlait de « ses 16 outils ». Ce serveur en offre 26 aujourd'hui. En
+  // executant CE script contre les 41 noms reellement offerts par les deux serveurs de paiement
+  // montes, 40 verdicts sont justes — chaque outil de depense bloque, chaque lecture passee, zero
+  // faux positif — et UN passait: `reopen_signing_window`. Un outil dont le metier est de ROUVRIR
+  // une fenetre de signature appartient a la classe « jamais autonome », et aucune des deux regles
+  // ne le voyait: DENY ne le contient pas, et MONEY_VERB exige un jeton entier, donc ni `reopen`,
+  // ni `signing`, ni `window` ne declenchent (le verbe `sign` de DENY, lui, n'apparait jamais comme
+  // SEGMENT dans un nom a underscores simples).
+  // Ce n'est pas la liste qui a echoue, c'est ce qu'une liste peut promettre: elle est exacte pour
+  // l'instantane ou on l'a ecrite. D'ou ARGUMENT-GUARD-DESIGN.md — et d'ou le fait de re-mesurer.
   'request_transfer', 'request_swap', 'request_wallet_sign', 'request_payment', 'request_secret',
   'claim_payment_credentials', 'request_account_change', 'use_service', 'pay_x402',
-  'world_buy_outcome', 'world_change_position', 'world_redeem',
+  'world_buy_outcome', 'world_change_position', 'world_redeem', 'reopen_signing_window',
   // lawbor — the agent-to-agent economy WRITES (post/offer/bid/settle/block). Descriptor-only, but an
   // unattended monitor must not autonomously speak, list, bid, lock a price, or bind a settlement.
   'lawbor_say', 'lawbor_bot_say', 'lawbor_offer', 'lawbor_post_job', 'lawbor_bid', 'lawbor_confirm',
