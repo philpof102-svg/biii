@@ -134,10 +134,32 @@
         var body = await res.json();
         var accept = (body.accepts||[])[0];
         if(!accept) throw new Error("invalid 402 challenge");
-        // Build EIP-681 URI: ethereum:<payTo>@<chainId>?value=<amountWei>&token=<USDC>
-        var amountWei = String(Number(accept.amount) * 1000000); // priceMicro = USDC atomic (6dp), but EIP-681 expects wei? Actually USDC 6dp, so amount is already microUSDC
-        // Simpler: use the payment URI from the server if available, else build from accepts
-        paymentURI = "ethereum:" + accept.payTo + "@" + (accept.network === "base" ? "8453" : accept.network) + "?value=" + accept.amount + "&token=" + accept.asset;
+        /* ⛔ CE QR ETAIT ILLISIBLE, Y COMPRIS PAR NOTRE PROPRE SCANNER. Trois fautes sur une ligne,
+         * mesurees le 2026-08-15 en passant l'URI produite a lib/qrpay.js parsePaymentQR:
+         *
+         * 1. LE CHAIN ID. `accept.network === "base"` n'est JAMAIS vrai: lib/openapi.js sert du CAIP-2,
+         *    `network: "eip155:8453"`. La branche vraie etait morte, et la branche else ecrivait
+         *    `@eip155:8453` dans l'URI. Verdict de notre scanner: valid=false, « not a 0x address or
+         *    an ethereum: URI ». Le QR ne menait a RIEN.
+         * 2. LA FORME. `?value=…&token=…` n'est pas un transfert ERC-20. En EIP-681, `value` est un
+         *    montant en WEI de la monnaie NATIVE et `token=` n'appartient pas au standard: un wallet
+         *    generique y lit « envoyer 250000 wei d'ETH », soit 0,00000000000025 ETH au lieu de
+         *    0,25 USDC. Meme avec le bon chain id, notre scanner ignore `value=` par conception (« un
+         *    app USDC n'envoie jamais d'ETH automatiquement ») et rendait un QR SANS MONTANT.
+         * 3. UN CALCUL MORT. `amountWei = Number(accept.amount) * 1000000` etait calcule et jamais
+         *    utilise, sous un commentaire qui se contredisait lui-meme (« amount is already
+         *    microUSDC ») — donc un piege pour le prochain lecteur qui « brancherait » la variable
+         *    inutilisee et multiplierait le prix par un million. Le calcul disparait, son explication
+         *    reste ici.
+         *
+         * FORME CANONIQUE, celle que lib/qrpay.js produit ET relit (temoin mesure: montant conserve):
+         *     ethereum:<USDC>@<chainId>/transfer?address=<payTo>&uint256=<micro>
+         * `accept.amount` est deja en unites atomiques (micro-USDC), il part tel quel. */
+        var reseau = String(accept.network || "");
+        var mChain = reseau.match(/^eip155:(\d+)$/);
+        var chainId = mChain ? mChain[1] : (reseau === "base" ? "8453" : null);
+        if(!chainId) throw new Error("402 challenge: unsupported network " + JSON.stringify(reseau));
+        paymentURI = "ethereum:" + accept.asset + "@" + chainId + "/transfer?address=" + accept.payTo + "&uint256=" + accept.amount;
         document.getElementById("qr-box").innerHTML = "";
         var qr = qrcode(0, "M"); qr.addData(paymentURI); qr.make();
         document.getElementById("qr-box").innerHTML = qr.createImgTag(5);

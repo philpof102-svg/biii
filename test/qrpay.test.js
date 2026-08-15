@@ -188,5 +188,66 @@ t('⚖️ TEMOIN — un montant ordinaire traverse toujours, virgule ou point', 
   assert.match(receiveURI({ address: BOB, amountUsd: '  7  ' }), /&uint256=7000000$/, 'les espaces sont retires, pas la valeur');
 });
 
+/* ── ★ NOTRE SCANNER DOIT SAVOIR LIRE LE QR QUE NOTRE PAYWALL PRODUIT ────────────────────────────
+ * `web/vet-meme.html` construit l intent de paiement du defi x402 dans la PAGE, sans passer par
+ * receiveURI (qui vit cote serveur). Rien ne liait les deux artefacts, et la page s en tirait mal.
+ * MESURE DU 2026-08-15 sur la forme alors produite:
+ *     ethereum:<payTo>@eip155:8453?value=250000&token=<USDC>   -> parsePaymentQR: valid=FALSE
+ * Trois fautes: `accept.network === "base"` n etait JAMAIS vrai (lib/openapi.js sert du CAIP-2
+ * `eip155:8453`), donc `@eip155:8453` cassait l URI; `?value=&token=` n est pas un transfert ERC-20
+ * (en EIP-681 `value` est du WEI natif, `token` n existe pas au standard); et un `amountWei` mort
+ * multipliait le prix par un million sans etre utilise.
+ * On extrait le bloc VERBATIM du fichier livre: un test qui recopierait la formule prouverait que ma
+ * copie est bonne, jamais que la page l est. */
+const fs = require('node:fs');
+const path = require('node:path');
+/* ⚠️ L'EXTRACTION NE DOIT PAS JETER HORS D'UN CAS. Premiere version: un `assert` au chargement du
+ * module. En mutant la page, le fichier mourait AVANT d'imprimer son bilan — fail-closed, mais la
+ * suite ne se comptait plus elle-meme, et le diagnostic disparaissait. Un marqueur introuvable est
+ * desormais une DEFAILLANCE COMPTEE, avec son message. */
+const BLOC_PAGE = (() => {
+  try {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'web', 'vet-meme.html'), 'utf8');
+    const i = html.indexOf('var reseau = String(accept.network');
+    const fin = '&uint256=" + accept.amount;';
+    const j = html.indexOf(fin, i);
+    if (i < 0 || j < i) return null;
+    return html.slice(i, j + fin.length).replace(/^\s+/gm, '');
+  } catch (e) { return null; }
+})();
+const uriDuPaywall = (accept) => {
+  assert.ok(BLOC_PAGE, 'web/vet-meme.html ne construit plus son intent de paiement de la facon '
+    + 'attendue (marqueurs introuvables). Ce test ne mesure plus rien: il rougit au lieu de passer.');
+  // eslint-disable-next-line no-new-func
+  return new Function('accept', 'var paymentURI;' + BLOC_PAGE + '\nreturn paymentURI;')(accept);
+};
+
+t('★ le QR du paywall est LISIBLE par notre propre scanner, montant compris', () => {
+  const uri = uriDuPaywall({ network: 'eip155:8453', asset: USDC_BASE, payTo: BOB, amount: '250000' });
+  const r = parsePaymentQR(uri);
+  assert.equal(r.valid, true, 'notre scanner refuse notre propre QR de paiement: ' + uri);
+  assert.equal(r.to, BOB, 'mauvais destinataire dans l intent');
+  assert.equal(r.amountMicro, '250000',
+    'le MONTANT n arrive pas jusqu au payeur — il devra le taper lui-meme, sur un paywall a prix fixe: ' + uri);
+  assert.equal(r.form, 'eip681-transfer', 'ce doit etre un transfert ERC-20, pas un envoi natif: ' + uri);
+});
+
+t('★ le reseau du defi est lu en CAIP-2, pas compare a une chaine qui n arrive jamais', () => {
+  /* `network: "eip155:8453"` est ce que lib/openapi.js sert VRAIMENT. La forme heritee "base" doit
+   * continuer de marcher, et toute autre chaine ne doit pas produire un QR Base silencieusement. */
+  const caip = parsePaymentQR(uriDuPaywall({ network: 'eip155:8453', asset: USDC_BASE, payTo: BOB, amount: '1' }));
+  const herite = parsePaymentQR(uriDuPaywall({ network: 'base', asset: USDC_BASE, payTo: BOB, amount: '1' }));
+  assert.equal(caip.valid, true, 'la forme CAIP-2 — celle qui est servie — doit passer');
+  assert.equal(herite.valid, true, 'la forme heritee doit rester acceptee');
+  assert.equal(caip.chainId, CHAIN); assert.equal(herite.chainId, CHAIN);
+});
+
+t('⚖️ TEMOIN — un reseau inconnu LEVE, au lieu de fabriquer un QR qui ne mene nulle part', () => {
+  assert.throws(() => uriDuPaywall({ network: 'solana', asset: USDC_BASE, payTo: BOB, amount: '1' }),
+    /unsupported network/, 'un reseau non gere doit se dire, pas se deviner');
+  assert.throws(() => uriDuPaywall({ network: '', asset: USDC_BASE, payTo: BOB, amount: '1' }),
+    /unsupported network/, 'un reseau absent aussi');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
