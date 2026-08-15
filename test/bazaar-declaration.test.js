@@ -157,6 +157,60 @@ t('le prix de la declaration suit le prix demande', () => {
   assert.strictEqual(j.accepts[0].amount, '30000', 'un seul prix, une seule source');
 });
 
+/* ═══ CE QUE LE VALIDATEUR OFFICIEL A ATTRAPE, ET PAS MOI ═══
+ *
+ * Les 16 cas ci-dessus passaient tous pendant que la declaration etait REJETEE
+ * par `@x402/extensions/bazaar`, le validateur que le facilitateur applique.
+ * Deux rejets successifs, tous deux silencieux cote reglement :
+ *
+ *   1. `schema` absent -> « Schema validation failed: schema must be object or
+ *      boolean », et `extractDiscoveryInfo()` rend NULL : le facilitateur
+ *      n'extrait RIEN. Le paiement aurait reussi, le catalogue serait reste
+ *      vide. C'est litteralement ce que la spec annonce — « non-conforming
+ *      content may be dropped even when verify and settle succeed ».
+ *   2. `schema` present mais decrivant le CORPS de requete -> quatre
+ *      « /input: must NOT have additional properties », une par champ de
+ *      l'enveloppe. Le validateur applique le schema a `info.input` TEL QUEL,
+ *      soit {type, method, bodyType, body} ; le schema du corps se niche dans
+ *      `input.properties.body`.
+ *
+ * Ces trois cas verrouillent la forme sans dependre du SDK — le depot se veut
+ * sans dependances. Le controle par le vrai validateur reste possible a part :
+ *   npm i @x402/extensions && node -e "..."  (voir DISTRIBUTION-x402.md)
+ */
+t('le `schema` decrit l ENVELOPPE info, pas le corps de requete', () => {
+  const s = declaration().extensions.bazaar.schema;
+  assert.strictEqual(typeof s, 'object', 'sans schema, le facilitateur n extrait RIEN');
+  const inp = s.properties.input;
+  assert.deepStrictEqual(Object.keys(inp.properties).sort(), ['body', 'bodyType', 'method', 'type'],
+    'le schema doit decrire l enveloppe info.input, pas le corps de requete');
+  assert.strictEqual(inp.additionalProperties, false);
+  assert.deepStrictEqual(Object.keys(s.properties.output.properties).sort(), ['example', 'type']);
+});
+
+t('le schema du corps VALIDE l exemple publie a cote', () => {
+  // Un exemple qui ne satisfait pas son propre schema fait rejeter la fiche.
+  const b = declaration().extensions.bazaar;
+  const corps = b.schema.properties.input.properties.body;
+  for (const requis of corps.required) {
+    assert.ok(requis in b.info.input.body,
+      'le schema exige ' + requis + ' mais l exemple publie ne le porte pas');
+  }
+  for (const cle of Object.keys(b.info.input.body)) {
+    assert.ok(cle in corps.properties,
+      'l exemple publie porte ' + cle + ' que le schema ne declare pas');
+  }
+});
+
+t('aucune route ne publie un schema vide', () => {
+  for (const route of Object.keys(BAZAAR_ROUTES)) {
+    const b = declaration({ route }).extensions.bazaar;
+    assert.ok(b.schema && b.schema.properties && b.schema.properties.input, 'route ' + route);
+    assert.ok(Object.keys(b.schema.properties.input.properties.body.properties).length > 0,
+      'route ' + route + ' publie un schema de corps vide');
+  }
+});
+
 (async () => {
   for (const [nom, fn] of cas) {
     try { await fn(); pass++; console.log('  ok   ' + nom); }

@@ -87,10 +87,56 @@ inchangé. Gabarit relevé sur Tavily, service réellement catalogué, pas dédu
 la doc. Vérifié sur le vrai serveur HTTP, les trois routes, en-tête de ~1,1 Ko.
 16 cas dans `test/bazaar-declaration.test.js`, dont un qui garde le corps v1.
 
+### Valider AVANT de dépenser — la vérification qui a tout changé
+
+La spec prévient : *« Facilitators validate the payload before cataloging;
+non-conforming content may be dropped even when verify and settle succeed. »*
+Autrement dit **un règlement peut réussir et ne rien cataloguer**. Le validateur
+officiel est public, gratuit, et n'exige aucun paiement :
+
+```sh
+npm i @x402/extensions
+```
+```js
+import { validateDiscoveryExtension, extractDiscoveryInfo } from '@x402/extensions/bazaar';
+const r = await fetch(URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+const decl = JSON.parse(Buffer.from(r.headers.get('payment-required'), 'base64').toString('utf8'));
+console.log(validateDiscoveryExtension(decl.extensions.bazaar));  // { valid: true } attendu
+console.log(extractDiscoveryInfo(decl) === null ? 'RIEN ne serait catalogue' : 'ok');
+```
+
+Passé sur la première version de cette déclaration, il a trouvé **deux défauts
+d'affilée que les 16 cas de test maison ne voyaient pas** :
+
+1. **`schema` absent** → *« schema must be object or boolean »*, et
+   `extractDiscoveryInfo` rendait **`null`**. Le paiement serait parti, le
+   catalogue serait resté vide.
+2. **`schema` présent mais décrivant le CORPS de requête** → quatre
+   *« /input: must NOT have additional properties »*, une par champ de
+   l'enveloppe. Le validateur applique le schéma à `info.input` **tel quel**
+   (`{type, method, bodyType, body}`) ; le schéma du corps se niche dans
+   `input.properties.body`.
+
+Les deux sont corrigés, et trois cas de test verrouillent la forme sans ajouter
+de dépendance au dépôt. **Ne pas régler sans avoir relancé ce validateur** —
+c'est la seule chose qui distingue un paiement utile d'un paiement perdu.
+
 ### Reste
 
 Un règlement passant par un facilitateur, avec un client qui ré-émet
-l'extension. C'est la seule étape qui engage des fonds et la posture : décision
+l'extension. Le CLI officiel est `awal` (Coinbase), qui dépend de
+`@x402/extensions` et expose bien le sous-module `bazaar` — donc il sait
+ré-émettre :
+
+```sh
+npx awal x402 pay https://biii-production.up.railway.app/x402/vet-address
+```
+
+Puis vérifier le catalogage (PowerShell) :
+
+```powershell
+(Invoke-WebRequest "https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources").Content -match "biii-production"
+``` C'est la seule étape qui engage des fonds et la posture : décision
 d'exploitation, pas de code. Ensuite,
 `GET /discovery/resources?payTo=0xa6cf…` doit renvoyer BIII, et agentic.market
 indexe automatiquement — sa FAQ le dit : *« If your service/endpoints are indexed
