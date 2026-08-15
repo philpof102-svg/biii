@@ -352,6 +352,47 @@ t('★ un schema NON http(s) rendu par l API ne peut pas atteindre un href', () 
   }
 });
 
+/* ── (G) LA CASSE DU SLUG DE CHAINE DESACTIVAIT LA COUCHE 2, EN SILENCE ─────────────────────────
+ * Le filtre de `candidatesFrom` compare String(p.chainId).toLowerCase(), donc une paire annoncee
+ * 'Base' passe. Mais `chain` gardait la casse de l API, et la couche holders-health est gardee par
+ * `canonical.chain === 'base'` — SENSIBLE A LA CASSE.
+ * MESURE DU 2026-08-15 avant correctif, meme paire, seule la casse change:
+ *     'base' -> holders-health APPELEE            verdict genuine
+ *     'Base' -> holders-health JAMAIS appelee,    verdict genuine QUAND MEME
+ * ⚖️ L en-tete de ce module documente que cette couche a DEJA ete morte une fois, gardee par ce
+ * meme `=== 'base'`. Deuxieme forme, meme garde.
+ * ⚠️ BORNE: DexScreener n a PAS ete observe rendant 'Base'. Le defaut etait LATENT; ce qui le rend
+ * reel est qu on normalisait deja d un cote et pas de l autre. */
+t('★ le slug de chaine est stocke NORMALISE, quelle que soit la casse rendue par l API', () => {
+  for (const casse of ['base', 'Base', 'BASE', 'bAsE']) {
+    const p = { chainId: casse, baseToken: { address: '0x' + '11'.repeat(20), symbol: 'CASE', name: 'c' },
+      liquidity: { usd: 900000 }, volume: { h24: 1 }, pairCreatedAt: 1 };
+    const c = candidatesFrom([p], 'CASE', 'base')[0];
+    assert.ok(c, 'le filtre accepte deja cette casse: ' + casse);
+    assert.strictEqual(c.chain, 'base',
+      'chainId ' + JSON.stringify(casse) + ' stocke ' + JSON.stringify(c.chain) + ' — la garde '
+      + "`canonical.chain === 'base'` de la couche holders-health est sensible a la casse, donc la "
+      + 'detection de rug serait SAUTEE et le verdict resterait rassurant.');
+  }
+});
+
+t('★ de bout en bout: holders-health tourne meme si l API change la casse du slug', async () => {
+  const paires = (casse) => [
+    { chainId: casse, baseToken: { address: '0x' + '11'.repeat(20), symbol: 'CASE', name: 'c' },
+      liquidity: { usd: 900000 }, volume: { h24: 50000 }, pairCreatedAt: 1 },
+    { chainId: casse, baseToken: { address: '0x' + '22'.repeat(20), symbol: 'CASE', name: 'c' },
+      liquidity: { usd: 1000 }, volume: { h24: 1 }, pairCreatedAt: 1 },
+  ];
+  for (const casse of ['base', 'Base']) {
+    let appelee = false;
+    await vetMeme({ symbol: 'CASE', chainId: 'base',
+      fetchImpl: async () => ({ pairs: paires(casse) }),
+      holderHealthImpl: async () => { appelee = true; return { ok: true, top10Concentration: 0.1 }; } });
+    assert.ok(appelee, 'chainId ' + JSON.stringify(casse) + ': la couche holders-health n a pas ete '
+      + 'appelee — la detection de rug disparait et le verdict sort quand meme');
+  }
+});
+
 t('⚖️ TEMOIN — une URL http(s) de l API est CONSERVEE (la garde ne remplace pas tout)', () => {
   /* Sans ce temoin, une garde qui ecraserait TOUJOURS par le repli passerait le cas precedent en
    * beaute — et on perdrait l URL exacte de la paire, celle qui pointe le bon marche. */
