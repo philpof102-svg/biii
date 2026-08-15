@@ -37,6 +37,74 @@ one-call service wouldn't show there regardless.) Verified: not listed on Onyx B
   explicitly, or route settlements through the CDP facilitator — the latter trades away part of our
   facilitator-less, non-custodial posture, so it's a deliberate choice, not a freebie.
 
+## Mesure du 2026-08-15 — ce qui est tranché, et ce qui reste
+
+La ligne « soit enregistrer `/openapi.json`, soit passer par le facilitateur »
+laissait croire à deux options. **Il n'y en a qu'une.** La spec bazaar est
+explicite :
+
+> *« Cataloging happens when a facilitator processes a `PaymentPayload` that
+> includes the echoed `bazaar` extension. **A server-side declaration alone
+> catalogs nothing** if no paying client echoes it. »*
+
+Il n'existe pas de chemin « enregistrer son OpenAPI » : la chaîne est
+**déclaration serveur → écho par le client → traitement par un facilitateur →
+catalogue**. Vérifié empiriquement — le catalogue CDP
+(`api.cdp.coinbase.com/platform/v2/x402/discovery/resources`, endpoint **public**,
+sans clé) contient 1 200 ressources, et ni `biii-production` ni l'adresse
+marchande n'y figurent.
+
+### Le coût réel n'est pas celui qu'on croyait
+
+Cette note disait que passer par le facilitateur « sacrifie une partie de la
+posture non-custodial ». Les 2 119 entrées `accepts` du catalogue portent toutes
+`extra: {name: "USD Coin", version: "2"}` — le domaine EIP-712 de l'USDC, donc
+de l'EIP-3009 `transferWithAuthorization` : **le payeur signe, le facilitateur
+diffuse, les fonds vont du payeur au `payTo` directement.** Le facilitateur ne
+détient jamais rien.
+
+Ce qu'on perd est donc *facilitator-less*, **pas** *non-custodial*. Deux
+propriétés distinctes, et une seule est en jeu. À confirmer en lisant le code du
+scheme `exact` avant de trancher, mais l'écart de coût est important.
+
+### Deux défauts trouvés au passage, dont un qui dépasse le listing
+
+1. **`extra` était absent du 402.** Sans le domaine EIP-712, un client x402
+   standard **ne peut pas signer** — il ignore quel `domainSeparator` utiliser.
+   Présent sur 1 659 des 1 665 entrées EVM du catalogue (99,6 %). Ce n'était pas
+   un défaut de vitrine mais d'interopérabilité : BIII était impayable par tout
+   client générique. **Corrigé** (additif, corps v1 inclus).
+2. **`network: "base"`** au lieu du CAIP-2 `"eip155:8453"` : 7 entrées sur 2 119
+   utilisent notre forme. **Corrigé dans la déclaration v2 seulement** — changer
+   le corps v1 est une rupture de contrat, elle se décide à part.
+
+### Fait
+
+Le 402 porte désormais un en-tête `payment-required` (base64 d'un
+`PaymentRequired` v2 : `resource` en objet, `accepts` en CAIP-2 avec `extra`,
+`extensions.bazaar` avec `info.input`/`info.output`), **à côté** du corps v1
+inchangé. Gabarit relevé sur Tavily, service réellement catalogué, pas déduit de
+la doc. Vérifié sur le vrai serveur HTTP, les trois routes, en-tête de ~1,1 Ko.
+16 cas dans `test/bazaar-declaration.test.js`, dont un qui garde le corps v1.
+
+### Reste
+
+Un règlement passant par un facilitateur, avec un client qui ré-émet
+l'extension. C'est la seule étape qui engage des fonds et la posture : décision
+d'exploitation, pas de code. Ensuite,
+`GET /discovery/resources?payTo=0xa6cf…` doit renvoyer BIII, et agentic.market
+indexe automatiquement — sa FAQ le dit : *« If your service/endpoints are indexed
+on the Bazaar, you'll automatically show up on agentic.market »*, aucune
+inscription.
+
+### Ce que ça vaut, sans enjoliver
+
+Marché mesuré le même jour : 50 services, 46 583 appels sur 30 jours, dont
+**58 % pour Tavily seul** et 94 % pour les cinq premiers. Dans la queue, Arkham
+fait 471 appels/mois, CoinMarketCap 105, et BlackSwan — le seul concurrent sur
+le créneau risque — **3**. À 0,25 $ l'appel, un BIII performant comme Arkham
+rapporterait ~118 $/mois. **Ce chantier achète une position, pas un revenu.**
+
 ## Anti-hype / posture
 Every listing describes only what BIII does (fail-closed, non-custodial, re-verifiable on-chain). No
 inflated numbers, no promo spam — only curated lists that invite service entries.
