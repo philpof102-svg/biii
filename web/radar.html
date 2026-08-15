@@ -54,25 +54,39 @@
 (function(){
   "use strict";
   var esc = function(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); };
-  var short = function(a){ a=String(a||""); return a.length>16 ? a.slice(0,10)+"…"+a.slice(-4) : a; };
+  /* ⛔ `short` NE RACCOURCIT PAS, IL N'ECHAPPE PAS. Il rendait sa valeur telle quelle — et `rowHtml`
+   * l'inserait dans du HTML sur la MEME ligne ou `esc(r.q)` protegeait deja l'attribut `title`: la
+   * meme valeur, echappee a gauche et crue a droite. Une valeur de 16 caracteres ou moins ressortait
+   * ENTIERE, et `<svg onload=x>` en fait 14.
+   * D'ou vient `r.q`: `/trust` valide `^0x[0-9a-f]{40}$` et rend 400 sinon, donc rien a craindre la;
+   * mais la route meme enregistre `q: b.symbol`, du TEXTE LIBRE. Elle est payante (x402), ce qui est
+   * un cout, pas un controle. `radar.html` est servi par le nœud: la valeur s'execute chez qui ouvre
+   * la page. On echappe DANS le raccourcisseur, pour qu'aucun appelant n'ait a y penser. */
+  var short = function(a){ a=String(a||""); var t = a.length>16 ? a.slice(0,10)+"…"+a.slice(-4) : a; return esc(t); };
   var tagFor = function(v){
     if(v==="impersonation") return ['🚨 IMPERSONATION','imp'];
     if(v==="blocked") return ['✗ BLOCKED','blk'];
     if(v==="unsafe") return ['✗ unsafe','imp'];
     if(v==="genuine") return ['✓ genuine','ok'];
     if(v==="not-known-bad") return ['~ not known-bad','list'];
-    return ['? '+v,'unk'];
+    /* Le `else` d'une liste blanche RENVOYAIT la valeur inconnue, sans borne ni echappement — et elle
+     * partait dans le HTML. Un verdict inconnu se dit, il ne se recopie pas. */
+    return ['? '+esc(String(v).slice(0,32)),'unk'];
   };
-  function card(n,l,sm){ return '<div class="card"><div class="n">'+n+'</div><div class="l">'+esc(l)+'</div>'+(sm?'<div class="sm">'+sm+'</div>':'')+'</div>'; }
-  function rowHtml(r){ var t=tagFor(r.verdict); return '<div class="row"><span class="tag '+t[1]+'">'+t[0]+'</span>'
+  /* `card` construit du HTML: il echappe ses PROPRES entrees. Avant, `n` et `sm` comptaient sur
+   * l'appelant — une regle qui tient jusqu'au premier appelant qui l'ignore. */
+  function card(n,l,sm){ return '<div class="card"><div class="n">'+esc(n)+'</div><div class="l">'+esc(l)+'</div>'+(sm?'<div class="sm">'+esc(sm)+'</div>':'')+'</div>'; }
+  function rowHtml(r){ var t=tagFor(r.verdict); return '<div class="row"><span class="tag '+esc(t[1])+'">'+t[0]+'</span>'
     + '<span class="q" title="'+esc(r.q)+'">'+esc(r.kind)+' · '+short(r.q)+(r.issuer?' · '+esc(r.issuer):'')+'</span></div>'; }
   function render(d){
     var c=d.coverage||{};
-    var byIssuer=Object.entries(c.byIssuer||{}).map(function(e){return esc(e[0])+' '+e[1];}).join(' · ');
+    /* Plus d'echappement ICI: `card` echappe ses entrees. Le laisser produirait `&amp;lt;` a l'ecran —
+     * un double echappement se voit, contrairement a son absence, mais les deux sont des defauts. */
+    var byIssuer=Object.entries(c.byIssuer||{}).map(function(e){return e[0]+' '+e[1];}).join(' · ');
     document.getElementById('coverage').innerHTML =
-      card(c.issuerVerified||0,'issuer-verified contracts',esc(byIssuer))
+      card(c.issuerVerified||0,'issuer-verified contracts',byIssuer)
       + card(c.chains||0,'chains covered')
-      + card((c.floor&&c.floor.addresses)||0,'known-bad floor',(c.floor&&c.floor.asOf?'as of '+esc(c.floor.asOf)+(c.floor.stale?' · ⚠ stale':''):''))
+      + card((c.floor&&c.floor.addresses)||0,'known-bad floor',(c.floor&&c.floor.asOf?'as of '+c.floor.asOf+(c.floor.stale?' · ⚠ stale':''):''))
       + card(d.served||0,'checks served');
     var flags=d.recentFlags||[];
     document.getElementById('flags').innerHTML = flags.length ? flags.map(rowHtml).join('') : '<div class="empty">no flags yet — no impersonation or known-bad seen this session.</div>';
