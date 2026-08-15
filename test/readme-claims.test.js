@@ -49,12 +49,38 @@ t('le nombre de chaines annonce est celui du registre', () => {
     `le README n annonce pas « ${chaines.size} chains » — ${[...chaines].sort((a, b) => a - b).join(', ')}`);
 });
 
+/* ⛔ 2026-08-15 — CES DEUX CAS COMPTAIENT PAR REGEX SUR LE SOURCE, ET SE SONT
+ * TROMPES UNE DEUXIEME FOIS. Le motif `/name:\s*'(till_[a-z_]+)'/` n'admet PAS
+ * de chiffre: sur `till_b20_authentic` il s'arrete a `till_b`, n'y trouve pas le
+ * guillemet fermant, et abandonne l'outil ENTIER. Comptage 28, serveur 29,
+ * README 28, suite VERTE.
+ *
+ * La correction du 11/08 avait remplace un SUR-comptage (`till_b` pris pour un
+ * outil) par un SOUS-comptage. Deux fois un README faux, deux fois du vert.
+ *
+ * 💎 La cause n'est pas le motif, c'est la METHODE: ce cas s'appelle « celui du
+ * serveur » et ne demandait rien au serveur. `bin/biii-mcp.js` EXPORTE `TOOLS`.
+ * On compte donc la liste que le serveur sert vraiment — plus de motif a tenir
+ * a jour, plus de forme de source a deviner. Verifie: 29, et le README corrige. */
+const { TOOLS } = require('../bin/biii-mcp.js');
+const nbOutils = () => {
+  assert.ok(Array.isArray(TOOLS) && TOOLS.length > 0, 'TOOLS n est plus exporte: ce test redeviendrait aveugle');
+  return new Set(TOOLS.map((o) => o.name)).size;
+};
+
 t('le nombre d outils MCP annonce est celui du serveur', () => {
+  const n = nbOutils();
+  assert.ok(README.includes(`**${n} tools**`), `le README n annonce pas « ${n} tools »`);
+});
+
+t('le comptage vient bien de la LISTE SERVIE, pas d un motif sur le source', () => {
+  // Le garde du garde. Si quelqu un revient a une regex, elle doit au moins
+  // retrouver le meme compte que la liste exportee — sinon on repart pour un
+  // troisieme tour du meme bug.
   const mcp = lire('bin/biii-mcp.js');
-  const outils = [...new Set([...mcp.matchAll(/name:\s*'(till_[a-z_]+)'/g)].map((m) => m[1]))];
-  assert.ok(outils.length > 0, 'aucun outil trouve: la forme du source a change, ce test est aveugle');
-  assert.ok(README.includes(`**${outils.length} tools**`),
-    `le README n annonce pas « ${outils.length} tools »`);
+  const parMotif = new Set([...mcp.matchAll(/name:\s*'(till_[a-z0-9_]+)'/g)].map((m) => m[1]));
+  assert.strictEqual(parMotif.size, nbOutils(),
+    'un outil est declare sous une forme que le motif ne voit pas — compter la liste, pas le texte');
 });
 
 /* ⛔ 2026-08-11 — CE CAS EXISTE PARCE QUE LE GATE CI-DESSUS M'A LAISSE PASSER.
@@ -64,14 +90,12 @@ t('le nombre d outils MCP annonce est celui du serveur', () => {
  * FAUX est ABSENT. Le README affirmait donc deux comptes contradictoires, sans un mot.
  * 💎 Une assertion de PRESENCE ne borne rien. Celle-ci borne: AUCUN autre compte d'outils n'est tolere. */
 t('le README n annonce AUCUN autre compte d outils que le vrai', () => {
-  const mcp = lire('bin/biii-mcp.js');
-  const outils = [...new Set([...mcp.matchAll(/name:\s*'(till_[a-z_]+)'/g)].map((m) => m[1]))];
-  assert.ok(outils.length > 0, 'aucun outil trouve: la forme du source a change, ce test est aveugle');
+  const vrai = nbOutils();
   const annonces = [...new Set([...README.matchAll(/\*\*(\d+) tools\*\*/g)].map((m) => Number(m[1])))];
   assert.ok(annonces.length > 0, 'le README n annonce aucun compte d outils — le cas precedent doit deja echouer');
-  const faux = annonces.filter((n) => n !== outils.length);
+  const faux = annonces.filter((n) => n !== vrai);
   assert.deepEqual(faux, [],
-    `le README porte ${annonces.length} compte(s) d outils distincts; ${faux.join(', ')} ne vaut/valent pas ${outils.length}`);
+    `le README porte ${annonces.length} compte(s) d outils distincts; ${faux.join(', ')} ne vaut/valent pas ${vrai}`);
 });
 
 /* ⛔ Les trois chiffres du resume d en-tete, RECOMPTES. Ils ont ete ajoutes le 11/08 et rien ne les

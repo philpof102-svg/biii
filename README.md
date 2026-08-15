@@ -1,6 +1,6 @@
 # BIII
 
-> Safe-to-pay verdicts on Base, with the evidence attached: **28 tools**, **55 modules**,
+> Safe-to-pay verdicts on Base, with the evidence attached: **29 tools**, **55 modules**,
 > **138 test files**, **54 probes** that publish their own bounds. Non-custodial, descriptor-only,
 > every verdict re-verifiable on-chain.
 
@@ -129,8 +129,10 @@ BIII_MERCHANT=0x<your address> npm run serve   # the non-custodial HTTP surface,
   token, recipient allow-list, per-charge max, AND the **cumulative cap** (drain-safe: ten small charges
   can't beat a low cap; a malformed or absent limit is REFUSED, never treated as "no limit"). Both
   fail-closed; BIII does not verify JWT signatures itself (delegated, no dep).
-- `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (**28 tools**, listed from the source
-  on 2026-08-05: `till_authorize`, `till_check_invoice`, `till_check_payment`, `till_create_charge`,
+- `bin/biii-mcp.js` — **the agentic bridge**: an MCP any agent loads (**29 tools**, counted from the
+  exported `TOOLS` list — not from a regex over the source, which silently dropped `till_b20_authentic`
+  because its name carries digits:
+  `till_authorize`, `till_b20_authentic`, `till_check_invoice`, `till_check_payment`, `till_create_charge`,
   `till_create_invoice`, `till_export`, `till_floor`, `till_funder_history`, `till_key_exposure`, `till_kya`,
   `till_launch_funder`, `till_meter`, `till_open_approvals`, `till_receipt`, `till_recovery_offer`,
   `till_resolve`, `till_roll`, `till_rug_powers`, `till_seed_exposure`, `till_trace_theft`, `till_trust`,
