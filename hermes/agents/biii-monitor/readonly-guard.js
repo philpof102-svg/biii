@@ -68,6 +68,26 @@ const DENY = new Set([
 // per call — an unattended monitor must never trigger them. Read verbs (discover/inspect/list/get/…) pass.
 const MONEY_VERB = /(^|_)(run|pay|buy|purchase|order|checkout|charge|spend|exec|execute|withdraw|deposit|transfer|remit|topup)($|_)/i;
 
+/* LECTURES faussement attrapees par MONEY_VERB. Liste EXACTE, jamais un motif — et verifiee AVANT
+ * MONEY_VERB mais APRES DENY, donc elle ne peut jamais debloquer un nom dangereux connu.
+ *
+ * ⛔ LE COMMENTAIRE CI-DESSUS SE TROMPAIT SUR SON PROPRE EXEMPLE. Il justifie de ne pas appliquer
+ * MONEY_VERB segment par segment en citant « `get-transfer-history` porte `transfer` » — ecrit avec
+ * des TIRETS, ou la regex ne matche pas. Mesure du 2026-08-15: ecrit avec des UNDERSCORES, qui est la
+ * convention reelle des noms MCP, `get_transfer_history` est BLOQUE dans les deux modes. L'exemple
+ * qui defend la regle tombe sous la regle.
+ *
+ * Cas reel qui a fait naitre cette liste: `monid_get_run`, la LECTURE du resultat d'un run, bloquee
+ * parce que le nom finit par `_run`. Sans elle, en mode non attendu (MONID_ALLOW_SPEND absent),
+ * l'agent ne peut meme pas relire un run passe.
+ *
+ * ⛔ POURQUOI PAS UNE REGLE STRUCTURELLE (« exempter les prefixes de lecture get_/list_/… »): teste,
+ * et elle DEBLOQUERAIT `get_buy_link`, qui rend un lien d'achat et doit rester bloque. Un elargissement
+ * flou echange un faux positif contre un faux negatif; une liste exacte n'echange rien. */
+const LECTURES = new Set([
+  'monid_get_run',        // recupere le resultat d'un run deja paye — ne depense pas
+]);
+
 /* Journal des FORMES observees (jamais les valeurs — un payload peut porter un secret). Le fail-closed
  * ci-dessous est correct mais aveugle: si Hermes renomme le champ, le garde bloquera TOUT et on
  * apprendra la nouvelle forme par une panne. En enregistrant les cles a chaque refus d'identification,
@@ -176,7 +196,11 @@ process.stdin.on('end', () => {
    * fait desactiver, et on perd tout. DENY est une liste EXACTE de noms dangereux connus: la tester
    * segment par segment ne cree aucun faux positif. Le trou restant — un verbe d'argent inconnu au
    * milieu d'un nom pointe — est nomme ici plutot que ferme au prix de faux blocages. */
-  if (DENY.has(tool) || segments.some((s) => DENY.has(s)) || MONEY_VERB.test(seg) || MONEY_VERB.test(tool)) {
+  /* L'ordre compte: DENY d'abord (une lecture ne peut pas racheter un nom dangereux connu), puis la
+   * liste exacte des lectures, puis seulement la regex floue. */
+  const estUneLecture = LECTURES.has(seg) || LECTURES.has(tool);
+  if (DENY.has(tool) || segments.some((s) => DENY.has(s))
+      || (!estUneLecture && (MONEY_VERB.test(seg) || MONEY_VERB.test(tool)))) {
     process.stdout.write(JSON.stringify({
       action: 'block',
       message: `biii-monitor is READ-ONLY: '${tool}' is a write/spend tool, blocked by policy. ` +

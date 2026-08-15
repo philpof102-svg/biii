@@ -54,10 +54,17 @@ Call **`till_vet_merchant`** (or `till_trust` for the full triangle) with the co
 - Not-on-floor → **"~ not known-bad (NOT a clean bill — no behavioral score)"**. Stay cautious.
 - If the caller has a resource/endpoint URL, pass `resourceUrl` so a hostile endpoint is flagged too.
 
-### C) (optional) Pay with a receipt
+### C) (optional) Pay with a receipt — **attended sessions only**
 If, after A+B, the user wants to pay: use `till_create_charge` → the user's own wallet executes the
 EIP-681 intent (BIII signs nothing) → `till_check_payment` verifies it field-for-field → `till_receipt`
 gives a txHash-anchored, re-verifiable receipt. This is the pre-flight → pay → prove loop.
+
+> ⛔ **This step does not run on a guarded node, and that is deliberate.** `readonly-guard.js` is
+> mounted as a `pre_tool_call` hook on the always-on node (`hermes/node/config.template.yaml`) and
+> holds `till_create_charge` in its DENY list — measured 2026-08-15: it blocks, in every mode. An
+> unattended node must stay a monitor, not an actor (`hermes/node/NODE.md`). A+B are the whole skill
+> there; C is for a session where a human is present and the guard is not mounted. Do not "fix" a
+> block here by disabling the hook.
 
 ## How to report (a tight brief, not a wall of text)
 Lead with the verdict emoji + one line, then the evidence, then the re-verify pointer. Example:
