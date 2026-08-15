@@ -30,6 +30,17 @@
 //      chiffres: la borne voyage avec la mesure, au lieu d'etre promise en en-tete.
 //      ⛔ Un cache vieux n'est PAS une panne ici — la sonde est ponctuelle par dessein, et sa date EST
 //      son sens. Ce qu'on refuse, c'est de lire ses nombres sans savoir de quand ils datent.
+//
+//      ⚖️ DECISION DE L'OPERATEUR, 2026-08-15 — ARBITREE, PAS SUBIE:
+//        · la mesure du 2026-08-05 est CONSERVEE telle quelle, comme observation DATEE. On ne relance
+//          pas `rewalk-safe-bucket-funders.js` pour la rafraichir: re-marcher les 11 financeurs
+//          produirait d'autres nombres, et ce sont ceux du 5 aout qui ont servi a trancher la
+//          contradiction que ce seau documente. Rafraichir effacerait la mesure au lieu de l'ajouter.
+//        · cette sonde AVERTIT et ne BLOQUE PAS, quel que soit l'age du cache.
+//      ⛔ NE PAS "durcir" en refus. Un forensicien doit pouvoir lire une mesure vieille EN SACHANT
+//      qu'elle est vieille — c'est le but meme de l'affichage d'age ci-dessous. Un seuil qui ferait
+//      sortir la sonde en erreur rendrait la donnee INACCESSIBLE au lieu de la rendre HONNETE, et
+//      supprimerait la seule population ou densite et issue sont connues ensemble.
 //   3. Ce seau a ete SELECTIONNE comme le cote SUR d'une regle. Le taux de base n'y est pas celui de
 //      la base, et une precision mesuree ici ne se transporte pas ailleurs.
 //
