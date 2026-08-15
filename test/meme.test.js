@@ -329,6 +329,40 @@ t('LES DEUX BORNES: le contrat dominant reste certifie', async () => {
   assert.strictEqual(r.status, 'genuine');
 });
 
+/* ── (F) L'URL RENDUE PAR L'API TIERCE FINISSAIT DANS UN href, SANS CONTROLE DE SCHEMA ─────────────
+ * `web/vet-meme.html` rend `canonical.dexscreener` en <a href="…"> apres l avoir passe a son esc(),
+ * qui neutralise & < > " et RIEN D AUTRE: un `javascript:` traverse l echappement INTACT et s execute
+ * au clic. On ne casse pas l attribut, on remplace le SCHEMA — et aucun echappeur HTML ne fait la
+ * difference. Le champ etait repris tel quel de `p.url`.
+ * ⚖️ DexScreener n a aucune raison d envoyer autre chose que du https, et c est precisement le point:
+ * l hypothese n etait ecrite NULLE PART, donc rien ne la defendait. Ce test l ecrit. */
+const paireUrl = (url) => ({
+  chainId: 'base', baseToken: { address: '0xurl0000000000000000000000000000000000001', symbol: 'URLX', name: 'x' },
+  liquidity: { usd: 1000 }, volume: { h24: 1 }, pairCreatedAt: 1, url,
+});
+const REPLI_URL = 'https://dexscreener.com/base/0xurl0000000000000000000000000000000000001';
+
+t('★ un schema NON http(s) rendu par l API ne peut pas atteindre un href', () => {
+  for (const hostile of ['javascript:alert(1)', 'JaVaScRiPt:alert(1)', 'data:text/html,<script>1</script>',
+    'vbscript:x', ' javascript:alert(1)', '', null, 42, {}]) {
+    const c = candidatesFrom([paireUrl(hostile)], 'URLX', 'base')[0];
+    assert.strictEqual(c.dexscreener, REPLI_URL,
+      'url ' + JSON.stringify(String(hostile)) + ' doit retomber sur l URL que NOUS construisons — '
+      + 'obtenu: ' + c.dexscreener);
+  }
+});
+
+t('⚖️ TEMOIN — une URL http(s) de l API est CONSERVEE (la garde ne remplace pas tout)', () => {
+  /* Sans ce temoin, une garde qui ecraserait TOUJOURS par le repli passerait le cas precedent en
+   * beaute — et on perdrait l URL exacte de la paire, celle qui pointe le bon marche. */
+  const c = candidatesFrom([paireUrl('https://dexscreener.com/base/0xAUTRE')], 'URLX', 'base')[0];
+  assert.strictEqual(c.dexscreener, 'https://dexscreener.com/base/0xAUTRE', 'une https doit passer');
+  const h = candidatesFrom([paireUrl('http://exemple.test/x')], 'URLX', 'base')[0];
+  assert.strictEqual(h.dexscreener, 'http://exemple.test/x', 'http aussi: on juge le SCHEMA, pas l hote');
+  const espaces = candidatesFrom([paireUrl('  https://exemple.test/y  ')], 'URLX', 'base')[0];
+  assert.strictEqual(espaces.dexscreener, 'https://exemple.test/y', 'les espaces sont retires, pas la valeur');
+});
+
 t('★ les quatre issues sont DISTINGUABLES (temoin d instrument)', async () => {
   const st = [];
   for (const adr of [DOM, SOSIE, JAMAIS_VU, '0x123'])
