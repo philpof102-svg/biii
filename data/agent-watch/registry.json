@@ -124,7 +124,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agentdm/agentdm",
-      "lastSeen": "2026-08-14T17:49:15.893Z"
+      "lastSeen": "2026-08-15T05:56:55.557Z"
     },
     "https://api.agentic-news.ai/mcp": {
       "verdict": "unauditable",
@@ -133,16 +133,16 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agentic-news/mcp",
-      "lastSeen": "2026-08-14T17:49:19.135Z"
+      "lastSeen": "2026-08-15T05:56:56.656Z"
     },
     "https://agenticfabricationnetwork.ai/mcp": {
-      "verdict": "unreachable",
-      "tools": null,
-      "names": null,
-      "movesValue": null,
-      "wantsSecret": null,
+      "verdict": "answers",
+      "tools": 10,
+      "names": "create_checkout,finalize_quote,get_fabrication_quote,get_material_guide,get_order_status,leave_review,list_orders,poll_quote,refine_quote,reply_to_maker",
+      "movesValue": [],
+      "wantsSecret": [],
       "name": "ai.agenticfabricationnetwork/ufp",
-      "lastSeen": "2026-08-14T17:49:24.943Z"
+      "lastSeen": "2026-08-15T05:56:59.905Z"
     },
     "https://api.agenticshelf.ai/m/graffeo/mcp": {
       "verdict": "unreachable",
@@ -151,7 +151,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agenticshelf/graffeo",
-      "lastSeen": "2026-08-14T17:49:26.697Z"
+      "lastSeen": "2026-08-15T05:57:01.152Z"
     },
     "https://api.agenticshelf.ai/mcp": {
       "verdict": "unreachable",
@@ -160,7 +160,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agenticshelf/mcp",
-      "lastSeen": "2026-08-14T17:49:27.788Z"
+      "lastSeen": "2026-08-15T05:57:02.044Z"
     },
     "https://api.agenticshelf.ai/m/puroair/mcp": {
       "verdict": "unreachable",
@@ -169,7 +169,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agenticshelf/puroair",
-      "lastSeen": "2026-08-14T17:49:28.779Z"
+      "lastSeen": "2026-08-15T05:57:02.923Z"
     },
     "https://mcp.agenticterminal.ai/mcp": {
       "verdict": "answers",
@@ -178,7 +178,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agenticterminal/directory",
-      "lastSeen": "2026-08-14T17:49:31.165Z"
+      "lastSeen": "2026-08-15T05:57:04.480Z"
     },
     "https://ai-akari.ai/mcp-trust": {
       "verdict": "high_risk",
@@ -189,7 +189,7 @@
       ],
       "wantsSecret": [],
       "name": "ai.ai-akari/agent-trust-receipt",
-      "lastSeen": "2026-08-14T19:50:15.507Z"
+      "lastSeen": "2026-08-15T05:57:14.767Z"
     },
     "https://ai-akari.ai/mcp": {
       "verdict": "high_risk",
@@ -200,7 +200,7 @@
       ],
       "wantsSecret": [],
       "name": "ai.ai-akari/one-minute-akari",
-      "lastSeen": "2026-08-14T19:50:17.265Z"
+      "lastSeen": "2026-08-15T05:57:16.598Z"
     },
     "https://www.ai-portal.ai/mcp": {
       "verdict": "answers",
@@ -209,7 +209,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.ai-portal/ai-portal",
-      "lastSeen": "2026-08-14T19:50:18.894Z"
+      "lastSeen": "2026-08-15T05:57:17.971Z"
     },
     "https://aient.ai/mcp": {
       "verdict": "unauditable",
@@ -218,7 +218,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.aient/mcp",
-      "lastSeen": "2026-08-14T19:50:20.632Z"
+      "lastSeen": "2026-08-15T05:57:19.027Z"
     },
     "https://mcp.airshelf.ai/mcp": {
       "verdict": "answers",
@@ -227,7 +227,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.airshelf/catalog",
-      "lastSeen": "2026-08-14T19:50:22.620Z"
+      "lastSeen": "2026-08-15T05:57:21.390Z"
     },
     "https://api.aisecuritygateway.ai/mcp": {
       "verdict": "unauditable",
@@ -722,7 +722,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agenticaffiliate/affiliate-networks-mcp",
-      "lastSeen": "2026-08-14T17:49:23.319Z"
+      "lastSeen": "2026-08-15T05:56:57.975Z"
     },
     "https://analyticslegends.ai/mcp": {
       "verdict": "answers",
@@ -749,7 +749,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agentplaybooks/agentplaybooks",
-      "lastSeen": "2026-08-14T19:50:12.403Z"
+      "lastSeen": "2026-08-15T05:57:11.449Z"
     },
     "https://mcp.atlaso.ai/mcp": {
       "verdict": "unauditable",
@@ -767,7 +767,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.ai-advisors/mcp",
-      "lastSeen": "2026-08-14T19:50:13.566Z"
+      "lastSeen": "2026-08-15T05:57:12.932Z"
     },
     "https://mcp.goji.agency/mcp": {
       "verdict": "answers",
@@ -785,7 +785,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agentlookups/counterscript",
-      "lastSeen": "2026-08-14T17:49:34.923Z"
+      "lastSeen": "2026-08-15T05:57:05.833Z"
     },
     "https://env.agentlookups.ai/mcp": {
       "verdict": "answers",
@@ -794,7 +794,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agentlookups/groundtruth",
-      "lastSeen": "2026-08-14T17:49:37.060Z"
+      "lastSeen": "2026-08-15T05:57:07.307Z"
     },
     "https://overassessed.agentlookups.ai/mcp": {
       "verdict": "answers",
@@ -803,7 +803,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agentlookups/overassessed",
-      "lastSeen": "2026-08-14T17:49:39.707Z"
+      "lastSeen": "2026-08-15T05:57:08.755Z"
     },
     "https://contractors.agentlookups.ai/mcp": {
       "verdict": "answers",
@@ -812,7 +812,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agentlookups/plumbline",
-      "lastSeen": "2026-08-14T17:49:42.726Z"
+      "lastSeen": "2026-08-15T05:57:10.187Z"
     },
     "https://mcp.aivonic.ai": {
       "verdict": "unauditable",
@@ -821,7 +821,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.aivonic/mcp",
-      "lastSeen": "2026-08-14T19:50:23.958Z"
+      "lastSeen": "2026-08-15T05:57:22.341Z"
     },
     "https://arketo.ai/api/mcp": {
       "verdict": "unauditable",
@@ -1022,5 +1022,5 @@
       "lastSeen": "2026-08-14T23:52:58.422Z"
     }
   },
-  "offset": 19
+  "offset": 39
 }
