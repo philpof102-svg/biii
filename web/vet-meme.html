@@ -31,8 +31,15 @@
   .verdict.impersonation { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); }
   .verdict.ambiguous { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); }
   .verdict.thin { background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.3); }
-  .verdict.unknown { background: rgba(107,114,128,0.12); border: 1px solid rgba(107,114,128,0.3); }
+  /* ⚠️ `not_a_candidate` N'AVAIT AUCUNE REGLE. lib/meme.js rend SIX statuts, ce CSS en habillait CINQ.
+   * Le manquant est celui qui dit « on n'a jamais vu cette adresse porter ce symbole — verifiez avant de
+   * conclure »: un etat de PRUDENCE, ecrit expres pour ne pas accuser un tiers sur une absence de donnee.
+   * Sans regle il ne recevait ni fond, ni bordure, ni couleur de titre — le SEUL des six sans traitement,
+   * donc visuellement le moins alarmant des six. Il partage la teinte neutre de `unknown`, qui est
+   * exactement ce qu'il veut dire: on ne sait pas. */
+  .verdict.unknown, .verdict.not_a_candidate { background: rgba(107,114,128,0.12); border: 1px solid rgba(107,114,128,0.3); }
   .verdict-title { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+  .verdict.unknown .verdict-title, .verdict.not_a_candidate .verdict-title { color: var(--text-dim); }
   .verdict.genuine .verdict-title { color: var(--green); }
   .verdict.impersonation .verdict-title { color: var(--red); }
   .verdict.ambiguous .verdict-title { color: #F59E0B; }
@@ -163,9 +170,18 @@
   // ── RENDER VERDICT ──
   function renderVerdict(data) {
     var v = data.status ? data : (data.verdict || {});
-    var status = v.status || "unknown";
-    var cls = status; // genuine, impersonation, ambiguous, thin, unknown
-    var title = status.toUpperCase();
+    /* ⛔ `cls = status` PARTAIT CRU DANS UN NOM DE CLASSE, sans liste blanche. Le commentaire d'origine
+     * en enumerait cinq — c'est precisement la preuve que l'oubli en est un: lib/meme.js en rend SIX, et
+     * `not_a_candidate` ne figurait ni dans cette liste ni dans le CSS. Un statut sans regle ne rend
+     * aucun style: le verdict le plus PRUDENT des six ressortait comme le moins alarmant.
+     * ⚖️ Un statut inconnu se REPLIE sur `unknown` — visible, neutre — au lieu de devenir un nom de
+     * classe arbitraire. Un tableau + indexOf plutot qu'un objet: une recherche par cle heriterait de
+     * `constructor`/`toString` du prototype et les laisserait passer pour des classes valides. */
+    var CONNUS = ["genuine", "impersonation", "ambiguous", "thin", "unknown", "not_a_candidate"];
+    var status = String(v.status || "unknown");
+    var cls = CONNUS.indexOf(status) >= 0 ? status : "unknown";
+    // le titre dit ce que le SERVEUR a repondu, meme si on n'a pas de style pour lui — echappe et borne.
+    var title = status.toUpperCase().slice(0, 40);
     var reason = v.reason || "";
     var html = '<div class="card"><div class="verdict ' + cls + '"><div class="verdict-title">' + esc(title) + '</div><div class="verdict-detail">' + esc(reason) + '</div>';
 
