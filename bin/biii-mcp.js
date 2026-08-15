@@ -701,7 +701,12 @@ async function callTool(name, a = {}) {
     }
     if (a.mode === 'tron') {
       if (!a.address) return { error: 'address is required for mode "tron"' };
-      return await followTron(a.address, { maxHops: a.maxHops || 3 });
+      /* Meme enveloppe que le mode `bridge` juste au-dessus. Sans elle, un refus de `followTron`
+       * arrivait a l'agent SANS `error`, alors que ce handler signale l'echec par `{ error }` quinze
+       * fois. C'est la divergence entre soeurs que test/trace-theft-error-shape.test.js a deja
+       * documentee pour `bridge` — le correctif d'alors s'etait arrete a une branche. */
+      const tr = await followTron(a.address, { maxHops: a.maxHops || 3 });
+      return tr && tr.ok ? tr : { ...tr, error: (tr && tr.reason) || 'the tron trace did not answer' };
     }
     return { error: 'mode must be one of: moved, bridge, tron' };
   }
