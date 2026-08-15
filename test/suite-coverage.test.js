@@ -41,6 +41,16 @@ const EXCLUS = new Map([
     + 'contraintes FIGEES dans server-json.test.js, qui vieillissent en silence — il compare le fige au reel '
     + 'et sort en 1 s\'il y a derive. Lance par `npm run test:schema`, a faire tourner quand le registre '
     + 'annonce une version de schema ou apres un 422 inattendu.'],
+  ['deploy-drift.js',
+    'interroge le NOEUD PUBLIC en direct. Meme raison que e2e-real-chain et schema-drift: une dependance '
+    + 'reseau dans la suite la rend rouge pour des motifs qui ne sont pas le code. Son role est de repondre '
+    + 'a « ce qui tourne est-il ce que ce depot contient »: il demarre le serveur de CE depot en memoire, '
+    + 'compare l\'ensemble des cles de /health a celui du distant, et sort en 1 s\'il manque un champ '
+    + 'la-bas. Il existe parce que le `deployment.marker` prevu pour cette question n\'est PAS deploye — '
+    + 'un marqueur ne peut rien dire tant qu\'il n\'est pas en ligne, une comparaison de FORME le peut des '
+    + 'le premier jour. Trois codes: 0 meme forme, 1 derive, 2 sonde muette (une panne de sonde ne doit '
+    + 'jamais se lire comme un vert). Lance par `npm run test:deploy`, a faire tourner AVANT et APRES '
+    + 'chaque deploiement.'],
   ['suite-total.js',
     'lance `npm test` lui-meme pour en additionner les bilans: l\'inclure dans la suite ferait tourner la '
     + 'suite entiere a l\'interieur de la suite. Il repare le fait que le total etait compte a la main et '

@@ -33,6 +33,7 @@
     "serve": "node lib/server.js",
     "test:chain": "node test/e2e-real-chain.test.js",
     "test:schema": "node test/schema-drift.js",
+    "test:deploy": "node test/deploy-drift.js",
     "test:total": "node test/suite-total.js"
   },
   "dependencies": {
