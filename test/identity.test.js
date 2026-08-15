@@ -162,6 +162,30 @@ t('★ LES DEUX BORNES: en SECONDES, le passé expire et le futur lie', () => {
   assert.strictEqual(bindingLens(complet(SEC() + 3600)).bound, true, 'un futur en secondes DOIT lier');
 });
 
+t('★ un expiry PRÉSENT mais ILLISIBLE est refusé, jamais relu comme « pas d\'expiration »', () => {
+  /* ⛔ LE TROISIÈME ÉTAT, ET LE JUMEAU L'AVAIT DÉJÀ. `lib/skyfire.js` a corrigé le 2026-07-28 le fait
+   * qu'une expiration illisible s'écrase sur la valeur qui signifie « pas d'expiration » — il porte
+   * `expPresent` / `expLisible` / `expIllisible`. Le correctif n'a jamais traversé jusqu'ici: ce module
+   * lisait `Number(a.expiry) > 0`, donc PRÉSENT-mais-illisible et ABSENT rendaient le même verdict.
+   * Mesure du 2026-08-15, attestation par ailleurs complète et verified:true:
+   *   expiry absent       -> bound:true, expiresAt:null
+   *   expiry 'abc'        -> bound:true, expiresAt:null   IDENTIQUE
+   *   expiry '2026-01-01' -> bound:true, expiresAt:null   IDENTIQUE
+   * 💎 `'2026-01-01'` est la MÊME faute plausible que celle des millisecondes testée juste au-dessus —
+   * un intégrateur qui écrit une date lisible par un humain. La garde des ms l'attrapait, celle-ci non. */
+  for (const mauvais of ['abc', '2026-01-01', {}, [], 'NaN']) {
+    const r = bindingLens(complet(mauvais));
+    assert.strictEqual(r.bound, false, 'expiry ' + JSON.stringify(mauvais) + ' ne doit pas lier');
+    assert.match(r.reason, /not a readable unix-SECONDS/i,
+      'et le refus doit nommer SA cause, pas « pas d\'expiration »: ' + r.reason);
+  }
+  /* ⚖️ Le refus doit être DISCERNABLE de celui d'une expiration absente sous requireExpiry — sinon un
+   * opérateur dit à l'appelant « ajoute une expiration » et s'entend répondre « j'en ai mis une ». */
+  const absent = bindingLens(complet(0), { requireExpiry: true });
+  assert.match(absent.reason, /carries NO expiry/i, 'témoin: l\'absent garde son propre message');
+  assert.ok(!/not a readable/i.test(absent.reason), 'les deux refus ne doivent pas se confondre');
+});
+
 t('★ `expiry: 0` garde son sens — pas d\'expiration, pas une unité fausse', () => {
   assert.strictEqual(bindingLens(complet(0)).bound, true);
 });
