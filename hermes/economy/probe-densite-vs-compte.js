@@ -18,8 +18,18 @@
 // ⛔ TROIS BORNES, a lire avant les nombres:
 //   1. L'unite d'independance est le FINANCEUR, pas le token. Onze operateurs. Tout taux publie ici
 //      porte ses deux effectifs.
-//   2. La densite est lue AUJOURD'HUI, l'issue s'est jouee AVANT. L'historique d'un financeur n'a pu
-//      que croitre, donc sa densite a pu bouger. Ce n'est pas une note vers l'avant.
+//   2. La densite est lue DANS UN CACHE DATE, l'issue s'est jouee AVANT. L'historique d'un financeur
+//      n'a pu que croitre, donc sa densite a pu bouger. Ce n'est pas une note vers l'avant.
+//      ⚠️ CETTE BORNE DISAIT « lue AUJOURD'HUI » ET C'ETAIT FAUX. `rewalk-safe-bucket.json` n'est pas
+//      recalcule a chaque passe: il est ecrit par `rewalk-safe-bucket-funders.js`, une sonde
+//      forensique PONCTUELLE (aucune entree dans cron/jobs.json — verifie le 2026-08-15), et il ne
+//      porte AUCUNE date interne. Mesure du 2026-08-15: le fichier datait du 2026-08-05, soit
+//      231 h — 9,6 jours pendant lesquels, par la logique de cette borne meme, les historiques n'ont
+//      pu que CROITRE sans que rien ici ne le compte. La phrase affirmait donc une fraicheur que son
+//      entree n'avait plus, dans le sens rassurant. L'age du cache est desormais IMPRIME avec les
+//      chiffres: la borne voyage avec la mesure, au lieu d'etre promise en en-tete.
+//      ⛔ Un cache vieux n'est PAS une panne ici — la sonde est ponctuelle par dessein, et sa date EST
+//      son sens. Ce qu'on refuse, c'est de lire ses nombres sans savoir de quand ils datent.
 //   3. Ce seau a ete SELECTIONNE comme le cote SUR d'une regle. Le taux de base n'y est pas celui de
 //      la base, et une precision mesuree ici ne se transporte pas ailleurs.
 //
@@ -33,7 +43,17 @@ const { maturityWindow, outcomeKnownAt } = require('../../lib/prequential');
 const RACINE = path.join(__dirname, '..', '..', 'data', 'token-radar');
 const rows = Object.entries(JSON.parse(fs.readFileSync(path.join(RACINE, 'tokens.json'), 'utf8')))
   .map(([addr, v]) => ({ addr, ...v }));
-const cache = JSON.parse(fs.readFileSync(path.join(RACINE, 'rewalk-safe-bucket.json'), 'utf8'));
+const CACHE_PATH = path.join(RACINE, 'rewalk-safe-bucket.json');
+const cache = JSON.parse(fs.readFileSync(CACHE_PATH, 'utf8'));
+/* L'AGE DU CACHE, lu sur le fichier parce qu'il ne porte pas sa date DEDANS. Ce n'est pas un detail
+ * d'affichage: toute la colonne `densite` en sort, et la borne 2 depend de sa fraicheur. `null` si le
+ * mtime est illisible — on ne fabrique pas une date, on dit qu'on ne l'a pas. */
+function ageCacheH() {
+  try {
+    const ms = fs.statSync(CACHE_PATH).mtimeMs;
+    return { iso: new Date(ms).toISOString(), h: (Date.now() - ms) / 3600000 };
+  } catch { return null; }
+}
 
 const MAINTENANT = Date.parse(process.argv[2] || new Date().toISOString());
 const { maturityH } = maturityWindow(rows);
@@ -50,7 +70,18 @@ for (const t of rows) {
 }
 
 console.log(`\n  ${parFinanceur.size} financeur(s) relus, adosses a `
-  + `${[...parFinanceur.values()].reduce((s, g) => s + g.length, 0)} token(s)\n`);
+  + `${[...parFinanceur.values()].reduce((s, g) => s + g.length, 0)} token(s)`);
+/* LA BORNE VOYAGE AVEC LE CHIFFRE. Toute la colonne `densite` vient de ce cache; l'imprimer en tete
+ * evite qu'un lecteur prenne des nombres de la semaine derniere pour l'etat d'aujourd'hui. */
+const ac = ageCacheH();
+if (!ac) {
+  console.log('  ⚠️ densite lue dans rewalk-safe-bucket.json — DATE ILLISIBLE (mtime non lu):'
+    + ' l anciennete de ces chiffres est INCONNUE, pas nulle.\n');
+} else {
+  console.log('  densite lue dans rewalk-safe-bucket.json, ecrit le ' + ac.iso
+    + ' (' + ac.h.toFixed(1) + ' h)'
+    + (ac.h > 48 ? '  ⚠️ les historiques n ont pu que CROITRE depuis, sans etre recomptes ici' : '') + '\n');
+}
 console.log('    financeur       compte  txScan  densite   COMPTE>=20   DENSITE>=0.40   tok   rug/res');
 console.log('    ' + '-'.repeat(86));
 
