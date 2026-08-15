@@ -34,11 +34,24 @@ fi
 cp -f "$BIII_DIR/hermes/agents/biii-monitor/SOUL.md" "$HERMES_HOME/SOUL.md"
 umask 077; printf 'OPENROUTER_API_KEY=%s\n' "$OPENROUTER_API_KEY" > "$HERMES_HOME/.env"
 
-# keyless watchdog: biii-watch every 30m ($0, no key) — the whole point of an always-on node
-hermes cron create 'every 30m' \
+# keyless watchdog: biii-watch every 30m ($0, no key) — the whole point of an always-on node.
+#
+# ⛔ AVANT: `hermes cron create ... >/dev/null 2>&1 || true`, puis une banniere qui annonçait
+# « watchdog: biii-watch/30m » DANS TOUS LES CAS. La sortie etait jetee, l'echec avale, et le nœud
+# demarrait en affirmant surveiller alors qu'il ne surveillait peut-etre rien. `check-runners.sh`
+# ecrit lui-meme la lecon — « a job can be scheduled, visible, and dead » — et ici c'est un cran
+# avant: le job peut n'avoir jamais ete cree, et la banniere dit qu'il l'est.
+#
+# On garde le demarrage non bloquant (un nœud sans watchdog vaut mieux qu'un nœud mort, et arreter le
+# boot est une decision d'exploitation), mais l'echec devient VISIBLE dans les logs du host et la
+# banniere dit ce qui est vrai.
+WATCHDOG_SORTIE="$(hermes cron create 'every 30m' \
   --script "$BIII_DIR/hermes/agents/biii-monitor/biii-scan.sh" \
-  --no-agent --deliver local >/dev/null 2>&1 || true
+  --no-agent --deliver local 2>&1)" && WATCHDOG='biii-watch/30m' || {
+    WATCHDOG='ABSENT — `hermes cron create` a echoue'
+    echo "!! watchdog NON planifie: $WATCHDOG_SORTIE" >&2
+  }
 
 echo "▸ BIII trust node up (READ-ONLY) — HERMES_HOME=$HERMES_HOME model=$HERMES_MODEL"
-echo "  toolsets: biii + gitlawb$([ -f "$LAWBOR_DIR/bin/lawbor-mcp.js" ] && echo ' + lawbor')$([ -n "${MEMORY_ROOTS:-}" ] && echo ' + recall') · guard: on · watchdog: biii-watch/30m"
+echo "  toolsets: biii + gitlawb$([ -f "$LAWBOR_DIR/bin/lawbor-mcp.js" ] && echo ' + lawbor')$([ -n "${MEMORY_ROOTS:-}" ] && echo ' + recall') · guard: on · watchdog: $WATCHDOG"
 exec hermes gateway run
