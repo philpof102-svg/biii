@@ -118,12 +118,30 @@
         +"<div class='mono-small'>Verdict BIII — floor local known-bad, décisif. Aucun bouton de paiement affiché.</div>";
       $("scan-status").textContent="Bloqué par BIII."; return;
     }
-    var badge = vet ? "<div class='mono-small' style='color:var(--green)'>✓ pas known-bad — "+esc((vet.disclosure||"").slice(0,80))+"</div>"
-                    : "<div class='mono-small'>Vérif de confiance indisponible — payez avec prudence.</div>";
+    /* ⛔ TROIS ETATS, DONC TROIS BRANCHES — et on BRANCHE sur un champ, on ne lit pas une phrase.
+     * Avant: tout `vet` non nul devenait « ✓ pas known-bad » EN VERT, puis la divulgation du serveur
+     * etait tronquee a 80 caracteres. Or elle vaut aussi « NOT SCREENED — … the known-bad floor was
+     * never consulted » ou « SCREENING UNAVAILABLE — no known-bad floor is loaded on this node », et
+     * 80 caracteres coupent exactement la ou commence « This is NOT a clean verdict ». La page
+     * affirmait donc « pas known-bad » a partir d'un verdict qui disait n'avoir rien crible.
+     * `vet.screen.available` porte desormais la difference (lib/vet.js) — un booleen, pas de la prose.
+     * ⚖️ CE QUI NE CHANGE PAS: le bouton de paiement reste affiche. Bloquer un paiement P2P parce que
+     * NOTRE crible est indisponible est un arbitrage PRODUIT, pas une correction — il n'est pas pris
+     * ici. On retire l'affirmation fausse, on garde la decision. */
+    var crible = !!(vet && vet.screen && vet.screen.available === true);
+    var dit = esc(String((vet && vet.disclosure) || "").slice(0, 300));   // 300: au-dela de la plus longue branche du serveur
+    var badge = !vet
+      ? "<div class='mono-small'>Vérif de confiance indisponible — payez avec prudence.</div>"
+      : crible
+        ? "<div class='mono-small' style='color:var(--green)'>✓ pas known-bad — "+dit+"</div>"
+        : "<div class='mono-small' style='color:var(--amber,#f59e0b)'>⚠ NON CRIBLÉ — ce destinataire n'a pas été vérifié. "+dit+"</div>";
     box.innerHTML="<div class='ok'><b>✓ Prêt à payer</b></div><div style='margin:8px 0'>À <span class='a'>"+esc(p.to)+"</span></div>"
-      +"<div style='font-size:22px;font-weight:800;margin-bottom:6px'>"+usd+" USDC</div>"+badge
+      +"<div style='font-size:22px;font-weight:800;margin-bottom:6px'>"+esc(usd)+" USDC</div>"+badge
       +"<a class='act' style='display:block;text-align:center;text-decoration:none;margin-top:12px' href='"+esc(uri)+"'>Ouvrir mon wallet pour payer ▶</a>";
-    $("scan-status").textContent="Validé — destinataire vérifié.";
+    // ⛔ Le resume ne peut pas contredire le badge: « verifie » ne se dit que si quelque chose l'a ete.
+    $("scan-status").textContent = crible
+      ? "Validé — destinataire criblé, pas known-bad."
+      : "Destinataire NON criblé — rien n'a été vérifié.";
   }
   $("btn-cam").onclick=function(){
     if(!("BarcodeDetector" in window)){ $("scan-status").textContent="La caméra-scan n'est pas supportée ici (iOS) — collez le texte du QR ci-dessous."; return; }
