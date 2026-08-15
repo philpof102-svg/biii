@@ -139,7 +139,17 @@
   let chargeToken = 0;        // identity of the current sale — a stale poll/cancel can't flip a new one
   let pollFails = 0;          // consecutive /status failures → surface after N instead of spinning silently
 
-  const microToUsd = function(micro){ var m=String(micro||"0"); if(!/^\d+$/.test(m)) return null; while(m.length<7)m="0"+m; var w=m.slice(0,-6); var f=m.slice(-6).replace(/0+$/,""); if(f.length<2)f=(f+"00").slice(0,2); return w+"."+f; };
+  /* microToUsd — LES DEUX FORMES D'ABSENCE RENDAIENT DEUX MAUVAISES REPONSES DIFFERENTES.
+   * `String(micro||"0")` transformait un montant ABSENT en "0", qui passe la regex: un verdict paye
+   * sans `paidMicro` s'affichait « 0.00 USDC » sous un « ✓ PAYE ». Un montant ILLISIBLE ("abc") rendait
+   * null, et l'appelant retombait par `||` sur le montant que le commercant avait TAPE — or
+   * `verifyPayment` accepte le SURPAIEMENT (got >= want), donc paye != demande PAR CONSTRUCTION: le recu
+   * aurait imprime un chiffre que la chaine n'a jamais confirme. Aucune des deux ne disait « je n'ai pas su lire ».
+   * ⚖️ Aucun de ces deux chemins n'est atteignable aujourd'hui: le serveur ne pose `paidMicro` que dans la
+   * branche payante de verifyPayment, et il n'y met que des chiffres. C'est de la defense en profondeur
+   * sur le seul nombre que la comptabilite du commercant recopie — pas un defaut vivant, et je le dis. */
+  const microToUsd = function(micro){ var m=String(micro==null?"":micro); if(!/^\d+$/.test(m)) return null; while(m.length<7)m="0"+m; var w=m.slice(0,-6); var f=m.slice(-6).replace(/0+$/,""); if(f.length<2)f=(f+"00").slice(0,2); return w+"."+f; };
+  var MONTANT_ILLISIBLE = "montant non lisible";   // ce qu'on affiche plutot qu'un chiffre qu'on n'a pas lu
   let toastTimer = null;
   function showError(msg){ var t=document.getElementById("toast"); t.textContent=msg; t.style.display="block"; if(toastTimer)clearTimeout(toastTimer); toastTimer=setTimeout(function(){t.style.display="none";},5000); }
 
@@ -256,8 +266,10 @@
   // ── SHOW PAID ── (renders what the CHAIN verified; every field escaped — the /status JSON is external)
   function showPaid(verdict) {
     lastVerdict = verdict;
-    const shown = microToUsd(verdict.paidMicro) || formatDisplay(rawCents);
-    $paidAmount.textContent = shown + " USDC";
+    // ⛔ PAS de repli sur `formatDisplay(rawCents)`: ce serait afficher le montant DEMANDE a la place du
+    // montant PAYE. Un `null` ici veut dire « je n'ai pas su lire », et ca se dit.
+    const shown = microToUsd(verdict.paidMicro);
+    $paidAmount.textContent = shown === null ? MONTANT_ILLISIBLE : shown + " USDC";
     let html = "";
     if (verdict.txHash) html += "<b>Tx:</b> " + esc(String(verdict.txHash).slice(0, 10)) + "…<br>";
     if (verdict.from)   html += "<b>De:</b> " + esc(String(verdict.from).slice(0, 8)) + "…<br>";
@@ -285,7 +297,8 @@
   // ── RECEIPT — the bon de caisse, anchored to the on-chain tx (the real proof) ──
   $btnReceipt.addEventListener("click", function() {
     const v = lastVerdict || {};
-    const amountUsd = microToUsd(v.paidMicro) || formatDisplay(rawCents);   // what the chain verified
+    const lu = microToUsd(v.paidMicro);                                     // what the chain verified
+    const amountUsd = lu === null ? MONTANT_ILLISIBLE : lu + " USDC";       // jamais le montant DEMANDE
     const tx = v.txHash && v.txHash !== "0xDEMO" ? v.txHash : null;
     const explorer = tx ? "https://basescan.org/tx/" + tx : null;
     const when = new Date().toLocaleString();
@@ -296,7 +309,7 @@
       + '<div style="text-align:center;font-weight:800;letter-spacing:2px;margin-bottom:2px">BIII · REÇU</div>'
       + '<div style="text-align:center;color:#888;font-size:11px;margin-bottom:14px">USDC sur Base</div>'
       + '<div style="border-top:1px dashed #ccc;margin:10px 0"></div>'
-      + '<div style="display:flex;justify-content:space-between"><span>Montant</span><b>' + amountUsd + ' USDC</b></div>'
+      + '<div style="display:flex;justify-content:space-between"><span>Montant</span><b>' + esc(amountUsd) + '</b></div>'
       + '<div style="display:flex;justify-content:space-between;color:#666"><span>Heure</span><span>' + esc(when) + '</span></div>'
       + (v.from ? '<div style="display:flex;justify-content:space-between;color:#666"><span>Payé par</span><span>' + esc(v.from.slice(0,6)) + '…' + esc(v.from.slice(-4)) + '</span></div>' : '')
       + '<div style="border-top:1px dashed #ccc;margin:10px 0"></div>'
