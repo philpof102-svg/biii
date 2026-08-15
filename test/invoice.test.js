@@ -272,11 +272,16 @@ t('les refus deja en place tiennent toujours', () => {
   for (const mauvais of [{ qty: 0, unitUsd: '5' }, { qty: -3, unitUsd: '5' }, { qty: 1.5, unitUsd: '5' }]) {
     assert.throws(() => I.normalizeItem({ description: 'x', ...mauvais }), /positive integer/);
   }
-  assert.throws(() => I.normalizeItem({ description: 'x', qty: 5 }), /invalid USD amount/,
-    'qty sans prix unitaire refuse — jamais une ligne gratuite');
-  assert.throws(() => I.normalizeItem({ description: 'x' }), /invalid USD amount/);
+  /* ⚠️ CES TROIS-LA ASSERTAIENT LA MEME CHAINE, `/invalid USD amount/`, parce que le helper partage
+   * rendait un texte unique. Le test ne pouvait donc PAS distinguer « il manque unitUsd » de « il manque
+   * amountUsd »: interchanger les deux branches de `normalizeItem` l'aurait laisse vert. Depuis que
+   * `usdToMicro` recoit le nom du champ de son appelant, on asserte LEQUEL est en cause. */
+  assert.throws(() => I.normalizeItem({ description: 'x', qty: 5 }), /"x": unitUsd must be a positive number/,
+    'qty sans prix unitaire refuse — jamais une ligne gratuite, et c est unitUsd qui manque');
+  assert.throws(() => I.normalizeItem({ description: 'x' }), /"x": amountUsd must be a positive number/,
+    'ligne plate sans montant — c est amountUsd qui manque, pas unitUsd');
   assert.throws(() => I.normalizeItem({ description: 'x', qty: 2, unitUsd: '5.00', amountUsd: 'abc' }),
-    /invalid USD amount/, 'un montant illisible reste refuse avant toute comparaison');
+    /"x": amountUsd must be a positive number/, 'un montant illisible reste refuse avant toute comparaison');
 });
 
 (async () => {
