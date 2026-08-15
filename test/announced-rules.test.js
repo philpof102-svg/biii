@@ -313,5 +313,44 @@ t('★ une annonce sans regle vivante est NOMMEE, jamais sautee en silence', () 
   assert.match(c.cards[0].note, /pas un zero/);
 });
 
+/* ★ L'HORLOGE EST UNE ENTREE, ET ELLE ARRIVE PAR argv (`run-announced.js` ligne 19).
+ * MESURE DU 2026-08-15 AVANT CORRECTIF, horloge « hier soir », base reelle de 2785 tokens: chaque
+ * carte basculait de 📊 a ⏳ et le bulletin AFFIRMAIT
+ *     « 0 appel(s) resolu(s) depuis l annonce — sous les 20 requis, le bruit domine et aucune
+ *       conclusion ne se tire dans un sens ni dans l autre »
+ * alors que 863 appels etaient resolus. La phrase porte le costume de la prudence, et c'est
+ * exactement pour ca qu'elle ne se fait pas questionner. NaN rend toute comparaison fausse.
+ * Le jumeau `runPrequential` a sa propre porte dans test/prequential.test.js — corriger l'un sans
+ * l'autre laisserait la moitie publiante sans garde. */
+t('★ gradeAnnounced REFUSE une horloge illisible au lieu d affirmer « 0 resolu »', () => {
+  /* DEUX DIRECTIONS, mesurees le 2026-08-15: `Date.parse(42)` vaut 2041-12-31 (un nombre nu est lu
+   * comme une ANNEE) et `Date.parse(1786000000000)` vaut NaN (un vrai epoch-ms est refuse). Le NaN
+   * fait echouer FERME (« 0 resolu »), l annee 2042 fait echouer OUVERT (tout parait resolu, et le
+   * bulletin publie sa confiance maximale sur une date fabriquee). Un seul `Number.isFinite` ne
+   * couvrait que la premiere moitie — le tri par DIRECTION, applique a un parseur. */
+  for (const horloge of ['hier soir', '', null, undefined, '2026-13-45', {}, 42, 0, '42', 1786000000000, new Date('x')]) {
+    assert.throws(() => gradeAnnounced(faire(40, 10, 'XAV', 'rugged'), horloge,
+      { rules: [jouet], announced: annonce }),
+    /horloge illisible/,
+    'l horloge ' + JSON.stringify(String(horloge)) + ' doit etre REFUSEE: une horloge illisible '
+      + 'n est pas « maintenant », et « 0 resolu » est une affirmation sur le monde alors que le seul '
+      + 'fait etabli est qu on n a pas su lire son horloge.');
+  }
+});
+
+t('★ TEMOIN — une horloge lisible passe TOUJOURS, et note vraiment', () => {
+  /* ⛔ Sans ce temoin, une garde qui refuserait TOUT passerait le cas precedent en beaute. */
+  const rows = [...faire(30, 10, 'XAV', 'rugged'), ...faire(30, 11, 'ZAP', 'live')];
+  const opts = { rules: [jouet], announced: annonce };
+  const r = gradeAnnounced(rows, iso(T0 + 500 * H), opts).cards[0];
+  assert.ok((r.dangerResolved || 0) + (r.safeResolved || 0) > 0,
+    'la garde mord plus que la panne qu elle repare: 0 appel resolu avec une horloge VALIDE, et le '
+    + 'test de refus passerait quand meme');
+  // Les deux autres formes que l API documente doivent rester acceptees, sinon la garde a deborde.
+  const parDate = gradeAnnounced(rows, new Date(T0 + 500 * H), opts).cards[0];
+  assert.ok((parDate.dangerResolved || 0) + (parDate.safeResolved || 0) > 0, 'un objet Date reste valide');
+  assert.ok(gradeAnnounced(rows, '2026-08-15', opts).cards.length > 0, 'une date ISO SANS heure reste valide');
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exitCode = 1;

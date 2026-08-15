@@ -465,5 +465,40 @@ t('★ TEMOIN — la somme se referme: marchees + ecartees = ce qu on nous a don
     'une ligne doit etre dans exactement une des deux colonnes');
 });
 
+/* ★ L'HORLOGE EST UNE ENTREE, ET ELLE ARRIVE PAR argv (`run-prequential.js` ligne 17).
+ * MESURE DU 2026-08-15 AVANT CORRECTIF, horloge « hier soir », base reelle de 2785 tokens:
+ *     resolus a hier soir : 0  ·  non resolus : 2785        (reel: 2514 resolus)
+ *     fuites vers le futur : 0
+ * Ce dernier zero est le pire des deux: le controle d'INTEGRITE du protocole — la clause 4, celle
+ * que ce fichier attaque en tete — passait au VERT parce qu'il n'avait plus rien a mordre. NaN rend
+ * toute comparaison fausse, donc rien ne se resout, donc aucune fuite n'est trouvable.
+ * Le jumeau `gradeAnnounced` a sa propre porte dans test/announced-rules.test.js. */
+t('★ runPrequential REFUSE une horloge illisible au lieu de publier « 0 resolu »', () => {
+  /* DEUX DIRECTIONS, mesurees le 2026-08-15 — un seul `Number.isFinite` n'en attrape qu'une:
+   *   NaN  ('hier soir', un epoch-ms)  -> rien ne se resout   (echec FERME)
+   *   2042 (42, 0, '42')               -> TOUT se resout      (echec OUVERT, le pire des deux)
+   * `Date.parse(42)` vaut 2041-12-31 et `Date.parse(1786000000000)` vaut NaN: la valeur qui
+   * RESSEMBLE a un timestamp est refusee, celle qui n'a rien d'une date devient un instant. */
+  for (const horloge of ['hier soir', '', null, undefined, '2026-13-45', {}, 42, 0, '42', 1786000000000, new Date('x')]) {
+    assert.throws(() => runPrequential(jeu(), horloge, { rules: [{ key: 'x', label: 'x', predict: () => DANGER }] }),
+      /horloge illisible/,
+      'l horloge ' + JSON.stringify(String(horloge)) + ' doit etre REFUSEE: avec NaN rien ne se resout, '
+      + 'tout est compte OUVERT, et le bulletin AFFIRME « 0 resolu ». C est une phrase sur le monde, '
+      + 'alors que le seul fait etabli est qu on n a pas su lire son horloge.');
+  }
+});
+
+t('★ TEMOIN — une horloge lisible passe TOUJOURS, et resout vraiment', () => {
+  /* ⛔ Sans ce temoin, une garde qui refuserait TOUT passerait le cas precedent en beaute. On exige
+   * donc que la meme entree, avec une horloge valide, resolve encore quelque chose. */
+  const regle = { rules: [{ key: 'x', label: 'x', predict: () => DANGER }] };
+  const c = runPrequential(jeu(), iso(T0 + 500 * H), regle);
+  assert.ok(c.resolvedTotal > 0, 'la garde mord plus que la panne qu elle repare: 0 resolu avec une '
+    + 'horloge VALIDE, et le test de refus passerait quand meme');
+  // Les deux autres formes que l API documente doivent rester acceptees, sinon la garde a deborde.
+  assert.ok(runPrequential(jeu(), new Date(T0 + 500 * H), regle).resolvedTotal > 0, 'un objet Date reste valide');
+  assert.ok(runPrequential(jeu(), '2026-08-15', regle) !== null, 'une date ISO SANS heure reste valide');
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exitCode = 1;
