@@ -417,5 +417,53 @@ t('★ TEMOIN: une regle qui s abstient BEAUCOUP mais pas partout reste `trop-pe
   assert.strictEqual(c.verdict, 'trop-peu', 'et sous le plancher il reste trop-peu: ' + c.verdict);
 });
 
+/* ── LA BORNE QUI NE VOYAGEAIT PAS: LES LIGNES SANS DATE LISIBLE ──────────────────────────────────────
+ *
+ * `runPrequential` et `gradeAnnounced` commencent tous deux par ecarter les lignes dont `firstSeen`
+ * n'est pas parsable. Le retrait est CORRECT — une marche chronologique ne peut rien faire d'une ligne
+ * sans date. Mais son COMPTE n'etait publie nulle part: les lignes ecartees disparaissaient du
+ * denominateur, de l'historique de chaque prediction et de tout chiffre rendu, sans laisser de trace.
+ * Ce module ecrit lui-meme « La BORNE voyage avec le chiffre »; c'etait la seule qui ne voyageait pas.
+ *
+ * ⚖️ MESURE DU 2026-08-15 SUR LA BASE REELLE: 2775 lignes, 2775 datables, 0 ecartee. Le defaut est
+ * LATENT, pas vivant, et ce test le dit — mais un collecteur qui changerait de nom de champ demain
+ * ferait fondre la population sans qu'aucun chiffre publie ne bouge, et c'est ca qu'on rend visible. */
+const SANS_DATE = [
+  { firstSeen: 'pas-une-date' }, { firstSeen: '' }, { firstSeen: null }, {},
+];
+const AVEC_DATE = [
+  { firstSeen: iso(T0 + 1 * H), rug: false }, { firstSeen: iso(T0 + 2 * H), rug: false },
+];
+
+t('★ runPrequential COMPTE les lignes qu il ecarte, au lieu de les faire disparaitre', () => {
+  const r = runPrequential([...AVEC_DATE, ...SANS_DATE], iso(T0 + 500 * H));
+  assert.strictEqual(r.tokensWalked, AVEC_DATE.length, 'seules les datables sont marchees');
+  assert.strictEqual(r.tokensUndated, SANS_DATE.length,
+    'les 4 ecartees doivent etre COMPTEES: ' + r.tokensUndated);
+});
+
+t('★ gradeAnnounced — le JUMEAU publie la meme borne', () => {
+  const annonce = [{ key: 'p', label: 'p', announcedAt: iso(T0), predicted: {}, basis: {}, note: 'x' }];
+  const g = gradeAnnounced([...AVEC_DATE, ...SANS_DATE], iso(T0 + 500 * H), { announced: annonce });
+  assert.strictEqual(g.tokensAvailable, AVEC_DATE.length);
+  assert.strictEqual(g.tokensUndated, SANS_DATE.length,
+    'corriger une moitie et pas l autre laisserait la publiante sans sa borne');
+});
+
+t('★ TEMOIN — une base entierement datable rend 0, pas `null` ni undefined', () => {
+  const r = runPrequential(AVEC_DATE, iso(T0 + 500 * H));
+  assert.strictEqual(r.tokensUndated, 0, 'zero est ici une MESURE, pas une absence');
+  assert.strictEqual(typeof r.tokensUndated, 'number');
+  /* ⛔ Sans ce temoin, un `tokensUndated` toujours egal a `toutes.length` passerait le cas precedent. */
+  assert.strictEqual(r.tokensWalked, AVEC_DATE.length);
+});
+
+t('★ TEMOIN — la somme se referme: marchees + ecartees = ce qu on nous a donne', () => {
+  const entree = [...AVEC_DATE, ...SANS_DATE];
+  const r = runPrequential(entree, iso(T0 + 500 * H));
+  assert.strictEqual(r.tokensWalked + r.tokensUndated, entree.length,
+    'une ligne doit etre dans exactement une des deux colonnes');
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exitCode = 1;
