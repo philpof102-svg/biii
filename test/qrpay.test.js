@@ -144,5 +144,49 @@ t('⚖️ TEMOIN — un QR legitime reste ACCEPTE (le contrat n est pas « tout 
   assert.ok(!porteUnMeta(r.to) && /^[0-9]+$/.test(r.amountMicro), 'et rester interpolable');
 });
 
+/* ── ★ UN MONTANT DEMANDE ET ILLISIBLE NE DOIT PAS DEVENIR « PAS DE MONTANT » ────────────────────
+ * `receiveURI` gardait le montant par `Number(amountUsd) > 0`, ce qui faisait deux fautes OPPOSEES:
+ *   · il REJETAIT ce que notre propre parseur accepte — `usdToMicro` fait
+ *     String(usd).trim().replace(',', '.'), donc la virgule decimale francaise est geree depuis
+ *     toujours, mais Number('5,50') vaut NaN et la valeur n atteignait jamais ce parseur;
+ *   · il DEGRADAIT EN SILENCE — un montant illisible ne levait rien, on retombait sur l URI SANS
+ *     montant. Le commercant montre un QR qu il croit porteur de 5,50 $, le payeur scanne et doit
+ *     taper la somme lui-meme. Aucune erreur, aucune trace.
+ * MESURE DU 2026-08-15 avant correctif: '5,50' et '1_000' rendaient `ethereum:0x…@8453`.
+ * ⚖️ Le produit parle FRANCAIS (web/p2p.html: « Montant a envoyer en USDC »), et son chemin PAYEUR
+ * fait deja v.replace(',', '.'). Le meme probleme, corrige d un seul cote. */
+const SANS_MONTANT = new RegExp('^ethereum:0x[0-9a-f]{40}@' + CHAIN + '$');
+
+t('★ la virgule decimale francaise est un MONTANT, pas une absence de montant', () => {
+  const uri = receiveURI({ address: ALICE, amountUsd: '5,50' });
+  assert.ok(!SANS_MONTANT.test(uri), 'le montant a disparu du QR: ' + uri);
+  assert.match(uri, /&uint256=5500000$/, '5,50 doit valoir 5 500 000 micro-USDC: ' + uri);
+});
+
+t('★ un montant DEMANDE mais illisible LEVE, au lieu de rendre un QR ampute', () => {
+  for (const mauvais of ['1_000', 'Infinity', '1e6', '0x10', 'cinq', '5$', '-1', '0']) {
+    let uri = null;
+    try { uri = receiveURI({ address: ALICE, amountUsd: mauvais }); } catch (e) { continue; }
+    assert.fail('amountUsd=' + JSON.stringify(mauvais) + ' n a pas leve et a rendu ' + uri
+      + (SANS_MONTANT.test(uri) ? '\n      — le montant a ete SILENCIEUSEMENT abandonne: le porteur du '
+        + 'QR croit demander une somme, le payeur ne la voit jamais.' : ''));
+  }
+});
+
+t('⚖️ TEMOIN — ne RIEN demander rend toujours l URI sans montant (c est un cas legitime)', () => {
+  /* ⛔ Sans lui, une garde qui leverait sur TOUT satisferait le cas precedent et casserait le QR
+   * « adresse seule », qui est une fonctionnalite: le payeur saisit la somme. */
+  assert.match(receiveURI({ address: ALICE }), SANS_MONTANT);
+  assert.match(receiveURI({ address: ALICE, amountUsd: null }), SANS_MONTANT);
+  assert.match(receiveURI({ address: ALICE, amountUsd: '' }), SANS_MONTANT);
+  assert.match(receiveURI({ address: ALICE, amountUsd: '   ' }), SANS_MONTANT, 'des espaces = rien demande');
+});
+
+t('⚖️ TEMOIN — un montant ordinaire traverse toujours, virgule ou point', () => {
+  assert.match(receiveURI({ address: BOB, amountUsd: '12.50' }), /&uint256=12500000$/);
+  assert.match(receiveURI({ address: BOB, amountUsd: '12,50' }), /&uint256=12500000$/, 'les deux ecritures sont le MEME montant');
+  assert.match(receiveURI({ address: BOB, amountUsd: '  7  ' }), /&uint256=7000000$/, 'les espaces sont retires, pas la valeur');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
