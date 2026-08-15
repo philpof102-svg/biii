@@ -65,5 +65,84 @@ t('ROUND-TRIP: Alice\'s receive QR, scanned by Bob, resolves to Alice + the amou
   assert.equal(r.to, ALICE); assert.equal(r.amountUsd, '4.20');
 });
 
+/* ── ★ LE CONTRAT DONT LA PAGE DE PAIEMENT DEPEND, ET QUE RIEN N ENONCAIT ────────────────────────
+ * `web/p2p.html` construit l intent que le WALLET va signer en interpolant SANS ENCODER:
+ *     var uri = "ethereum:<USDC>@8453/transfer?address=" + p.to + "&uint256=" + amtMicro;
+ * C est sain aujourd hui, et uniquement grace a deux gardes qui vivent ICI: `to` passe par un
+ * /^0x[0-9a-fA-F]{40}$/ ancre, et `amountMicro` par /^\d+$/ avec BigInt > 0 (sinon null).
+ * Mesure du 2026-08-15: cablage verifie, lib/server.js sert bien parsePaymentQR sur le texte brut.
+ *
+ * ⚠️ AUCUN TEST NE LIAIT LES DEUX MODULES. Assouplir `isAddr` — accepter un nom ENS, un alias — est
+ * une demande de fonctionnalite banale, et elle rendrait la page injectable EN SILENCE: un `to`
+ * portant un `&` ajoute des parametres a l intent, donc le destinataire ou le montant que le wallet
+ * propose de SIGNER cessent d etre ceux que l ecran affiche (l ecran, lui, passe par esc()).
+ * Un chemin de paiement ne doit pas tenir par accident.
+ *
+ * ⚖️ LA PROPRIETE N EXIGE PAS LE REFUS: elle exige que **ce qui est ACCEPTE soit interpolable**.
+ * Une evolution peut elargir ce qui passe, tant que ce qui passe ne peut pas pirater l URI. */
+const META_URI = ['&', '?', '#', '=', '/', '%', ' ', '\n', '"', "'", '\\'];
+const porteUnMeta = (v) => META_URI.some((c) => String(v).indexOf(c) >= 0);
+
+const QR_HOSTILES = [
+  ALICE + '&uint256=999999999',
+  'ethereum:' + USDC_BASE + '@8453/transfer?address=' + ALICE + '%26uint256%3D9&uint256=1',
+  'ethereum:' + USDC_BASE + '@8453/transfer?address=' + ALICE + '&uint256=1&address=' + BOB,
+  'ethereum:' + USDC_BASE + '@8453/transfer?address=' + ALICE + '&uint256=1e6',
+  'ethereum:' + USDC_BASE + '@8453/transfer?address=' + ALICE + '&uint256=-1',
+  'ethereum:' + USDC_BASE + '@8453/transfer?address=' + ALICE + '&uint256=0x10',
+  'ethereum:' + USDC_BASE + '@8453/transfer?address=' + ALICE + ' &uint256=1',
+  'ethereum:' + USDC_BASE + '@8453/transfer?address=alice.eth&uint256=1',
+];
+
+t('★ CONTRE-BORNE — la batterie porte bien des valeurs qui INJECTERAIENT si rien ne gardait', () => {
+  /* Sans ce controle, une batterie de chaines anodines rendrait les cas suivants verts en n ayant
+   * rien attaque. On mesure sur la CHAINE SOURCE, avant tout parsing. */
+  const injectantes = QR_HOSTILES.filter((s) => porteUnMeta(s.slice(s.indexOf('address=') + 8)));
+  assert.ok(injectantes.length >= 5,
+    'seulement ' + injectantes.length + ' entree(s) portent un metacaractere apres `address=` — la '
+    + 'batterie n attaque pas assez pour que son resultat veuille dire quelque chose');
+});
+
+/* ⚠️ JETER N EST PAS VIOLER LA PROPRIETE, ET LES CONFONDRE AFFAIBLIT LE TEST.
+ * Mesure du 2026-08-15: en relachant la garde de montant, `parsePaymentQR` JETTE sur `uint256=1e6`
+ * (BigInt refuse la notation exponentielle). Ma premiere version laissait l exception remonter: les
+ * deux cas rougissaient, la boucle s arretait au 4e QR, et `0x10` — la VRAIE violation, un montant
+ * accepte qui n est pas fait de chiffres — n etait jamais atteint. Le test rougissait donc pour la
+ * mauvaise raison, et manquait la bonne.
+ * Une exception vaut REFUS (la route rend 500, la page dit « Validation indisponible » = fail-closed),
+ * donc on la compte comme telle et on CONTINUE la batterie. */
+const analyse = (s) => { try { return parsePaymentQR(s); } catch (e) { return { valid: false, jete: e.message }; } };
+
+t('★ tout QR ACCEPTE rend un `to` interpolable tel quel dans l intent EIP-681', () => {
+  for (const s of QR_HOSTILES) {
+    const r = analyse(s);
+    if (!r.valid) continue;                       // refuser est une facon valide de tenir le contrat
+    assert.ok(!porteUnMeta(r.to),
+      'QR accepte dont le `to` porte un metacaractere d URI: ' + JSON.stringify(r.to) + '\n      '
+      + 'la page l interpole SANS encoder — le wallet signerait autre chose que ce que l ecran montre.'
+      + '\n      QR: ' + JSON.stringify(s.slice(0, 90)));
+  }
+});
+
+t('★ tout QR ACCEPTE rend un `amountMicro` fait de CHIFFRES, ou null', () => {
+  for (const s of QR_HOSTILES) {
+    const r = analyse(s);
+    if (!r.valid || r.amountMicro == null) continue;
+    assert.match(String(r.amountMicro), /^[0-9]+$/,
+      'montant accepte non numerique: ' + JSON.stringify(r.amountMicro) + ' — il part dans l intent '
+      + 'que le wallet propose de signer.\n      QR: ' + JSON.stringify(s.slice(0, 90)));
+  }
+});
+
+t('⚖️ TEMOIN — un QR legitime reste ACCEPTE (le contrat n est pas « tout refuser »)', () => {
+  /* ⛔ Sans lui, un parseur qui refuserait absolument tout satisferait les cas ci-dessus en beaute,
+   * et la page ne pourrait plus jamais payer personne. */
+  const r = parsePaymentQR(receiveURI({ address: BOB, amountUsd: '7.25' }));
+  assert.equal(r.valid, true, 'un QR que NOUS produisons doit rester lisible');
+  assert.equal(r.to, BOB);
+  assert.equal(r.amountMicro, '7250000');
+  assert.ok(!porteUnMeta(r.to) && /^[0-9]+$/.test(r.amountMicro), 'et rester interpolable');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
