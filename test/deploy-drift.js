@@ -31,6 +31,38 @@
 const http = require('node:http');
 const { build } = require('../lib/server');
 
+/**
+ * chemins — l'ensemble des CHEMINS de cles, pas seulement le premier niveau.
+ *
+ * ⛔ POURQUOI CE N'EST PAS COSMETIQUE, ET LA MESURE QUI L'A PROUVE. Ce fichier comparait
+ * `Object.keys()` — le PREMIER NIVEAU seulement. Or `/health` porte deux objets imbriques
+ * (`collector`, `deployment`), et c'est LA que vivent les champs de divulgation. Mesure du
+ * 2026-08-16: un champ ajoute dans `collector.*` sur l'arbre local, absent en ligne, et ce
+ * detecteur imprimait « aucune derive de FORME detectee ». Le seul defaut qu'il existe pour voir
+ * lui echappait des qu'il descendait d'un cran.
+ *
+ * ⚡ ET CE N'EST PAS UNE HYPOTHESE: c'est exactement la derive constatee le MEME JOUR sur
+ * `avisradar` — cinq champs de fraicheur (`live.settlementsWindowStale`, `live.settlementsLagHours`,
+ * …) ECRITS dans le depot et ABSENTS de la reponse servie, tous imbriques d'un niveau. La prod y
+ * annoncait `status: "active"` sur une fenetre vieille de 5,5 h, sans un mot. Ce depot-ci porte le
+ * meme risque de forme; il porte desormais l'instrument qui le voit.
+ *
+ * ⚖️ BORNE: on descend dans les OBJETS, pas dans les TABLEAUX. Le contenu d'un tableau varie
+ * legitimement d'un environnement a l'autre (une liste vide en local, remplie en ligne, n'est pas
+ * une derive de code); un tableau est donc une FEUILLE — sa presence compte, jamais son contenu.
+ * `null` aussi est une feuille: un champ present valant null EST une information (« lu, rien a
+ * dire »), et sa cle doit compter.
+ */
+function chemins(o, prefixe = '', sortie = new Set()) {
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return sortie;
+  for (const [k, v] of Object.entries(o)) {
+    const chemin = prefixe ? prefixe + '.' + k : k;
+    sortie.add(chemin);
+    if (v && typeof v === 'object' && !Array.isArray(v)) chemins(v, chemin, sortie);
+  }
+  return sortie;
+}
+
 const DISTANT = process.env.BIII_LIVE_URL || 'https://biii-production.up.railway.app';
 const M = '0x' + 'ab'.repeat(20);
 
@@ -49,6 +81,21 @@ const get = async (url) => {
 (async () => {
   console.log('derive de deploiement — ce depot contre ' + DISTANT + ':\n');
 
+  /* ⚠️ LA REFERENCE LOCALE DOIT NAITRE DANS LA MEME BRANCHE D'ENVIRONNEMENT QUE LA PROD, sinon on
+   * compare deux mondes differents et le detecteur crie au loup. Mesure du 2026-08-16, au premier run
+   * apres le passage aux chemins imbriques: `deployment.note` sortait « ABSENT en ligne » — alors que
+   * ce champ n'existe QUE lorsque AUCUN marqueur de build n'est pose (lib/server.js:253). En local il
+   * n'y en a pas, en prod `RAILWAY_DEPLOYMENT_ID` existe: difference d'ENVIRONNEMENT, pas de CODE.
+   *
+   * ⛔ Et ce n'est pas un detail de confort: ce fichier documente deja, pour le CRLF, qu'une garde qui
+   * alarme en permanence se fait retirer — et avec elle la detection des VRAIES derives. On pose donc
+   * un marqueur synthetique pour que la branche prise ici soit celle de la prod.
+   *
+   * ⚖️ BORNE, dite: la branche SANS marqueur (`deployment.note`) n'est alors plus comparee. Elle est
+   * couverte par la suite hors-reseau, pas ici. */
+  const marqueurAvant = process.env.BIII_COMMIT;
+  process.env.BIII_COMMIT = 'sonde-derive';
+
   // 1) LA FORME ATTENDUE, produite par LE CODE DE CE DEPOT. Jamais recopiee.
   const local = build({ merchant: M, findPayment: async () => null });
   await new Promise((r) => local.listen(0, r));
@@ -59,12 +106,13 @@ const get = async (url) => {
    * GATE: ses trois codes (0 vert / 1 derive / 2 sonde muette) sont tout ce qu'il produit d'exploitable,
    * et 127 les ecrasait tous les trois. On pose `process.exitCode` et on laisse la boucle se vider. */
   await new Promise((r) => local.close(r));
+  if (marqueurAvant === undefined) delete process.env.BIII_COMMIT; else process.env.BIII_COMMIT = marqueurAvant;
 
   if (!ici.j) {
     console.log('  ECHEC: le serveur local n a pas rendu de /health lisible — rien a comparer.');
     process.exitCode = 1; return;
   }
-  const clesIci = Object.keys(ici.j).sort();
+  const clesIci = [...chemins(ici.j)].sort();
   console.log('  attendu (ce depot) : ' + clesIci.join(', '));
 
   // 2) CE QUE LE NOEUD PUBLIC REND.
@@ -76,7 +124,7 @@ const get = async (url) => {
     console.log('\n  ⚠️ AUCUNE CONCLUSION. Ne pas lire cette sortie comme « pas de derive ».');
     process.exitCode = 2; return;
   }
-  const clesLa = Object.keys(la.j).sort();
+  const clesLa = [...chemins(la.j)].sort();
   console.log('  servi   (en ligne) : ' + clesLa.join(', '));
 
   // 3) LA DERIVE.
