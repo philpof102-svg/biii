@@ -52,7 +52,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.aarna/atars-mcp",
-      "lastSeen": "2026-08-15T03:55:37.660Z"
+      "lastSeen": "2026-08-16T14:29:37.044Z"
     },
     "https://mcp.abmeter.ai": {
       "verdict": "unauditable",
@@ -61,7 +61,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.abmeter/abmeter",
-      "lastSeen": "2026-08-15T03:55:40.467Z"
+      "lastSeen": "2026-08-16T14:29:38.586Z"
     },
     "https://api.adadvisor.ai/mcp": {
       "verdict": "unauditable",
@@ -70,7 +70,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.adadvisor/mcp-server",
-      "lastSeen": "2026-08-15T03:55:43.822Z"
+      "lastSeen": "2026-08-16T14:29:41.154Z"
     },
     "https://mcp.adramp.ai": {
       "verdict": "unauditable",
@@ -79,7 +79,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.adramp/google-ads",
-      "lastSeen": "2026-08-15T03:55:47.109Z"
+      "lastSeen": "2026-08-16T14:29:44.528Z"
     },
     "https://api.adside.ai/mcp": {
       "verdict": "unauditable",
@@ -88,7 +88,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.adside/adside",
-      "lastSeen": "2026-08-15T03:55:48.137Z"
+      "lastSeen": "2026-08-16T14:29:45.561Z"
     },
     "https://mcp.adweave.ai/meta-ads-mcp": {
       "verdict": "unauditable",
@@ -97,7 +97,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.adweave/meta-ads-mcp",
-      "lastSeen": "2026-08-15T03:55:49.129Z"
+      "lastSeen": "2026-08-16T14:29:46.904Z"
     },
     "https://agentberg.ai/mcp": {
       "verdict": "unauditable",
@@ -106,7 +106,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agentberg/agentberg",
-      "lastSeen": "2026-08-15T03:55:53.136Z"
+      "lastSeen": "2026-08-16T14:29:49.419Z"
     },
     "https://api.agentdm.ai/api/v1/grid": {
       "verdict": "unauditable",
@@ -115,7 +115,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agentdm/agentdm",
-      "lastSeen": "2026-08-15T03:55:54.181Z"
+      "lastSeen": "2026-08-16T14:29:50.525Z"
     },
     "https://api.agentdm.ai/mcp/v1/grid": {
       "verdict": "unauditable",
@@ -124,7 +124,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agentdm/agentdm",
-      "lastSeen": "2026-08-15T05:56:55.557Z"
+      "lastSeen": "2026-08-16T14:29:51.420Z"
     },
     "https://api.agentic-news.ai/mcp": {
       "verdict": "unauditable",
@@ -133,7 +133,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agentic-news/mcp",
-      "lastSeen": "2026-08-15T05:56:56.656Z"
+      "lastSeen": "2026-08-16T14:29:52.520Z"
     },
     "https://agenticfabricationnetwork.ai/mcp": {
       "verdict": "answers",
@@ -142,7 +142,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agenticfabricationnetwork/ufp",
-      "lastSeen": "2026-08-15T05:56:59.905Z"
+      "lastSeen": "2026-08-16T14:29:58.767Z"
     },
     "https://api.agenticshelf.ai/m/graffeo/mcp": {
       "verdict": "unreachable",
@@ -151,7 +151,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agenticshelf/graffeo",
-      "lastSeen": "2026-08-15T05:57:01.152Z"
+      "lastSeen": "2026-08-16T14:29:59.837Z"
     },
     "https://api.agenticshelf.ai/mcp": {
       "verdict": "unreachable",
@@ -160,7 +160,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agenticshelf/mcp",
-      "lastSeen": "2026-08-15T05:57:02.044Z"
+      "lastSeen": "2026-08-16T14:30:00.693Z"
     },
     "https://api.agenticshelf.ai/m/puroair/mcp": {
       "verdict": "unreachable",
@@ -169,7 +169,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agenticshelf/puroair",
-      "lastSeen": "2026-08-15T05:57:02.923Z"
+      "lastSeen": "2026-08-16T14:30:01.540Z"
     },
     "https://mcp.agenticterminal.ai/mcp": {
       "verdict": "answers",
@@ -178,7 +178,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agenticterminal/directory",
-      "lastSeen": "2026-08-15T05:57:04.480Z"
+      "lastSeen": "2026-08-16T14:30:03.051Z"
     },
     "https://ai-akari.ai/mcp-trust": {
       "verdict": "high_risk",
@@ -722,7 +722,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agenticaffiliate/affiliate-networks-mcp",
-      "lastSeen": "2026-08-15T05:56:57.975Z"
+      "lastSeen": "2026-08-16T14:29:56.883Z"
     },
     "https://analyticslegends.ai/mcp": {
       "verdict": "answers",
@@ -740,7 +740,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.afmr/discovery",
-      "lastSeen": "2026-08-15T03:55:51.776Z"
+      "lastSeen": "2026-08-16T14:29:48.025Z"
     },
     "https://agentplaybooks.ai/api/mcp/manage": {
       "verdict": "answers",
@@ -857,7 +857,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.adoraads/beauty",
-      "lastSeen": "2026-08-15T03:55:45.075Z"
+      "lastSeen": "2026-08-16T14:29:42.432Z"
     },
     "https://mcp.adplane.ai": {
       "verdict": "unauditable",
@@ -866,7 +866,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.adplane/google-ads",
-      "lastSeen": "2026-08-15T03:55:46.079Z"
+      "lastSeen": "2026-08-16T14:29:43.450Z"
     },
     "https://actwise.ai/ideation/mcp/v1": {
       "verdict": "unauditable",
@@ -875,7 +875,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.actwise/ideation",
-      "lastSeen": "2026-08-15T03:55:42.423Z"
+      "lastSeen": "2026-08-16T14:29:40.009Z"
     },
     "https://ai-media-studio.b77.ai/mcp": {
       "verdict": "unauditable",
@@ -1022,5 +1022,5 @@
       "lastSeen": "2026-08-16T10:26:51.565Z"
     }
   },
-  "offset": 7
+  "offset": 27
 }
