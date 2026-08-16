@@ -189,7 +189,7 @@
       ],
       "wantsSecret": [],
       "name": "ai.ai-akari/agent-trust-receipt",
-      "lastSeen": "2026-08-15T05:57:14.767Z"
+      "lastSeen": "2026-08-16T16:31:16.142Z"
     },
     "https://ai-akari.ai/mcp": {
       "verdict": "high_risk",
@@ -200,7 +200,7 @@
       ],
       "wantsSecret": [],
       "name": "ai.ai-akari/one-minute-akari",
-      "lastSeen": "2026-08-15T05:57:16.598Z"
+      "lastSeen": "2026-08-16T16:31:18.044Z"
     },
     "https://www.ai-portal.ai/mcp": {
       "verdict": "answers",
@@ -209,7 +209,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.ai-portal/ai-portal",
-      "lastSeen": "2026-08-15T05:57:17.971Z"
+      "lastSeen": "2026-08-16T16:31:19.459Z"
     },
     "https://aient.ai/mcp": {
       "verdict": "unauditable",
@@ -218,7 +218,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.aient/mcp",
-      "lastSeen": "2026-08-15T05:57:19.027Z"
+      "lastSeen": "2026-08-16T16:31:20.560Z"
     },
     "https://mcp.airshelf.ai/mcp": {
       "verdict": "answers",
@@ -227,7 +227,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.airshelf/catalog",
-      "lastSeen": "2026-08-15T05:57:21.390Z"
+      "lastSeen": "2026-08-16T16:31:22.647Z"
     },
     "https://api.aisecuritygateway.ai/mcp": {
       "verdict": "unauditable",
@@ -245,7 +245,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.alphacreek/alphacreek-mcp",
-      "lastSeen": "2026-08-15T07:58:13.181Z"
+      "lastSeen": "2026-08-16T16:31:25.392Z"
     },
     "https://mcp.alpic.ai": {
       "verdict": "unauditable",
@@ -254,7 +254,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.alpic.mcp/alpic-mcp",
-      "lastSeen": "2026-08-15T07:58:14.481Z"
+      "lastSeen": "2026-08-16T16:31:26.528Z"
     },
     "https://test.alpic.ai/": {
       "verdict": "unreachable",
@@ -263,7 +263,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.alpic.test/test-mcp-server",
-      "lastSeen": "2026-08-15T07:58:15.343Z"
+      "lastSeen": "2026-08-16T16:31:27.326Z"
     },
     "https://mcp.ambix.ai": {
       "verdict": "unauditable",
@@ -272,7 +272,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.ambix/ambix",
-      "lastSeen": "2026-08-15T07:58:16.433Z"
+      "lastSeen": "2026-08-16T16:31:29.503Z"
     },
     "https://mcp.anomalyarmor.ai/mcp": {
       "verdict": "unauditable",
@@ -281,7 +281,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.anomalyarmor/armor-mcp",
-      "lastSeen": "2026-08-15T07:58:19.098Z"
+      "lastSeen": "2026-08-16T16:31:32.323Z"
     },
     "https://api-v2.appdeploy.ai/mcp": {
       "verdict": "unauditable",
@@ -290,7 +290,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.appdeploy/deploy-app",
-      "lastSeen": "2026-08-15T07:58:20.121Z"
+      "lastSeen": "2026-08-16T16:31:33.869Z"
     },
     "https://arclan.ai/mcp": {
       "verdict": "answers",
@@ -299,7 +299,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.arclan/registry",
-      "lastSeen": "2026-08-15T07:58:21.363Z"
+      "lastSeen": "2026-08-16T16:31:35.733Z"
     },
     "https://argushq.ai/api/mcp": {
       "verdict": "answers",
@@ -726,12 +726,12 @@
     },
     "https://analyticslegends.ai/mcp": {
       "verdict": "answers",
-      "tools": 17,
-      "names": "count_firms_by,find_opportunities,find_sap_clients,get_concept,get_concept_card,get_day_rate_benchmark,get_firm,get_firm_intel,get_sap_client_profile,get_study,list_firm_kinds,list_sap_modules,list_studies,query_knowledge_graph,search_concepts,search_firms,search_news",
+      "tools": 20,
+      "names": "count_firms_by,find_academy_modules,find_opportunities,find_sap_clients,get_academy_module,get_concept,get_concept_card,get_day_rate_benchmark,get_firm,get_firm_intel,get_sap_client_profile,get_study,list_firm_kinds,list_freelance_platforms,list_sap_modules,list_studies,query_knowledge_graph,search_concepts,search_firms,search_news",
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.analyticslegends/sap-analytics",
-      "lastSeen": "2026-08-15T07:58:17.806Z"
+      "lastSeen": "2026-08-16T16:31:30.998Z"
     },
     "https://afmr.ai/api/rpc": {
       "verdict": "answers",
@@ -749,7 +749,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agentplaybooks/agentplaybooks",
-      "lastSeen": "2026-08-15T05:57:11.449Z"
+      "lastSeen": "2026-08-16T16:31:13.570Z"
     },
     "https://mcp.atlaso.ai/mcp": {
       "verdict": "unauditable",
@@ -767,7 +767,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.ai-advisors/mcp",
-      "lastSeen": "2026-08-15T05:57:12.932Z"
+      "lastSeen": "2026-08-16T16:31:14.782Z"
     },
     "https://mcp.goji.agency/mcp": {
       "verdict": "answers",
@@ -785,7 +785,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agentlookups/counterscript",
-      "lastSeen": "2026-08-15T05:57:05.833Z"
+      "lastSeen": "2026-08-16T16:31:07.288Z"
     },
     "https://env.agentlookups.ai/mcp": {
       "verdict": "answers",
@@ -794,7 +794,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agentlookups/groundtruth",
-      "lastSeen": "2026-08-15T05:57:07.307Z"
+      "lastSeen": "2026-08-16T16:31:08.754Z"
     },
     "https://overassessed.agentlookups.ai/mcp": {
       "verdict": "answers",
@@ -803,7 +803,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agentlookups/overassessed",
-      "lastSeen": "2026-08-15T05:57:08.755Z"
+      "lastSeen": "2026-08-16T16:31:10.277Z"
     },
     "https://contractors.agentlookups.ai/mcp": {
       "verdict": "answers",
@@ -812,7 +812,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agentlookups/plumbline",
-      "lastSeen": "2026-08-15T05:57:10.187Z"
+      "lastSeen": "2026-08-16T16:31:11.839Z"
     },
     "https://mcp.aivonic.ai": {
       "verdict": "unauditable",
@@ -821,7 +821,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.aivonic/mcp",
-      "lastSeen": "2026-08-15T05:57:22.341Z"
+      "lastSeen": "2026-08-16T16:31:23.691Z"
     },
     "https://arketo.ai/api/mcp": {
       "verdict": "unauditable",
@@ -1022,5 +1022,5 @@
       "lastSeen": "2026-08-16T10:26:51.565Z"
     }
   },
-  "offset": 27
+  "offset": 47
 }
