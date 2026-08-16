@@ -1,6 +1,6 @@
 {
-  "updatedAt": "2026-08-16T09:27:30.993Z",
-  "tokensTracked": 2794,
+  "updatedAt": "2026-08-16T10:29:46.303Z",
+  "tokensTracked": 2801,
   "rugsObserved": 2095,
   "warnedBeforeTheRug": 1546,
   "ofWhichStrong": 901,
@@ -32,7 +32,7 @@
   "verdictsWithoutBasis": 0,
   "preBasisRows": 214,
   "armedPowersObserved": 67,
-  "basisRecorded": 2580,
-  "ownerStateReadable": 357,
+  "basisRecorded": 2587,
+  "ownerStateReadable": 358,
   "note": "warnRate = share of observed rugs carrying ANY warning at first sight; strongRate = share we called rug_ready or high_risk. Both are published because they say different things: a caution that rugs means the warning was there but too quiet to act on. abstained = rugs we had called unknown, which is honest but useless to a buyer. missedOutright = rugs we had called clean, the only truly damaging error — but read cleanVerdictsEmitted first: at 0 clean verdicts ever given, a 0 there is trivial rather than earned. THE PRECISION FIGURES: there are two and neither may be quoted alone. A strong call on a token that has not rugged is not an error yet, it is OPEN (strongCallsOpen) — rugs resolve in about an hour while a false alarm only proves itself by surviving maturityWindowHours, so counting every live flag as a miss permanently depressed the number with calls that had not had time to answer. strongPrecisionResolved grades only the calls whose outcome is known and is therefore optimistic; strongPrecisionWorstCase assumes every open call is wrong and is therefore pessimistic. The truth is between them, and it moves as the open ones resolve. A buyer acting today should read the worst case."
 }
