@@ -34,7 +34,8 @@
     "test:chain": "node test/e2e-real-chain.test.js",
     "test:schema": "node test/schema-drift.js",
     "test:deploy": "node test/deploy-drift.js",
-    "test:total": "node test/suite-total.js"
+    "test:total": "node test/suite-total.js",
+    "test:publish": "node test/publish-is-possible.js"
   },
   "dependencies": {
     "trust-core": "file:./vendor/trust-core"

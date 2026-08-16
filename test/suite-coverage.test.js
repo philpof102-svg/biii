@@ -51,6 +51,17 @@ const EXCLUS = new Map([
     + 'le premier jour. Trois codes: 0 meme forme, 1 derive, 2 sonde muette (une panne de sonde ne doit '
     + 'jamais se lire comme un vert). Lance par `npm run test:deploy`, a faire tourner AVANT et APRES '
     + 'chaque deploiement.'],
+  ['publish-is-possible.js',
+    'interroge le REGISTRE npm en direct. Meme raison que les trois au-dessus: une dependance reseau dans '
+    + 'la suite la rend rouge pour des motifs qui ne sont pas le code. Sa question est la PRECONDITION de '
+    + 'toutes les autres: « ce qui est corrige ici peut-il seulement atteindre quelqu\'un ? ». npm REFUSE de '
+    + 'republier une version existante, donc quand la version locale EGALE la publiee alors que des fichiers '
+    + 'de `files` ont change, chaque correctif est enferme — et rien ne le dit, puisque le registre annonce '
+    + 'la meme version que le depot, ce qui se lit « a jour ». Mesure du 2026-08-16 qui l\'a fait naitre: '
+    + 'biii-mcp 0.2.1 publie le 27/07, version locale AUSSI 0.2.1, et 464 commits sur des chemins expedies '
+    + 'depuis — dont 159 de CODE, le reste etant les commits horaires de la base d\'observations, comptes a '
+    + 'part pour que le nombre porte sa composition. Trois codes: 0 publier est possible, 1 BLOQUE, 2 sonde '
+    + 'muette. Lance par `npm run test:publish`, a faire tourner avant de croire qu\'un correctif est distribue.'],
   ['suite-total.js',
     'lance `npm test` lui-meme pour en additionner les bilans: l\'inclure dans la suite ferait tourner la '
     + 'suite entiere a l\'interieur de la suite. Il repare le fait que le total etait compte a la main et '
