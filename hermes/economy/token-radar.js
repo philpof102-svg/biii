@@ -143,7 +143,67 @@ function getJSON(url) {
 }
 
 const readJSON = (f, fb) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return fb; } };
-const writeJSON = (f, v) => fs.writeFileSync(f, JSON.stringify(v, null, 2) + '\n');
+
+/* ⛔ « ABSENT » ET « ILLISIBLE » NE SONT PAS LA MEME CHOSE POUR UNE BASE QU'ON VA REECRIRE.
+ * `readJSON(f, {})` est juste pour un fichier qui n'existe pas encore (premier run) et FAUX pour un
+ * fichier present mais dechire: le radar repart alors de zero et son `writeJSON` remplace ~2 800
+ * tokens — 2 095 rugs, 1 471 traces de financeurs — par une base de quelques entrees, parfaitement
+ * VALIDE. Mesure du 2026-08-16 (encadre 224): un garde de monotonie a du etre pose dans le
+ * committeur pour attraper cet effacement en aval; celui-ci l'empeche a la SOURCE. */
+const readJSONStrict = (f, fb, quoi) => {
+  let brut;
+  try { brut = fs.readFileSync(f, 'utf8'); }
+  catch (e) {
+    if (e && e.code === 'ENOENT') return fb;    // absent = premier run, le seul cas ou le repli est vrai
+    throw new Error('[token-radar] REFUS: ' + quoi + ' (' + f + ') illisible: ' + e.message
+      + '. Repartir d une base vide ECRASERAIT l historique au prochain writeJSON.');
+  }
+  try { return JSON.parse(brut); }
+  catch (e) {
+    throw new Error('[token-radar] REFUS: ' + quoi + ' (' + f + ') ne parse pas: ' + e.message
+      + ' (' + brut.length + ' octets lus). Une base dechiree lue comme VIDE serait reecrite comme vide '
+      + '— on s arrete, le prochain run reprendra sur le fichier intact.');
+  }
+};
+
+/* ⛔ ECRITURE ATOMIQUE: temporaire + rename, AVEC REPRISE — et la reprise n'est pas de la prudence
+ * decorative, elle a ete mesuree.
+ *
+ * MESURE DU 2026-08-16, banc a DEUX PROCESSUS (un ecrivain en boucle, un lecteur SEPARE), base de
+ * 9,3 Mo, ~45 reecritures en 6 s:
+ *     writeFileSync direct   -> 10 lectures DECHIREES sur 47 (1 fichier vide, 9 JSON tronques)
+ *     tmp + rename nu        -> l'ecrivain PLANTE: EPERM sur rename (Windows refuse de remplacer une
+ *                               destination qu'un autre processus tient ouverte)
+ *     tmp + rename + reprise -> 44 lectures, 0 dechiree, 0 abandon
+ *
+ * ⚠️ Le premier banc (lecteur et ecrivain dans le MEME processus) rendait 0 dechirure pour les DEUX
+ * helpers: sans deux processus, il n'y a pas de course a atteindre. Un instrument qui ne discrimine
+ * pas aurait valide n'importe quoi.
+ *
+ * ⛔ ON N'A PAS DE REPLI SUR L'ECRITURE DIRECTE. Si le rename ne passe toujours pas apres 2 s, on
+ * ABANDONNE en laissant l'ANCIEN fichier intact et on jette: retomber sur `writeFileSync` rouvrirait
+ * exactement la fenetre qu'on ferme, et une base d'observations gardee une heure de plus coute
+ * infiniment moins qu'une base dechiree publiee. Le `.tmp` porte le PID: deux runs concurrents ne se
+ * marchent pas dessus, et le tmp abandonne est nettoye par celui qui l'a ecrit. */
+const writeJSON = (f, v) => {
+  const tmp = f + '.' + process.pid + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(v, null, 2) + '\n');
+  const debut = Date.now();
+  for (;;) {
+    try { fs.renameSync(tmp, f); return; }
+    catch (e) {
+      const verrou = e && (e.code === 'EPERM' || e.code === 'EACCES' || e.code === 'EBUSY');
+      if (!verrou || Date.now() - debut > 2000) {
+        try { fs.unlinkSync(tmp); } catch { /* le tmp porte notre pid */ }
+        throw new Error('[token-radar] REFUS: impossible de remplacer ' + f + ' de facon atomique ('
+          + (e && e.code) + '). L ANCIEN fichier est INTACT — aucune ecriture directe en repli, ce '
+          + 'serait rouvrir la fenetre 0-octet. Le prochain run reprendra.');
+      }
+      const t = Date.now() + 15;
+      while (Date.now() < t) { /* attente courte, synchrone comme le reste de ce payload */ }
+    }
+  }
+};
 const pct = (n) => Math.round(n * 100) + '%';
 const usd = (n) => '$' + Math.round(n).toLocaleString('en-US');
 
@@ -272,7 +332,9 @@ function recordBlackout(db, nowIso) {
 
 (async () => {
   fs.mkdirSync(DB_DIR, { recursive: true });
-  const db = readJSON(TOKENS, {});
+  /* La base d'observations est la SEULE lecture dont le repli serait destructeur: elle est reecrite
+   * en fin de run. Les autres (`blackouts`, `scorecard`) sont recalculees, pas foldees sur elles-memes. */
+  const db = readJSONStrict(TOKENS, {}, 'la base d observations');
   const now = new Date().toISOString();
   const blackout = recordBlackout(db, now);
   const lines = [];
