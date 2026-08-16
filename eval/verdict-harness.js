@@ -122,7 +122,23 @@ const CASES = [
   { name: 'non-finite score never clears', label: 'failclosed',
     run: () => triangle({ score: NaN }, null, null), ok: (v) => v.payable === false },
 
+  /* ⛔ LA PAIRE-FRONTIERE DU PLANCHER PAR DEFAUT — ajoutee le 2026-08-16 apres une mutation qui a
+   * traverse tout le harnais: `minScore = 40 -> 10` dans lib/trust.js, et `--check` repondait encore
+   * « gates hold, policy.json matches current behavior ». Cause: les deux cas de plancher existants
+   * passent `{ minScore: 40 }` EXPLICITEMENT — ils prouvent « le plancher marche quand on demande
+   * 40 », jamais « le plancher EST 40 quand on ne demande rien ». Or l'appelant reel
+   * (bin/biii-mcp.js:576, till_trust) ne passe AUCUNE option: le DEFAUT est le plancher expedie, et
+   * il n'etait epingle nulle part — le `minScoreDefault: 40` de policy.json etait un litteral recopie,
+   * pas une mesure. Ces deux cas au DEFAUT (aucun opts) le transforment en mesure: 39 refuse / 40
+   * paie, donc tout deplacement du plancher fait basculer l'un des deux — vers le bas c'est le cas
+   * failclosed qui rougit (porte DURE), vers le haut c'est le positif, rattrape par le DRIFT de
+   * policy.json en mode --check (la porte positive est advisory, la derive de l'artefact ne l'est pas). */
+  { name: 'score 39 with the DEFAULT floor: weak, not payable — pins the shipped floor from below', label: 'failclosed',
+    run: () => triangle({ decision: 'PROCEED', score: 39 }, null, null), ok: (v) => v.payable === false },
+
   // ── POSITIVES: clean cases should pass (soft) ──
+  { name: 'score 40 with the DEFAULT floor: payable — pins the shipped floor from above', label: 'positive',
+    run: () => triangle({ decision: 'PROCEED', score: 40 }, null, null), ok: (v) => v.payable === true },
   { name: 'PROCEED at/above floor is trusted & payable', label: 'positive',
     run: () => triangle({ decision: 'PROCEED', score: 71 }, null, null, { minScore: 40 }), ok: (v) => v.payable === true },
   { name: 'proven standing alone is trusted & payable', label: 'positive',
@@ -229,6 +245,8 @@ function buildPolicy(r) {
     artifact: 'biii-verdict-policy',
     generatedFrom: 'lib/trust.assessTriangle + lib/asset.assessAsset',
     policy: {
+      /* Litteral, mais desormais TEMOIGNE: la paire-frontiere 39/40 au DEFAUT (aucun opts) fait de ce
+       * chiffre une mesure — le deplacer fait rougir une porte ou deriver cet artefact. */
       minScoreDefault: 40,
       reputationClassification: r.repSnapshot,               // decision → status, as the CODE decides it
       overrideRule: 'reputation.status==="unsafe" forces trust="unsafe" and payable=false, over any other green',
