@@ -20,9 +20,12 @@
  * Run: node test/commit-radar-data.test.js
  */
 const assert = require('node:assert');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 /* Requérir ce fichier ne doit lancer AUCUNE commande git — c'est la seule façon de tester un committeur
  * sans en devenir un. Si ce require avait un effet de bord, le test le déclencherait à chaque suite. */
-const { classer, DATA_PATHS } = require('../scripts/commit-radar-data.js');
+const { classer, valider, DATA_PATHS } = require('../scripts/commit-radar-data.js');
 
 let pass = 0, fail = 0;
 const t = (n, fn) => { try { fn(); pass++; console.log('  ✓ ' + n); } catch (e) { fail++; console.log('  ✗ ' + n + '\n      ' + (e && e.message)); } };
@@ -76,6 +79,66 @@ t('LES DEUX BORNES: un arbre où seuls les fichiers listés bougent ne refuse ri
   const r = classer(DATA_PATHS.map((f) => m(f)), DATA_PATHS);
   assert.strictEqual(r.duCode.length + r.nouvellesDonnees.length, 0);
   assert.strictEqual(r.aCommiter.length, DATA_PATHS.length);
+});
+
+/* ── valider — la fenêtre 0-octet du writer ne doit jamais atteindre un commit ──────────────────────
+ *
+ * Mesuré le 2026-08-16: `token-radar.js` réécrit `tokens.json` (3,3 Mo) par writeFileSync DIRECT, et
+ * 2 lectures sur 30 tombent sur un fichier de ZÉRO octet. Avant `valider`, le committeur horaire pris
+ * dans cette fenêtre commitait la base déchirée TELLE QUELLE (prouvé en bac à sable: exit 0, message
+ * « could not be summarised — committing the files as they are ») — et `--push` l'aurait publiée.
+ * Ces cas écrivent de VRAIS fichiers: `valider` lit le disque, pas une fixture en mémoire. */
+
+const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'biii-valider-'));
+const pose = (rel, contenu) => {
+  const abs = path.join(TMP, rel);
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  if (contenu !== null) fs.writeFileSync(abs, contenu);
+  return rel;
+};
+
+t('valider: un tokens.json de ZÉRO octet CASSE le lot — la fenêtre mesurée du writer', () => {
+  const f = pose('data/token-radar/tokens.json', '');
+  const r = valider([f], TMP);
+  assert.strictEqual(r.length, 1, 'le fichier vide doit être signalé');
+  assert.strictEqual(r[0].file, f);
+  assert.ok(r[0].why.length > 0, 'le refus porte sa cause');
+});
+
+t('valider: un JSON DÉCHIRÉ (écriture interrompue) casse le lot aussi', () => {
+  const f = pose('data/token-radar/scorecard.json', '{"a": {"outcome": "rug');
+  assert.strictEqual(valider([f], TMP).length, 1);
+});
+
+t('valider: un fichier du lot DISPARU casse le lot — le radar ne supprime jamais sa base', () => {
+  const r = valider(['data/token-radar/absent.json'], TMP);
+  assert.strictEqual(r.length, 1);
+});
+
+t('valider TÉMOIN: un lot entièrement valide passe sans bruit', () => {
+  const a = pose('data/token-radar/ok-tokens.json', '{"0xd": {"outcome": "rugged"}}\n');
+  const b = pose('data/token-radar/ok-blackouts.json', '[]\n');
+  assert.deepStrictEqual(valider([a, b], TMP), []);
+});
+
+t('valider BORNE: un .log de zéro octet est LÉGAL — seuls les .json sont jugés', () => {
+  /* fleet-refusals.log vide veut dire « aucun refus », pas « fichier déchiré ». Le juger casserait le
+   * committeur en permanence sur un état parfaitement sain. */
+  const f = pose('data/fleet-refusals.log', '');
+  assert.deepStrictEqual(valider([f], TMP), []);
+});
+
+t('valider est CÂBLÉ dans le flux, avant le staging — pas seulement exporté', () => {
+  /* Un garde exporté mais jamais appelé est le motif « canonical-helper-weaker-copy ». On lit la source:
+   * l'appel doit exister entre le calcul de `changed` et le `git add`. Fragile au renommage — c'est
+   * voulu: renommer ce garde doit faire relire ce test. */
+  const src = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'commit-radar-data.js'), 'utf8');
+  const iChanged = src.indexOf('const changed = tracked.filter');
+  const iValider = src.indexOf('valider(changed, ROOT)');
+  const iAdd = src.indexOf("git('add'");
+  assert.ok(iChanged > 0 && iValider > 0 && iAdd > 0, 'les trois repères existent');
+  assert.ok(iChanged < iValider && iValider < iAdd, 'valider court APRÈS le tri du lot et AVANT le staging');
+  assert.ok(/refuse\(/.test(src.slice(iValider, iValider + 600)), 'un lot cassé se REFUSE, il ne se journalise pas');
 });
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

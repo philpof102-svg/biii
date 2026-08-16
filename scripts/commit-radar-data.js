@@ -26,6 +26,7 @@
 
 const { execFileSync } = require('node:child_process');
 const path = require('node:path');
+const fs = require('node:fs');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -97,10 +98,45 @@ function refuse(why) {
   process.exit(1);
 }
 
+/**
+ * valider — chaque .json du lot doit se parser AVANT d'etre commite.
+ *
+ * ⚠️ LA FENETRE QUE CE GARDE FERME, mesuree le 2026-08-16: `token-radar.js` reecrit `tokens.json`
+ * (3,3 Mo) par un `writeFileSync` DIRECT — ni fichier temporaire, ni rename. Pendant la reecriture,
+ * 2 lectures sur 30 voient un fichier de ZERO octet. Ce committeur tourne toutes les heures sur la
+ * meme machine: tombe dans la fenetre, il commitait la base dechiree TELLE QUELLE — le catch du
+ * resume disait « could not be summarised — committing the files as they are », la divulgation
+ * existait et la DECISION l'ignorait. Avec `--push`, le deploiement suivant servait une base VIDE
+ * comme verite mesuree. Prouve en bac a sable avant ce garde: commit `radar: observation database —
+ * (the database could not be summarised…)` sur un tokens.json de 0 octet, exit 0.
+ *
+ * Refuser est le bon geste PARCE QUE l'etat est transitoire: le prochain run horaire commite
+ * l'ecriture finie. Une suppression (ENOENT sur un fichier du lot) refuse aussi — le radar ne
+ * supprime jamais sa base, une disparition est une alarme, pas un lot a publier.
+ *
+ * ⚖️ BORNE, dite plutot que cachee: le fichier peut encore se dechirer ENTRE cette validation et le
+ * `git add` quelques millisecondes plus tard. Ce garde retrecit la fenetre d'« une heure entiere »
+ * a « quelques ms », il ne la ferme pas — seul tmp+rename dans l'ECRIVAIN la fermerait, et
+ * l'ecrivain est epingle par sha256 (le corriger est un geste d'operateur, pas d'audit).
+ * Les fichiers non-.json (`fleet-refusals.log`) ne sont pas juges: un log texte de 0 octet est legal.
+ */
+function valider(files, root) {
+  const casses = [];
+  for (const f of files) {
+    if (!String(f).endsWith('.json')) continue;
+    try {
+      JSON.parse(fs.readFileSync(path.join(root, f), 'utf8'));
+    } catch (e) {
+      casses.push({ file: f, why: String((e && e.message) || e).split('\n')[0] });
+    }
+  }
+  return casses;
+}
+
 /* Exporte AVANT le flux, et le flux ne s'execute qu'en lancement direct. Un `return` au niveau module est
  * legal en CommonJS (le module est enveloppe dans une fonction), donc requerir ce fichier depuis un test
  * ne lance AUCUNE commande git — ce qui est la seule facon de tester un committeur sans en devenir un. */
-module.exports = { classer, DATA_PATHS };
+module.exports = { classer, valider, DATA_PATHS };
 if (require.main !== module) return;
 
 // ── 1. is the tree in a state an unattended script may act on? ─────────────────
@@ -162,6 +198,17 @@ if (!changed.length) {
   process.exit(0);
 }
 
+// ── 2b. does every file in the lot ACTUALLY PARSE? ────────────────────────────
+const casses = valider(changed, ROOT);
+if (casses.length) {
+  refuse('data file(s) in this lot do NOT parse — the radar is most likely rewriting them RIGHT NOW'
+    + ' (writeFileSync with no tmp+rename leaves a zero-byte window; measured 2 reads of 30):\n         '
+    + casses.map((c) => c.file + '  (' + c.why + ')').join('\n         ')
+    + '\n         Committing now would publish a torn database as the truth. This state is transient:'
+    + '\n         the next hourly run commits the finished write. If it persists across runs, a human'
+    + '\n         needs to look at the file, not a script.');
+}
+
 // ── 3. describe the change in terms someone reading the log will understand ───
 let summary = '';
 try {
@@ -172,7 +219,12 @@ try {
   const newest = rows.reduce((m, r) => Math.max(m, Date.parse(r.lastSeen || 0) || 0), 0);
   summary = rows.length + ' tokens · ' + rugs + ' rugs · ' + funded + ' with a traced funder'
     + (newest ? ' · newest observation ' + new Date(newest).toISOString() : '');
-} catch { summary = '(the database could not be summarised — committing the files as they are)'; }
+} catch {
+  /* Reachable only when tokens.json is NOT part of this lot (absent, or being rewritten while only
+   * scorecard/blackouts commit): every file IN the lot passed `valider` above. The lot is sound;
+   * only the human-facing summary is unavailable. */
+  summary = '(tokens.json unreadable right now and not in this lot — the lot itself was validated)';
+}
 
 console.log('branch      ' + branch);
 console.log('changed     ' + changed.join(', '));
