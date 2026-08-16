@@ -13,7 +13,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const assert = require('node:assert');
-const { lookup, STALE_HOURS, _clearCache } = require('../lib/funder-history');
+const { lookup, readingFor, STALE_HOURS, _clearCache } = require('../lib/funder-history');
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'biii-funder-'));
 const H = 3600000;
@@ -184,6 +184,75 @@ t('une base illisible n est PAS mise en cache — un fichier repare doit etre re
   assert.strictEqual(lookup(PAYEUR, { dbPath: p }).verdict, 'database_unreadable');
   fs.writeFileSync(p, JSON.stringify({ t1: { funder: PAYEUR, lastSeen: new Date().toISOString(), outcome: 'live' } }));
   assert.strictEqual(lookup(PAYEUR, { dbPath: p }).verdict, 'funder_unseen', 'la reparation doit etre vue');
+});
+
+/* ── readingFor — l export consomme par le chemin PAYANT, et il n avait AUCUN cas ─────────────────────
+ * Mesure du 2026-08-16: zero occurrence de `readingFor` dans ce fichier alors que `lib/meme.js` le
+ * consomme pour `till_vet_meme` (route MCP + jumelle payante). `lookup` etait couvert absent/0 octet/
+ * tronque/sain — son frere servi aux memes enjeux ne l etait pas: untested-export-silent-break. */
+
+const JETON = '0x' + 'ab'.repeat(20);
+console.log('\nreadingFor serves four states, and the paid path leans on every one of them:');
+
+t('readingFor: base ABSENTE -> no_database, l etat NORMAL d un noeud neuf', () => {
+  _clearCache();
+  const r = readingFor(JETON, { dbPath: path.join(TMP2, 'jamais-ecrit.json') });
+  assert.strictEqual(r.state, 'no_database');
+  assert.strictEqual(r.siblingCount, null);
+  assert.match(r.detail, /NORMAL state/);
+});
+
+t('readingFor: base de ZERO octet -> unreadable, jamais confondue avec un demarrage a froid', () => {
+  _clearCache();
+  const r = readingFor(JETON, { dbPath: ecrire('rf-vide.json', '') });
+  assert.strictEqual(r.state, 'unreadable');
+  assert.strictEqual(r.siblingCount, null);
+  assert.match(r.detail, /NOT a cold start/);
+});
+
+t('readingFor: base DECHIREE (ecriture interrompue) -> unreadable aussi', () => {
+  _clearCache();
+  assert.strictEqual(readingFor(JETON, { dbPath: ecrire('rf-dechire.json', '{"a":{') }).state, 'unreadable');
+});
+
+t('readingFor TEMOIN: un hit rend le compte, le drapeau plancher, la date — et tolere la casse', () => {
+  _clearCache();
+  const p = ecrire('rf-hit.json', JSON.stringify({ [JETON]: { siblingCount: 7, siblingCountCensored: true,
+    symbolVerdict: 'observed', lastSeen: '2026-08-10T00:00:00.000Z' } }));
+  const r = readingFor(JETON.toUpperCase().replace('0X', '0x'), { dbPath: p });
+  assert.strictEqual(r.state, 'hit');
+  assert.strictEqual(r.siblingCount, 7);
+  assert.strictEqual(r.siblingCountCensored, true, 'un PLANCHER doit voyager comme tel');
+  assert.strictEqual(r.observedAt, '2026-08-10T00:00:00.000Z');
+});
+
+t('readingFor: hit SANS drapeau de censure -> null, le troisieme etat — jamais false par defaut', () => {
+  _clearCache();
+  const p = ecrire('rf-sansflag.json', JSON.stringify({ [JETON]: { siblingCount: 3, lastSeen: '2026-08-10T00:00:00.000Z' } }));
+  const r = readingFor(JETON, { dbPath: p });
+  assert.strictEqual(r.siblingCountCensored, null, '« le radar n a rien ecrit » n est pas « compte etabli »');
+});
+
+t('readingFor: token inconnu d une base SAINE -> miss, qui decrit le token et pas une panne', () => {
+  _clearCache();
+  const p = ecrire('rf-miss.json', JSON.stringify({ ['0x' + 'cd'.repeat(20)]: { siblingCount: 1 } }));
+  const r = readingFor(JETON, { dbPath: p });
+  assert.strictEqual(r.state, 'miss');
+  assert.match(r.detail, /never been observed/);
+});
+
+t('readingFor BORNE: une entree qui n est pas une adresse -> miss dit, rien n est cherche', () => {
+  const r = readingFor('bonjour', { dbPath: ecrire('rf-nonadresse.json', '{}') });
+  assert.strictEqual(r.state, 'miss');
+  assert.match(r.detail, /not a 0x address/);
+});
+
+t('readingFor: une panne n est PAS mise en cache — le fichier repare est relu', () => {
+  _clearCache();
+  const p = ecrire('rf-repare.json', '{"a":{');
+  assert.strictEqual(readingFor(JETON, { dbPath: p }).state, 'unreadable');
+  fs.writeFileSync(p, JSON.stringify({ [JETON]: { siblingCount: 2, lastSeen: '2026-08-10T00:00:00.000Z' } }));
+  assert.strictEqual(readingFor(JETON, { dbPath: p }).state, 'hit', 'la reparation doit etre vue');
 });
 
 try { fs.rmSync(TMP2, { recursive: true, force: true }); } catch { /* best effort */ }

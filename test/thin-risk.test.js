@@ -242,6 +242,41 @@ t('la valeur FOURNIE par l appelant prime sur la base, et le dit', async () => {
   assert.strictEqual(r.observedRisk.applies, true);
 });
 
+/* ── LES DEUX ETATS QUE PERSONNE N'AVAIT BRANCHES AU BOUT: base ILLISIBLE et base ABSENTE ─────────────
+ * `readingFor` les distingue depuis le 2026-07-28, `vetMeme` fait voyager `lu.detail` — mais aucun cas
+ * ne l'ATTESTAIT dans la reponse payee. La distinction qui compte: « illisible » ne doit JAMAIS se lire
+ * comme « jamais observe ». L'un accuse notre panne, l'autre decrit le token; les confondre fait porter
+ * notre incident au token — never-accuse-on-own-incompleteness, dans une route facturee. */
+
+t('★ base ILLISIBLE (0 octet): la panne voyage dans la source, et ne se lit PAS comme un miss', async () => {
+  _clearCache();
+  const zero = path.join(os.tmpdir(), 'thin-risk-db-zero.json');
+  fs.writeFileSync(zero, '');
+  const r = await vetMeme({ symbol: 'TEST', chainId: 'base', address: ADR, dbPath: zero,
+    fetchImpl: async () => paires(ADR) });
+  assert.strictEqual(r.observedRisk.rate, null, 'rien ne se publie sur une base en panne');
+  assert.strictEqual(r.observedRisk.boundChecked, false);
+  assert.ok(/cannot be read/.test(r.observedRisk.siblingCountSource),
+    'la PANNE doit etre nommee: ' + r.observedRisk.siblingCountSource);
+  assert.ok(/NOT a cold start/.test(r.observedRisk.siblingCountSource),
+    'et distinguee d un demarrage a froid');
+  assert.ok(!/never been observed/.test(r.observedRisk.siblingCountSource),
+    'NOTRE panne ne doit jamais se lire comme une propriete du token');
+});
+
+t('★ base ABSENTE (noeud neuf): l etat NORMAL est nomme, sans accuser le token ni inventer une panne', async () => {
+  _clearCache();
+  const r = await vetMeme({ symbol: 'TEST', chainId: 'base', address: ADR,
+    dbPath: path.join(os.tmpdir(), 'thin-risk-db-inexistante', 'tokens.json'),
+    fetchImpl: async () => paires(ADR) });
+  assert.strictEqual(r.observedRisk.rate, null);
+  assert.ok(/no observation database/.test(r.observedRisk.siblingCountSource),
+    'l absence est dite: ' + r.observedRisk.siblingCountSource);
+  assert.ok(/NORMAL state/.test(r.observedRisk.siblingCountSource), 'et qualifiee de normale');
+  assert.ok(!/cannot be read/.test(r.observedRisk.siblingCountSource),
+    'absent et illisible ne sont pas la meme chose — dans la reponse servie aussi');
+});
+
 /* ══════════════════════════════════════════════════════════════════════════════════════════════════
  * LA GARDE DE LANGUE — et pourquoi elle vaut plus que la correction qu'elle protège.
  *
@@ -376,7 +411,9 @@ t('★ CABLAGE, le cas qui manquait — un token dont le compte est un PLANCHER 
   assert.ok(/FLOOR, not a count/.test(r.observedRisk.why), r.observedRisk.why);
 });
 
-const ATTENDUS = 22;
+/* 22 -> 24 le 2026-08-16: les deux etats jamais attestes dans la reponse payee — base ILLISIBLE
+ * (la panne voyage et ne se lit pas comme un miss) et base ABSENTE (l etat normal est nomme). */
+const ATTENDUS = 24;
 Promise.all(encours).then(() => {
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   if (pass + fail !== ATTENDUS) {
