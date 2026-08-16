@@ -201,9 +201,18 @@
         dernierURI = res.j.paymentURI;
         $('bill').textContent = res.j.bill;
         $('sortie').hidden = false;
+        /* ⛔ La bibliotheque vendue expose `qrcode(...)` — une FABRIQUE minuscule — et PAS un
+           constructeur `QRCode`. Ecrit de memoire la premiere fois, ca rendait « QR indisponible »
+           en silence: la page marchait, le QR manquait. p2p.html l'appelle correctement depuis
+           toujours, a dix lignes d'ici. Sonder l'interface avant d'ecrire contre elle vaut aussi
+           pour ses propres fichiers. */
         $('qr').innerHTML = '';
-        try { new QRCode($('qr'), { text: dernierURI, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M }); }
-        catch (e) { $('qr').textContent = 'QR indisponible — utilisez le lien ci-dessous.'; }
+        try {
+          var qr = qrcode(0, 'M');
+          qr.addData(dernierURI);
+          qr.make();
+          $('qr').innerHTML = qr.createImgTag(6);
+        } catch (e) { $('qr').textContent = 'QR indisponible — utilisez le lien ci-dessous.'; }
         /* Le suivi se pre-remplit depuis la facture EMISE: recopier un total a la main est
            exactement la faute qui ferait juger un autre document. */
         $('c-to').value = inv.merchant.address;
