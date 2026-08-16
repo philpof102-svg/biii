@@ -167,6 +167,55 @@ function req(server, method, p, body, headers) {
     assert.match(r.reason, /too old/i);
   });
 
+  /* ── CE QUI REND L'ABSENCE DE LIAISON PAR ROUTE INOFFENSIVE — ET LE JOUR OU CA CESSERA ──────────
+   *
+   * Mesure du 2026-08-16 sur le noeud DEPLOYE: les trois routes payantes servent un defi 402
+   * IDENTIQUE — meme `amount` (250000), meme `payTo`, et un `resource` generique
+   * (`…/x402`, sans le chemin de la route). `challenge402()` RECOIT pourtant un parametre `route`
+   * (lib/server.js le passe) et ne s'en sert nulle part. Cote reglement, `settleOnce({ proof,
+   * merchant, needMicro })` borne le txHash, le destinataire et le MONTANT — jamais la route.
+   *
+   * ⚖️ CE N'EST PAS UNE FUITE AUJOURD'HUI, et il ne faut pas le survendre: les trois routes valent
+   * le MEME prix (`need` est calcule une seule fois depuis BIII_VET_PRICE_USD, pas par route), et
+   * un paiement redime EXACTEMENT un verdict. Payer $0,25 et appeler n'importe laquelle des trois
+   * est donc exactement ce qui a ete achete.
+   *
+   * ⛔ CE QUI LE RENDRAIT LETAL TIENT EN UNE LIGNE: le jour ou une route coute PLUS CHER qu'une
+   * autre, un appelant paierait le prix de la moins chere et appellerait la plus chere — le
+   * reglement ne regarde pas laquelle. Et le piege est deja arme d'une facon particulierement
+   * traitre: le parametre `route` EXISTE, il est PASSE, et il est SILENCIEUSEMENT JETE. Quiconque
+   * lit `challenge402({ …, route })` conclura que la route est prise en compte.
+   *
+   * Ce cas epingle donc l'INVARIANT qui rend le design actuel sur — un prix unique — pour que sa
+   * rupture soit BRUYANTE au lieu d'etre une modification anodine de configuration. */
+  await t('★ LE PRIX EST UNIQUE POUR TOUTES LES ROUTES PAYANTES — sinon le reglement doit borner la ROUTE', () => {
+    const { challenge402, BAZAAR_ROUTES } = require('../lib/openapi');
+    const routes = Object.keys(BAZAAR_ROUTES || {});
+    assert.ok(routes.length >= 2, 'succes vide: ' + routes.length + ' route(s) payante(s) lue(s) — rien a comparer');
+
+    const montants = new Set();
+    for (const r of routes) {
+      const { body } = challenge402({ origin: 'https://x', merchant: M, route: r });
+      montants.add(String(body.accepts[0].amount));
+    }
+    assert.strictEqual(montants.size, 1,
+      'les routes payantes n ont plus le MEME prix (' + [...montants].join(' / ') + '). Or `settleOnce` ne '
+      + 'borne PAS la route: un appelant peut payer le prix le plus bas et appeler la route la plus chere. '
+      + 'Avant de differencier les prix, il faut lier le reglement a la route — et faire porter cette route '
+      + 'par le defi 402 servi, qui aujourd hui rend un `resource` generique.');
+  });
+
+  await t('le parametre `route` de challenge402 est aujourd hui SANS EFFET — fige, pour que l ajouter se voie', () => {
+    /* On ne juge pas: on CONSTATE. Ce cas devient rouge le jour ou quelqu un branche `route` — et
+     * c est exactement le moment ou il faut relire le reglement et cette liaison ensemble. */
+    const { challenge402 } = require('../lib/openapi');
+    const a = challenge402({ origin: 'https://x', merchant: M, route: '/x402/vet-address' }).body.accepts[0];
+    const b = challenge402({ origin: 'https://x', merchant: M, route: '/x402/vet-meme' }).body.accepts[0];
+    assert.deepStrictEqual(a, b,
+      'le defi 402 DIFFERE desormais selon la route — bonne nouvelle, mais alors `settleOnce` doit lier le '
+      + 'paiement a cette route, et ce cas doit etre reecrit pour l exiger au lieu de constater l inverse.');
+  });
+
   server.close();
   try { fs.unlinkSync(process.env.BIII_X402_CONSUMED); } catch {}
   console.log(`\nx402-replay: ${pass} passed, ${fail} failed`);
