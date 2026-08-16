@@ -133,10 +133,43 @@ function valider(files, root) {
   return casses;
 }
 
+/**
+ * effondrement — la base d'observations ne retrecit JAMAIS; un lot qui la retrecit ne part pas seul.
+ *
+ * ⚠️ LE SCENARIO QUE CE GARDE ATTRAPE, et que `valider` ne peut PAS voir: dans le writer epingle,
+ * `readJSON(TOKENS, {})` lit une base ILLISIBLE comme une base VIDE. Un process tue a mi-ecriture ou
+ * un volume plein (deja vecu ici le 07/06) laisse un fichier dechire; au run suivant le radar repart
+ * de `{}` et son `writeJSON` remplace ~2 800 tokens de memoire par un JSON parfaitement VALIDE de
+ * quelques entrees. `valider` le laisse passer — il parse. Ce qui le trahit, c'est la TAILLE.
+ *
+ * ⚖️ LE SEUIL EST UNE MESURE, pas un choix: 60 commits de `tokens.json` inspectes le 2026-08-16
+ * (2026-08-12 → 2026-08-16, 2470 → 2801 tokens), ZERO retrecissement — la croissance est monotone,
+ * +3 a +16 par heure. Donc TOUT retrecissement est une alarme, sans seuil a calibrer. Si un jour une
+ * retention legitime retire des tokens, ce garde refusera aussi — et c'est voulu: ce jour-la un humain
+ * commite a la main et met a jour cette regle EN CONNAISSANCE, plutot qu'un script qui laisse passer
+ * les deux cas parce qu'il ne sait pas les distinguer.
+ *
+ * BORNE: ce garde ne couvre que `tokens.json` — la seule base dont la monotonie est MESUREE.
+ * `registry.json` (agent-watch) a probablement le meme profil mais personne ne l'a mesure; l'etendre
+ * sans mesure serait exactement le defaut « un seuil qui fait la mesure ».
+ */
+function effondrement(avantN, apresN) {
+  if (typeof avantN !== 'number' || typeof apresN !== 'number') return { ok: true, detail: 'nothing to compare' };
+  if (apresN < avantN) {
+    return { ok: false, avantN, apresN,
+      detail: 'tokens.json SHRANK from ' + avantN + ' to ' + apresN + ' entries. Measured across 60 commits'
+        + ' this base only ever GROWS, so a shrink is the signature of the pinned writer reading a torn file'
+        + ' as an empty database (readJSON fallback {}) and rewriting history from scratch. Committing this'
+        + ' would publish the erasure. If the shrink is intentional (a new retention rule), commit by hand'
+        + ' and update the effondrement guard IN THE SAME CHANGE.' };
+  }
+  return { ok: true, avantN, apresN };
+}
+
 /* Exporte AVANT le flux, et le flux ne s'execute qu'en lancement direct. Un `return` au niveau module est
  * legal en CommonJS (le module est enveloppe dans une fonction), donc requerir ce fichier depuis un test
  * ne lance AUCUNE commande git — ce qui est la seule facon de tester un committeur sans en devenir un. */
-module.exports = { classer, valider, DATA_PATHS };
+module.exports = { classer, valider, effondrement, DATA_PATHS };
 if (require.main !== module) return;
 
 // ── 1. is the tree in a state an unattended script may act on? ─────────────────
@@ -207,6 +240,19 @@ if (casses.length) {
     + '\n         Committing now would publish a torn database as the truth. This state is transient:'
     + '\n         the next hourly run commits the finished write. If it persists across runs, a human'
     + '\n         needs to look at the file, not a script.');
+}
+
+// ── 2c. did the observation base COLLAPSE? valider cannot see this: a reset base parses fine ──
+const TOKENS_REL = 'data/token-radar/tokens.json';
+if (changed.includes(TOKENS_REL)) {
+  let avantN = null;
+  let apresN = null;
+  try { avantN = Object.keys(JSON.parse(git('show', 'HEAD:' + TOKENS_REL))).length; } catch { avantN = null; }
+  /* HEAD n'a pas le fichier (premiere publication) ou ne se parse pas: rien a comparer — le garde ne
+   * juge que quand les DEUX bornes existent, sinon il inventerait une base de comparaison. */
+  try { apresN = Object.keys(JSON.parse(fs.readFileSync(path.join(ROOT, TOKENS_REL), 'utf8'))).length; } catch { apresN = null; }
+  const e = effondrement(avantN, apresN);
+  if (!e.ok) refuse(e.detail);
 }
 
 // ── 3. describe the change in terms someone reading the log will understand ───

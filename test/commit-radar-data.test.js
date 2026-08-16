@@ -25,7 +25,7 @@ const os = require('node:os');
 const path = require('node:path');
 /* Requérir ce fichier ne doit lancer AUCUNE commande git — c'est la seule façon de tester un committeur
  * sans en devenir un. Si ce require avait un effet de bord, le test le déclencherait à chaque suite. */
-const { classer, valider, DATA_PATHS } = require('../scripts/commit-radar-data.js');
+const { classer, valider, effondrement, DATA_PATHS } = require('../scripts/commit-radar-data.js');
 
 let pass = 0, fail = 0;
 const t = (n, fn) => { try { fn(); pass++; console.log('  ✓ ' + n); } catch (e) { fail++; console.log('  ✗ ' + n + '\n      ' + (e && e.message)); } };
@@ -139,6 +139,42 @@ t('valider est CÂBLÉ dans le flux, avant le staging — pas seulement exporté
   assert.ok(iChanged > 0 && iValider > 0 && iAdd > 0, 'les trois repères existent');
   assert.ok(iChanged < iValider && iValider < iAdd, 'valider court APRÈS le tri du lot et AVANT le staging');
   assert.ok(/refuse\(/.test(src.slice(iValider, iValider + 600)), 'un lot cassé se REFUSE, il ne se journalise pas');
+});
+
+/* ── effondrement — une base VALIDE mais RASÉE ne doit pas se publier ────────────────────────────────
+ *
+ * Le scénario que `valider` ne peut PAS voir: le writer épinglé lit une base déchirée comme `{}`
+ * (readJSON fallback) et réécrit ~2 800 tokens de mémoire en un JSON parfaitement parseable de
+ * quelques entrées. Ce qui le trahit est la TAILLE: mesuré sur 60 commits (2470→2801), la base ne
+ * rétrécit JAMAIS. Prouvé en bac à sable: 500→3 entrées valides = REFUSED; 500→502 = commit. */
+
+t('effondrement: un rétrécissement REFUSE — la base ne rétrécit jamais (mesuré sur 60 commits)', () => {
+  const r = effondrement(500, 3);
+  assert.strictEqual(r.ok, false);
+  assert.ok(r.detail.includes('SHRANK'), 'le refus nomme le rétrécissement');
+  assert.ok(r.detail.includes('500') && r.detail.includes('3'), 'les deux bornes voyagent avec le refus');
+});
+
+t('effondrement TÉMOIN: croissance et stagnation passent', () => {
+  assert.strictEqual(effondrement(500, 502).ok, true);
+  assert.strictEqual(effondrement(500, 500).ok, true);
+});
+
+t('effondrement BORNE: sans les DEUX bornes, rien n est jugé — première publication comprise', () => {
+  /* HEAD sans le fichier (première publication) ou illisible: inventer une base de comparaison serait
+   * le défaut « un seuil qui fait la mesure ». On ne juge que ce qui se mesure. */
+  assert.strictEqual(effondrement(null, 3).ok, true);
+  assert.strictEqual(effondrement(500, null).ok, true);
+});
+
+t('effondrement est CÂBLÉ après valider et avant le staging', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'commit-radar-data.js'), 'utf8');
+  const iValider = src.indexOf('valider(changed, ROOT)');
+  const iEff = src.indexOf('effondrement(avantN, apresN)', src.indexOf('module.exports'));
+  const iAdd = src.indexOf("git('add'");
+  assert.ok(iValider > 0 && iEff > 0 && iAdd > 0, 'les trois repères existent');
+  assert.ok(iValider < iEff && iEff < iAdd, 'l ordre est: valider, effondrement, staging');
+  assert.ok(/refuse\(e\.detail\)/.test(src), 'un effondrement se REFUSE, il ne se journalise pas');
 });
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
