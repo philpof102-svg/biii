@@ -1,6 +1,6 @@
 {
-  "updatedAt": "2026-08-18T12:43:29.254Z",
-  "tokensTracked": 3180,
+  "updatedAt": "2026-08-18T13:45:39.618Z",
+  "tokensTracked": 3185,
   "rugsObserved": 2284,
   "warnedBeforeTheRug": 1701,
   "ofWhichStrong": 921,
@@ -12,9 +12,9 @@
   "flaggedButStillAlive": 169,
   "strongCallsTotal": 1090,
   "strongCallsRight": 921,
-  "strongCallsWrong": 159,
-  "strongCallsOpen": 10,
-  "strongCallsResolved": 1080,
+  "strongCallsWrong": 160,
+  "strongCallsOpen": 9,
+  "strongCallsResolved": 1081,
   "maturityWindowHours": 14,
   "beyondWindowRugs": 113,
   "slowestRugHours": 393.6,
@@ -32,7 +32,7 @@
   "verdictsWithoutBasis": 0,
   "preBasisRows": 214,
   "armedPowersObserved": 87,
-  "basisRecorded": 2966,
+  "basisRecorded": 2971,
   "ownerStateReadable": 417,
   "note": "warnRate = share of observed rugs carrying ANY warning at first sight; strongRate = share we called rug_ready or high_risk. Both are published because they say different things: a caution that rugs means the warning was there but too quiet to act on. abstained = rugs we had called unknown, which is honest but useless to a buyer. missedOutright = rugs we had called clean, the only truly damaging error — but read cleanVerdictsEmitted first: at 0 clean verdicts ever given, a 0 there is trivial rather than earned. THE PRECISION FIGURES: there are two and neither may be quoted alone. A strong call on a token that has not rugged is not an error yet, it is OPEN (strongCallsOpen) — rugs resolve in about an hour while a false alarm only proves itself by surviving maturityWindowHours, so counting every live flag as a miss permanently depressed the number with calls that had not had time to answer. strongPrecisionResolved grades only the calls whose outcome is known and is therefore optimistic; strongPrecisionWorstCase assumes every open call is wrong and is therefore pessimistic. The truth is between them, and it moves as the open ones resolve. A buyer acting today should read the worst case."
 }
