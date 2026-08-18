@@ -425,7 +425,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.autorfp/mcp",
-      "lastSeen": "2026-08-17T18:47:53.939Z"
+      "lastSeen": "2026-08-18T06:54:27.814Z"
     },
     "https://api.auxen.ai/mcp": {
       "verdict": "unreachable",
@@ -434,7 +434,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.auxen/auxen",
-      "lastSeen": "2026-08-17T18:47:55.270Z"
+      "lastSeen": "2026-08-18T06:54:29.034Z"
     },
     "https://aviado.ai/api/mcp": {
       "verdict": "answers",
@@ -443,7 +443,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.aviado/health",
-      "lastSeen": "2026-08-17T18:47:58.354Z"
+      "lastSeen": "2026-08-18T06:54:30.450Z"
     },
     "https://mcp.neuroautomata.axonagentic.ai/mcp": {
       "verdict": "unauditable",
@@ -452,7 +452,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.axonagentic/neuroautomata",
-      "lastSeen": "2026-08-17T18:48:01.812Z"
+      "lastSeen": "2026-08-18T06:54:34.481Z"
     },
     "https://mcp.backengine.ai/mcp": {
       "verdict": "unreachable",
@@ -884,7 +884,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.b77/ai-media-studio",
-      "lastSeen": "2026-08-17T18:48:02.783Z"
+      "lastSeen": "2026-08-18T06:54:35.412Z"
     },
     "https://apple-search-ads.b77.ai/mcp": {
       "verdict": "unauditable",
@@ -893,7 +893,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.b77/apple-search-ads",
-      "lastSeen": "2026-08-17T18:48:03.737Z"
+      "lastSeen": "2026-08-18T06:54:36.298Z"
     },
     "https://chess-results.b77.ai/mcp": {
       "verdict": "unauditable",
@@ -902,7 +902,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.b77/chess-results",
-      "lastSeen": "2026-08-17T18:48:04.702Z"
+      "lastSeen": "2026-08-18T06:54:37.189Z"
     },
     "https://feedback.b77.ai/mcp": {
       "verdict": "unauditable",
@@ -911,7 +911,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.b77/feedback",
-      "lastSeen": "2026-08-17T18:48:05.675Z"
+      "lastSeen": "2026-08-18T06:54:38.076Z"
     },
     "https://fibalo.b77.ai/mcp": {
       "verdict": "unauditable",
@@ -920,7 +920,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.b77/fibalo",
-      "lastSeen": "2026-08-17T18:48:06.649Z"
+      "lastSeen": "2026-08-18T06:54:39.242Z"
     },
     "https://file-storage.b77.ai/mcp": {
       "verdict": "unauditable",
@@ -929,7 +929,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.b77/file-storage",
-      "lastSeen": "2026-08-17T18:48:07.642Z"
+      "lastSeen": "2026-08-18T06:54:40.768Z"
     },
     "https://google-ads.b77.ai/mcp": {
       "verdict": "unauditable",
@@ -938,7 +938,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.b77/google-ads",
-      "lastSeen": "2026-08-17T18:48:08.570Z"
+      "lastSeen": "2026-08-18T06:54:41.645Z"
     },
     "https://google-news.b77.ai/mcp": {
       "verdict": "unauditable",
@@ -947,7 +947,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.b77/google-news",
-      "lastSeen": "2026-08-17T18:48:09.535Z"
+      "lastSeen": "2026-08-18T06:54:42.517Z"
     },
     "https://google-search-console.b77.ai/mcp": {
       "verdict": "unauditable",
@@ -956,7 +956,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.b77/google-search-console",
-      "lastSeen": "2026-08-17T18:48:10.463Z"
+      "lastSeen": "2026-08-18T06:54:43.397Z"
     },
     "https://kinnovis-storage.b77.ai/mcp": {
       "verdict": "unauditable",
@@ -965,7 +965,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.b77/kinnovis-storage",
-      "lastSeen": "2026-08-17T18:48:11.386Z"
+      "lastSeen": "2026-08-18T06:54:44.356Z"
     },
     "https://knowledge-base.b77.ai/mcp": {
       "verdict": "unauditable",
@@ -974,7 +974,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.b77/knowledge-base",
-      "lastSeen": "2026-08-17T18:48:12.286Z"
+      "lastSeen": "2026-08-18T06:54:45.240Z"
     },
     "https://nightscout.b77.ai/mcp": {
       "verdict": "unauditable",
@@ -983,7 +983,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.b77/nightscout",
-      "lastSeen": "2026-08-17T18:48:13.269Z"
+      "lastSeen": "2026-08-18T06:54:46.130Z"
     },
     "https://seo-content-factory.b77.ai/mcp": {
       "verdict": "unauditable",
@@ -992,7 +992,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.b77/seo-content-factory",
-      "lastSeen": "2026-08-17T20:48:21.366Z"
+      "lastSeen": "2026-08-18T06:54:47.009Z"
     },
     "https://teamwork.b77.ai/mcp": {
       "verdict": "unauditable",
@@ -1001,7 +1001,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.b77/teamwork",
-      "lastSeen": "2026-08-17T20:48:22.354Z"
+      "lastSeen": "2026-08-18T06:54:47.921Z"
     },
     "https://time.b77.ai/mcp": {
       "verdict": "unauditable",
@@ -1010,7 +1010,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.b77/time",
-      "lastSeen": "2026-08-17T20:48:23.351Z"
+      "lastSeen": "2026-08-18T06:54:48.796Z"
     },
     "https://web-analytics.b77.ai/mcp": {
       "verdict": "unauditable",
@@ -1028,7 +1028,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.awardcast/federal-contracts",
-      "lastSeen": "2026-08-17T18:48:00.441Z"
+      "lastSeen": "2026-08-18T06:54:33.162Z"
     },
     "https://bidclub.ai/api/mcp": {
       "verdict": "answers",
@@ -1058,5 +1058,5 @@
       "lastSeen": "2026-08-18T04:53:26.642Z"
     }
   },
-  "offset": 64
+  "offset": 84
 }
