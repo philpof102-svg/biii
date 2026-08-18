@@ -34,7 +34,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "agency.lona/trading",
-      "lastSeen": "2026-08-17T12:44:16.742Z"
+      "lastSeen": "2026-08-18T00:51:08.707Z"
     },
     "https://agoclnqfyinwjxdmjnns.supabase.co/functions/v1/mcp": {
       "verdict": "unauditable",
@@ -43,7 +43,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.1325/mcp",
-      "lastSeen": "2026-08-17T12:44:18.998Z"
+      "lastSeen": "2026-08-18T00:51:10.838Z"
     },
     "https://mcp.aarna.ai/mcp": {
       "verdict": "answers",
@@ -52,7 +52,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.aarna/atars-mcp",
-      "lastSeen": "2026-08-17T12:44:20.539Z"
+      "lastSeen": "2026-08-18T00:51:12.366Z"
     },
     "https://mcp.abmeter.ai": {
       "verdict": "unauditable",
@@ -61,7 +61,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.abmeter/abmeter",
-      "lastSeen": "2026-08-17T12:44:22.451Z"
+      "lastSeen": "2026-08-18T00:51:13.979Z"
     },
     "https://api.adadvisor.ai/mcp": {
       "verdict": "unauditable",
@@ -70,7 +70,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.adadvisor/mcp-server",
-      "lastSeen": "2026-08-17T12:44:25.675Z"
+      "lastSeen": "2026-08-18T00:51:17.160Z"
     },
     "https://mcp.adramp.ai": {
       "verdict": "unauditable",
@@ -79,7 +79,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.adramp/google-ads",
-      "lastSeen": "2026-08-17T12:44:29.129Z"
+      "lastSeen": "2026-08-18T00:51:20.532Z"
     },
     "https://api.adside.ai/mcp": {
       "verdict": "unauditable",
@@ -88,7 +88,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.adside/adside",
-      "lastSeen": "2026-08-17T12:44:30.149Z"
+      "lastSeen": "2026-08-18T00:51:21.664Z"
     },
     "https://mcp.adweave.ai/meta-ads-mcp": {
       "verdict": "unauditable",
@@ -97,7 +97,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.adweave/meta-ads-mcp",
-      "lastSeen": "2026-08-17T12:44:31.383Z"
+      "lastSeen": "2026-08-18T00:51:22.685Z"
     },
     "https://agentberg.ai/mcp": {
       "verdict": "unauditable",
@@ -106,7 +106,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agentberg/agentberg",
-      "lastSeen": "2026-08-17T12:44:34.342Z"
+      "lastSeen": "2026-08-18T00:51:25.465Z"
     },
     "https://api.agentdm.ai/api/v1/grid": {
       "verdict": "unauditable",
@@ -115,7 +115,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agentdm/agentdm",
-      "lastSeen": "2026-08-17T12:44:35.450Z"
+      "lastSeen": "2026-08-18T00:51:26.555Z"
     },
     "https://api.agentdm.ai/mcp/v1/grid": {
       "verdict": "unauditable",
@@ -124,7 +124,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agentdm/agentdm",
-      "lastSeen": "2026-08-17T12:44:36.332Z"
+      "lastSeen": "2026-08-18T00:51:27.445Z"
     },
     "https://api.agentic-news.ai/mcp": {
       "verdict": "unauditable",
@@ -133,7 +133,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agentic-news/mcp",
-      "lastSeen": "2026-08-17T14:45:28.738Z"
+      "lastSeen": "2026-08-18T00:51:28.515Z"
     },
     "https://agenticfabricationnetwork.ai/mcp": {
       "verdict": "answers",
@@ -142,7 +142,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.agenticfabricationnetwork/ufp",
-      "lastSeen": "2026-08-17T14:45:31.690Z"
+      "lastSeen": "2026-08-18T00:51:33.215Z"
     },
     "https://api.agenticshelf.ai/m/graffeo/mcp": {
       "verdict": "unreachable",
@@ -151,7 +151,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agenticshelf/graffeo",
-      "lastSeen": "2026-08-17T14:45:32.995Z"
+      "lastSeen": "2026-08-18T00:51:34.260Z"
     },
     "https://api.agenticshelf.ai/mcp": {
       "verdict": "unreachable",
@@ -722,7 +722,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.agenticaffiliate/affiliate-networks-mcp",
-      "lastSeen": "2026-08-17T14:45:29.780Z"
+      "lastSeen": "2026-08-18T00:51:31.657Z"
     },
     "https://analyticslegends.ai/mcp": {
       "verdict": "answers",
@@ -740,7 +740,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "ai.afmr/discovery",
-      "lastSeen": "2026-08-17T12:44:32.622Z"
+      "lastSeen": "2026-08-18T00:51:23.773Z"
     },
     "https://agentplaybooks.ai/api/mcp/manage": {
       "verdict": "answers",
@@ -776,7 +776,7 @@
       "movesValue": [],
       "wantsSecret": [],
       "name": "agency.goji/goji",
-      "lastSeen": "2026-08-17T12:44:15.731Z"
+      "lastSeen": "2026-08-18T00:51:07.651Z"
     },
     "https://rx.agentlookups.ai/mcp": {
       "verdict": "answers",
@@ -851,13 +851,13 @@
       "lastSeen": "2026-08-17T18:47:53.216Z"
     },
     "https://mcp.adoraads.ai/beauty": {
-      "verdict": "answers",
-      "tools": 6,
-      "names": "brand_spotlight,fire_billing_event,get_shopper_prefs,routine_builder,skin_match,sponsored_search",
-      "movesValue": [],
-      "wantsSecret": [],
+      "verdict": "unreachable",
+      "tools": null,
+      "names": null,
+      "movesValue": null,
+      "wantsSecret": null,
       "name": "ai.adoraads/beauty",
-      "lastSeen": "2026-08-17T12:44:26.924Z"
+      "lastSeen": "2026-08-18T00:51:18.291Z"
     },
     "https://mcp.adplane.ai": {
       "verdict": "unauditable",
@@ -866,7 +866,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.adplane/google-ads",
-      "lastSeen": "2026-08-17T12:44:27.969Z"
+      "lastSeen": "2026-08-18T00:51:19.393Z"
     },
     "https://actwise.ai/ideation/mcp/v1": {
       "verdict": "unauditable",
@@ -875,7 +875,7 @@
       "movesValue": null,
       "wantsSecret": null,
       "name": "ai.actwise/ideation",
-      "lastSeen": "2026-08-17T12:44:24.517Z"
+      "lastSeen": "2026-08-18T00:51:15.936Z"
     },
     "https://ai-media-studio.b77.ai/mcp": {
       "verdict": "unauditable",
@@ -1049,5 +1049,5 @@
       "lastSeen": "2026-08-17T22:49:47.756Z"
     }
   },
-  "offset": 4
+  "offset": 24
 }
