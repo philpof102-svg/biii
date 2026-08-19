@@ -413,7 +413,76 @@ t('★ CABLAGE, le cas qui manquait — un token dont le compte est un PLANCHER 
 
 /* 22 -> 24 le 2026-08-16: les deux etats jamais attestes dans la reponse payee — base ILLISIBLE
  * (la panne voyage et ne se lit pas comme un miss) et base ABSENTE (l etat normal est nomme). */
-const ATTENDUS = 24;
+/* ══ LE REPLI SUR LE CANONIQUE — LE CHEMIN QUE LA FICHE VEND, ET LE SEUL QUI NE LISAIT RIEN ═══════
+ * `address` est OPTIONNEL sur `till_vet_meme`, et sa description promet: « omit it and this node checks
+ * its own observation database for free ». Or le repli passait `canonical`, un OBJET, la ou
+ * `readingFor` attend une chaine — il tombait donc sur la garde d entree et rendait `miss` SANS
+ * jamais ouvrir la base. Mesure du 2026-08-19, meme token et meme base fabriquee:
+ *     avec `address`  -> siblingCount=3, boundChecked=true,  rate=0.189
+ *     sans `address`  -> siblingCount=undef, boundChecked=false, rate=null
+ * ⚠️ Les quatre cas ci-dessous tiennent les DEUX bornes: le repli doit LIRE, et il ne doit surtout pas
+ * elargir le refus — une adresse malformee FOURNIE par l appelant garde sa phrase d entree rejetee. */
+
+t('★ REPLI — sans `address`, un token observe leve la retenue VIA LE CANONIQUE', async () => {
+  _clearCache();
+  const db = baseFabriquee(3);
+  const r = await vetMeme({ symbol: 'TEST', chainId: 'base', dbPath: db,
+    fetchImpl: async () => paires(ADR) });
+  assert.strictEqual(r.canonical.address, ADR, 'le canonique est bien celui de la base fabriquee');
+  assert.strictEqual(r.observedRisk.siblingCount, 3,
+    'le repli doit LIRE: il passait un objet a une garde qui attend une chaine');
+  assert.strictEqual(r.observedRisk.boundChecked, true);
+  assert.strictEqual(r.observedRisk.siblingCountSource, 'this node own observation');
+  assert.ok(typeof r.observedRisk.rate === 'number', 'le taux doit sortir sans appel reseau');
+  assert.ok(!/not a 0x address/.test(r.observedRisk.siblingCountSource),
+    'NOTRE cablage rate ne doit jamais se lire comme une faute de frappe de l appelant');
+});
+
+t('★ REPLI, cas OPPOSE — un canonique que ce noeud n a jamais vu garde sa retenue', async () => {
+  _clearCache();
+  const db = baseFabriquee(3);
+  const r = await vetMeme({ symbol: 'TEST', chainId: 'base', dbPath: db,
+    fetchImpl: async () => paires(HORS) });
+  assert.strictEqual(r.canonical.address, HORS);
+  assert.strictEqual(r.observedRisk.rate, null, 'rien ne se publie sur un token inconnu de nous');
+  assert.strictEqual(r.observedRisk.boundChecked, false);
+  assert.ok(/never been observed/.test(r.observedRisk.siblingCountSource),
+    'la base A ETE consultee et n a rien: ' + r.observedRisk.siblingCountSource);
+});
+
+t('★ RIEN A CHERCHER — ni address ni canonique: on le DIT, sans inventer une entree malformee', async () => {
+  _clearCache();
+  const db = baseFabriquee(3);
+  const maigre = { pairs: [{ chainId: 'base', baseToken: { symbol: 'TEST', address: ADR, name: 'T' },
+    liquidity: { usd: 5 }, volume: { h24: 1 }, url: 'https://x' }] };
+  const r = await vetMeme({ symbol: 'TEST', chainId: 'base', dbPath: db, fetchImpl: async () => maigre });
+  assert.strictEqual(r.status, 'thin');
+  assert.strictEqual(r.canonical, null);
+  assert.strictEqual(r.observedRisk.rate, null);
+  assert.ok(/no address to look up/.test(r.observedRisk.siblingCountSource),
+    'l absence de cible est nommee: ' + r.observedRisk.siblingCountSource);
+  assert.ok(/gap in this answer, not a finding about the token/.test(r.observedRisk.siblingCountSource),
+    'notre trou ne doit pas se lire comme une propriete du token');
+  assert.ok(!/not a 0x address/.test(r.observedRisk.siblingCountSource),
+    'personne n a fourni d adresse: aucune faute d entree a reprocher');
+});
+
+t('★ BORNE INVERSE — une adresse MALFORMEE fournie garde bien sa phrase d entree rejetee', async () => {
+  _clearCache();
+  const db = baseFabriquee(3);
+  const r = await vetMeme({ symbol: 'TEST', chainId: 'base', address: 'pas-une-adresse', dbPath: db,
+    fetchImpl: async () => paires(ADR) });
+  assert.strictEqual(r.status, 'unknown');
+  assert.ok(/not a 0x address of 40 hex/.test(r.observedRisk.siblingCountSource),
+    'ici l appelant A fourni une entree fautive, et le refus doit le dire: '
+    + r.observedRisk.siblingCountSource);
+  assert.ok(!/no address to look up/.test(r.observedRisk.siblingCountSource),
+    'ne PAS elargir: une adresse fournie et illisible n est pas une absence d adresse');
+});
+
+/* 24 -> 28 le 2026-08-19: le repli sur le canonique ne lisait jamais la base (objet passe a une garde
+ * qui attend une chaine), les deux bornes du refus, et le cas ou il n y a rien a chercher. */
+const ATTENDUS = 28;
 Promise.all(encours).then(() => {
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   if (pass + fail !== ATTENDUS) {
