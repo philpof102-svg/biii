@@ -25,6 +25,9 @@ const path = require('node:path');
 const fs = require('node:fs');
 const FUNDER = require('../lib/funder-registry');
 const SEED = require('../lib/seed-band');
+// ⛔ LA REGLE D'ISSUE VIENT DU CANONIQUE, elle ne se reecrit pas ici. Voir `resolve` plus bas :
+// ce fichier en portait une COPIE, restee sur la version d'avant le correctif du 2026-08-05.
+const { outcomeKnownAt } = require('../lib/prequential');
 
 const DB = process.argv[2] || path.join(__dirname, '..', 'data', 'token-radar', 'tokens.json');
 
@@ -44,9 +47,37 @@ const q = (s, p) => s[Math.min(s.length - 1, Math.ceil(p * s.length) - 1)];
 const W = Math.max(1, Math.ceil(q(lifetimes, 0.95)));
 const slowest = lifetimes[lifetimes.length - 1];
 
-/** Resolved, open, or rugged — the same rule the scorecard uses, so the two never disagree. */
-const resolve = (r) => (r.outcome === 'rugged' ? 'rugged'
-  : ((now - Date.parse(r.firstSeen)) / 3600000 >= W ? 'survived' : 'open'));
+/* Resolved, open, or rugged — la MEME regle que le scorecard, et cette fois c'est vrai.
+ * =====================================================================================
+ * ⛔ CE COMMENTAIRE MENTAIT. Il disait deja « the same rule the scorecard uses, so the two never
+ * disagree », au-dessus d'une COPIE de la regle restee a la version d'avant le correctif du
+ * 2026-08-05. La copie testait l'age depuis la PREMIERE vue :
+ *
+ *     (now - firstSeen) / 3600000 >= W ? 'survived' : 'open'
+ *
+ * Le canonique (`lib/prequential.js:outcomeKnownAt`) exige `min(lastSeen, t) - firstSeen >= W` :
+ * il ne suffit pas que le token ait VIEILLI, il faut l'avoir VU VIVANT a cet age. La difference
+ * n'est pas theorique — `token-radar.js` fait `if (liq == null) continue;` sans regrader, donc un
+ * pool entierement retire (le rug le plus complet qui soit) GELE sa ligne, `lastSeen` cesse
+ * d'avancer, et le token vieillit tranquillement en « survivant ».
+ *
+ * MESURE sur la base reelle (3 212 tokens, W = 14 h, releve du 2026-08-20) :
+ *
+ *                        copie locale      canonique
+ *     survived                    857            530
+ *     open                         63            390
+ *     baseRate                  0.728          0.812
+ *
+ *   · 327 lignes sur 3 212 en desaccord ;
+ *   · 675 des 920 tokens 'live' n'avaient pas ete relus depuis plus de 24 h, 550 depuis plus de
+ *     7 jours — et la copie les comptait tous comme survivants.
+ *
+ * Le LIFT survit (c'est ce qui compte pour le signal), mais chaque taux ABSOLU bougeait de ~8
+ * points. ⚠️ Les taux figes dans `lib/announced-rules.js` (baseRate 0.753) ont ete produits par
+ * l'ancienne regle : ils ne sont PAS corriges ici — ce fichier est gele par convention, et
+ * requalifier un pari annonce apres coup est une decision humaine, pas un correctif.
+ */
+const resolve = (r) => outcomeKnownAt(r, now, W) || 'open';
 
 const span = (now - Math.min(...rows.map((r) => Date.parse(r.firstSeen)))) / 3600000;
 console.log('database  ' + rows.length + ' tokens over ' + span.toFixed(1) + 'h · newest ' + new Date(now).toISOString());
